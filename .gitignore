@@ -63,6 +63,9 @@ local.properties
 **/uploads/
 .env
 .env.*
+!.env.example
+!server/.env.example
+!webApp/.env.example
 application-local.properties
 application-dev.properties
 application-prod.properties

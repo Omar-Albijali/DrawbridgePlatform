@@ -48,24 +48,137 @@ A comprehensive multi-platform retail and e-commerce solution built with Kotlin 
 
 ## 🚀 Getting Started | البدء بالعمل
 
+### Team Local Standard (Recommended) | إعداد موحد للفريق
+
+Use the same local ports for everyone:
+استخدموا نفس المنافذ المحلية للجميع:
+
+- **Server**: `http://localhost:8080`
+- **Web App**: `http://localhost:3000`
+
+### 1) Create local env files | إنشاء ملفات الإعداد المحلية
+
+Linux / macOS:
+
+```bash
+./setup-env.bash
+```
+
+Windows:
+
+```cmd
+setup-env.cmd
+```
+
+Then open `server/.env` and set:
+ثم افتح `server/.env` واضبط القيم التالية:
+
+- `DB_USER`
+- `DB_PASSWORD`
+- `JWT_SECRET`
+
+The rest can stay as default for local team development.
+وباقي القيم يمكن أن تبقى افتراضية للتطوير المحلي للفريق.
+
+### 2) Run backend | تشغيل الخادم
+
+Linux / macOS:
+
+```bash
+./gradlew :server:bootRun
+```
+
+Windows:
+
+```cmd
+gradlew.bat :server:bootRun
+```
+
+### 3) Run web app | تشغيل تطبيق الويب
+
+Linux / macOS:
+
+```bash
+cd webApp
+npm install
+npm run start
+```
+
+Windows:
+
+```cmd
+cd webApp
+npm install
+npm run start
+```
+
+### 4) Build when needed | البناء عند الحاجة
+
+Linux / macOS:
+
+```bash
+./gradlew :shared:jsBrowserDevelopmentLibraryDistribution
+./gradlew :server:build
+cd webApp
+npm run build
+```
+
+Windows:
+
+```cmd
+gradlew.bat :shared:jsBrowserDevelopmentLibraryDistribution
+gradlew.bat :server:build
+cd webApp
+npm run build
+```
+
 ### Build Commands | أوامر البناء
 
 Use the following commands to build the different parts of the project:
 استخدم الأوامر التالية لبناء الأجزاء المختلفة من المشروع:
 
 #### 1. Shared Module | الوحدة المشتركة
-```powershell
+
+Linux / macOS:
+
+```bash
 ./gradlew :shared:jsBrowserDevelopmentLibraryDistribution
 ```
 
+Windows:
+
+```cmd
+gradlew.bat :shared:jsBrowserDevelopmentLibraryDistribution
+```
+
 #### 2. Server | الخادم
-```powershell
+
+Linux / macOS:
+
+```bash
 ./gradlew server:build
 ```
 
+Windows:
+
+```cmd
+gradlew.bat :server:build
+```
+
 #### 3. Web Application | تطبيق الويب
-```powershell
-cmd /c "npm run build"
+
+Linux / macOS:
+
+```bash
+cd webApp
+npm run build
+```
+
+Windows:
+
+```cmd
+cd webApp
+npm run build
 ```
 
 ---
