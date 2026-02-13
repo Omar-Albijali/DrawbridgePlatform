@@ -14,6 +14,8 @@ import Orders from './pages/Orders';
 import OrderDetails from './pages/OrderDetails';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
+import AssistantPage from "./pages/AssistantPage";
+
 
 // Settings Pages
 import Profile from './pages/settings/Profile';
@@ -93,6 +95,11 @@ export const router = createBrowserRouter([
                 path: 'support',
                 element: <SupportPage />
             },
+            {
+                path: 'assistant',
+                element: <AssistantPage />
+            },
+
             {
                 path: 'products',
                 element: <ProductsPage />

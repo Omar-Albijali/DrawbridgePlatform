@@ -12,6 +12,7 @@ import {
     BarChart3,
     ChevronLeft,
     ChevronRight,
+    Bot,
 } from 'lucide-react';
 
 interface NavItem {
@@ -34,6 +35,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
         { label: 'Inventory', path: '/inventory', icon: <Package className="w-5 h-5" /> },
         { label: 'Orders', path: '/orders', icon: <ClipboardList className="w-5 h-5" /> },
         { label: 'Support', path: '/support', icon: <HelpCircle className="w-5 h-5" /> },
+        { label: "Assistant", path: "/assistant", icon: <Bot className="w-5 h-5"/>},
+
     ];
 
     const wholesalerNavItems: NavItem[] = [
