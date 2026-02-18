@@ -36,7 +36,7 @@ class ImageController(
 
         // Delete old profile image if exists
         user.avatar?.let {
-            val oldPath = it.removePrefix("/uploads/")
+            val oldPath = it.removePrefix("/api/uploads/")
             fileStorageService.deleteFile(oldPath)
         }
 
@@ -62,30 +62,49 @@ class ImageController(
     fun uploadProductImage(
         @PathVariable productId: String,
         @RequestParam("file") file: MultipartFile,
-        @RequestParam("altText", defaultValue = "") altText: String
+        @RequestParam("altText", defaultValue = "") altText: String,
+        @RequestParam("sortIndex", required = false) sortIndex: Int?
     ): ResponseEntity<ProductImageResponse> {
-        val productImage = productImageService.uploadProductImage(productId, file, altText)
+        val productImage = productImageService.uploadProductImage(productId, file, altText, sortIndex)
         return ResponseEntity.status(HttpStatus.CREATED).body(
             ProductImageResponse(
                 id = productImage.id,
                 url = productImage.url,
                 altText = productImage.altText,
+                sortIndex = productImage.sortIndex,
                 productId = productImage.productId ?: ""
             )
         )
     }
 
     /**
-     * Get all images for a product
+     * Reorder product images. Accepts an ordered list of image IDs.
+     * The first ID gets sortIndex 0 (main image), second gets 1, etc.
+     */
+    @PutMapping("/products/{productId}/images/reorder")
+    fun reorderImages(
+        @PathVariable productId: String,
+        @RequestBody orderedImageIds: List<String>
+    ): ResponseEntity<Void> {
+        return if (productImageService.reorderImages(productId, orderedImageIds)) {
+            ResponseEntity.ok().build()
+        } else {
+            ResponseEntity.notFound().build()
+        }
+    }
+
+    /**
+     * Get all images for a product (sorted by sortIndex)
      */
     @GetMapping("/products/{productId}/images")
     fun getProductImages(@PathVariable productId: String): ResponseEntity<List<ProductImageResponse>> {
         val images = productImageService.getProductImages(productId)
-        return ResponseEntity.ok(images.map {
+        return ResponseEntity.ok(images.sortedBy { it.sortIndex }.map {
             ProductImageResponse(
                 id = it.id,
                 url = it.url,
                 altText = it.altText,
+                sortIndex = it.sortIndex,
                 productId = it.productId ?: ""
             )
         })

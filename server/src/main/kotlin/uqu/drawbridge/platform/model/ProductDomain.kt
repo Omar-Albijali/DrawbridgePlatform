@@ -73,6 +73,9 @@ open class ProductImage(
     @Column(nullable = false)
     open var altText: String,
 
+    @Column(nullable = false)
+    open var sortIndex: Int = 0,
+
     @Column(name = "productId", insertable = false, updatable = false, nullable = false)
     open var productId: String? = null
 )

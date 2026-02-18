@@ -5,13 +5,16 @@ import org.springframework.transaction.annotation.Transactional
 import uqu.drawbridge.platform.model.*
 import uqu.drawbridge.platform.repository.CategoryRepository
 import uqu.drawbridge.platform.repository.ProductRepository
+import uqu.drawbridge.platform.repository.UserRepository
 import uqu.drawbridge.platform.*
+import java.math.BigDecimal
 
 @Service
 class ProductService(
     private val productRepository: ProductRepository,
     private val categoryRepository: CategoryRepository,
-    private val productDiscountService: ProductDiscountService
+    private val productDiscountService: ProductDiscountService,
+    private val userRepository: UserRepository
 ) {
 
     // ==================== PRODUCT OPERATIONS ====================
@@ -28,6 +31,15 @@ class ProductService(
 
     fun searchProducts(query: String): List<Product> = 
         productRepository.findByNameContainingIgnoreCase(query)
+
+    fun getPublishedProducts(): List<Product> =
+        productRepository.findByPublishedTrue()
+
+    fun searchPublishedProducts(query: String): List<Product> =
+        productRepository.findByNameContainingIgnoreCase(query).filter { it.published }
+
+    fun getPublishedProductsByCategory(categoryId: String): List<Product> =
+        productRepository.findByCategoryId(categoryId).filter { it.published }
 
     @Transactional
     fun createProduct(product: Product): Product = productRepository.save(product)
@@ -50,6 +62,13 @@ class ProductService(
         } else {
             false
         }
+    }
+
+    @Transactional
+    fun togglePublished(id: String): ProductDTO? {
+        val product = getProductById(id) ?: return null
+        product.published = !product.published
+        return productRepository.save(product).toDTO()
     }
 
     // ==================== CATEGORY OPERATIONS ====================
@@ -91,19 +110,23 @@ class ProductService(
             this.price.toDouble()
         }
         
+        val sortedImages = this.images.sortedBy { it.sortIndex }
+        
         return ProductDTO(
             id = (this.id ?: ""),
             name = this.name,
             description = this.description,
             price = effectivePrice,
             originalPrice = originalPrice,
-            image = this.images.firstOrNull()?.url ?: "",
+            image = sortedImages.firstOrNull()?.url ?: "",
+            images = sortedImages.map { it.url }.toTypedArray(),
             category = category?.name ?: "",
             brand = "", // Brand is not in the entity
             stock = this.stockQuantity,
             rating = this.averageRating.toDouble(),
             reviews = this.ratingCount,
-            supplier = this.wholesaler.businessName
+            supplier = this.wholesaler.businessName,
+            published = this.published
         )
     }
 
@@ -128,9 +151,46 @@ class ProductService(
     fun searchProductsDTO(query: String): List<ProductDTO> = 
         searchProducts(query).map { it.toDTO() }
 
+    fun getPublishedProductsDTO(): List<ProductDTO> =
+        getPublishedProducts().map { it.toDTO() }
+
+    fun searchPublishedProductsDTO(query: String): List<ProductDTO> =
+        searchPublishedProducts(query).map { it.toDTO() }
+
+    fun getPublishedProductsDTOByCategory(categoryId: String): List<ProductDTO> =
+        getPublishedProductsByCategory(categoryId).map { it.toDTO() }
+
     fun createProductDTO(product: Product): ProductDTO = createProduct(product).toDTO()
 
     fun updateProductDTO(id: String, product: Product): ProductDTO? = updateProduct(id, product)?.toDTO()
+
+    @Transactional
+    fun createProductFromRequest(request: CreateProductRequest): ProductDTO {
+        val wholesaler = userRepository.findById(request.wholesalerId).orElseThrow {
+            NoSuchElementException("Wholesaler not found: ${request.wholesalerId}")
+        }
+        val product = Product(
+            wholesaler = wholesaler,
+            name = request.name,
+            description = request.description,
+            categoryId = request.categoryId,
+            price = BigDecimal.valueOf(request.price),
+            stockQuantity = request.stock,
+            published = true
+        )
+        return createProduct(product).toDTO()
+    }
+
+    @Transactional
+    fun updateProductFromRequest(id: String, request: CreateProductRequest): ProductDTO? {
+        val existing = getProductById(id) ?: return null
+        existing.name = request.name
+        existing.description = request.description
+        existing.categoryId = request.categoryId
+        existing.price = BigDecimal.valueOf(request.price)
+        existing.stockQuantity = request.stock
+        return productRepository.save(existing).toDTO()
+    }
 
     fun getAllCategoriesDTO(): List<CategoryDTO> = getAllCategories().map { it.toDTO() }
 

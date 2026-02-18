@@ -81,6 +81,6 @@ class FileStorageService(
      * Gets the full URL path for serving uploaded files
      */
     fun getFileUrl(relativePath: String): String {
-        return "/uploads/$relativePath"
+        return "/api/uploads/$relativePath"
     }
 }

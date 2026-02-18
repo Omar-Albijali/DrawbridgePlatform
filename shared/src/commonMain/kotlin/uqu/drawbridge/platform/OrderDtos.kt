@@ -8,10 +8,13 @@ import kotlin.js.JsExport
 enum class OrderStatus {
     PENDING,
     CONFIRMED,
+
+
     PROCESSING,
     SHIPPED,
     DELIVERED,
     CANCELLED,
+
     RETURNED
 }
 
