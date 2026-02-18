@@ -12,12 +12,14 @@ data class ProductDTO(
     val price: Double, // BigDecimal -> Double
     val originalPrice: Double?,
     val image: String,
+    val images: Array<String>,
     val category: String,
     val brand: String,
     val stock: Int,
     val rating: Double,
     val reviews: Int,
-    val supplier: String
+    val supplier: String,
+    val published: Boolean
 )
 
 @OptIn(ExperimentalJsExport::class)
@@ -57,5 +59,6 @@ data class ProductImageResponse(
     val id: String?, // Long -> String
     val url: String,
     val altText: String,
+    val sortIndex: Int,
     val productId: String // Long -> String
 )

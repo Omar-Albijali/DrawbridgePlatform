@@ -14,6 +14,8 @@ import Orders from './pages/Orders';
 import OrderDetails from './pages/OrderDetails';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
+import ManageProducts from './pages/ManageProducts';
+import ProductForm from './pages/ProductForm';
 
 // Settings Pages
 import Profile from './pages/settings/Profile';
@@ -30,12 +32,6 @@ const SupportPage = () => (
     </div>
 );
 
-const ProductsPage = () => (
-    <div className="text-center py-16">
-        <h1 className="text-2xl font-bold text-navy-800 mb-2">Manage Products</h1>
-        <p className="text-navy-500">Manage your product listings here.</p>
-    </div>
-);
 
 const ReportsPage = () => (
     <div className="text-center py-16">
@@ -95,7 +91,15 @@ export const router = createBrowserRouter([
             },
             {
                 path: 'products',
-                element: <ProductsPage />
+                element: <ManageProducts />
+            },
+            {
+                path: 'products/new',
+                element: <ProductForm />
+            },
+            {
+                path: 'products/edit/:id',
+                element: <ProductForm />
             },
             {
                 path: 'reports',
