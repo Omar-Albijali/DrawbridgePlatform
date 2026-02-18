@@ -196,3 +196,88 @@ npm run build
 ## 📄 License | الترخيص
 Internal project for Drawbridge Platform.
 مروع داخلي لمنصة Drawbridge.
+
+---
+
+## 🚩 Project Status | حالة المشروع
+I've updated the priority list for you. Every issue previously marked as Low (green) has been moved up to Medium (yellow).
+
+### **Known Issues:**
+
+### **1. Account Management**
+
+* 🔴 **Password change is a mocked browser alert** (no actual change).
+* 🔴 **"Forgot Password" link is a dead `#` link**.
+* 🟠 Duplicate email registration is not blocked.
+* 🟠 Email verification workflow is missing.
+* 🟡 "Remember Me" checkbox has no logic.
+* 🟡 Two-Factor Authentication toggle is non-functional.
+* 🟡 **Avatar/Logo upload buttons do nothing**.
+* 🟡 **Server-side session invalidation on logout is missing**.
+
+### **2. Product Market**
+
+* 🔴 **Product detail pages do not exist** (cannot see specs/descriptions).
+* 🟠 Pagination is missing (performance risk for large catalogs).
+* 🟠 Minimum Order Quantities (MOQ) are not displayed.
+* 🟡 Category/Brand filters are hardcoded, not dynamic.
+* 🟡 "Featured" sort option has no logic.
+* 🟡 **Wishlist functionality is missing**.
+
+### **3. Inventory Management**
+
+* 🔴 **Edit (pencil) button has no click handler** (cannot adjust stock).
+* 🔴 **Manual stock level adjustment is impossible**.
+* 🟠 POS integration is completely missing.
+* 🟡 Stock history/audit logs are missing.
+* 🟡 Batch operations for multiple items are missing.
+* 🟡 **Wholesalers can access the Retailer Inventory route via URL**.
+
+### **4. Order Management**
+
+* 🔴 **Shipping address is not saved to the order during checkout**.
+* 🟠 "Download Invoice" button is a mocked alert.
+* 🟠 No UI exists for entering tracking numbers or carrier info.
+* 🟠 Return/Refund workflow is missing.
+* 🟡 "Contact Support" button is a mocked alert.
+* 🟡 Retailer delivery confirmation is missing.
+* 🟡 **Re-order functionality is missing**.
+
+### **5. Notifications**
+
+* 🔴 **Actual notification delivery (Email/SMS/Push) is missing**.
+* 🟠 Preference toggles do not save to the backend.
+* 🟠 Notification bell/inbox is missing from the header.
+* 🟡 Activity feed uses hardcoded mock notifications.
+
+### **6. Dashboard**
+
+* 🔴 **Bar and Pie charts use hardcoded static data** (not user data).
+* 🟠 KPI trend percentages are commented out in code.
+* 🟡 Date range filtering is missing.
+* 🟡 **Manual data refresh button is missing**.
+
+### **7. Support**
+
+* 🔴 **Support page is a static text placeholder**.
+* 🔴 **Ticket creation form is missing**.
+* 🟠 Ticket history list is missing.
+* 🟡 FAQ/Knowledge base is missing.
+
+### **8. Payment Management**
+
+* 🔴 **Real payment gateway integration is missing**.
+* 🟠 Card validation is minimal (no Luhn algorithm or past-date checks).
+* 🟠 Promo code "Apply" button has no handler.
+* 🟡 Payment history screen is missing.
+
+### **9. Product Management (Wholesaler)**
+
+* 🟢 **~~"Manage Products" page is a static text placeholder~~**.
+* 🟢 **~~Product creation and editing forms are missing~~**.
+* 🟢 **~~Product deletion capability is missing~~**.
+* 🟢 ~~Product image upload UI is missing~~.
+
+---
+
+
