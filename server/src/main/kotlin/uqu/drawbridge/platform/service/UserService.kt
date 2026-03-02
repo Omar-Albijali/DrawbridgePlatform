@@ -2,20 +2,27 @@ package uqu.drawbridge.platform.service
 
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import uqu.drawbridge.platform.AuthResponse
 import uqu.drawbridge.platform.LoginRequest
 import uqu.drawbridge.platform.RegisterRequest
 import uqu.drawbridge.platform.model.Address
+import uqu.drawbridge.platform.model.PasswordResetToken
 import uqu.drawbridge.platform.model.Representative
 import uqu.drawbridge.platform.model.User
+import uqu.drawbridge.platform.repository.PasswordResetTokenRepository
 import uqu.drawbridge.platform.repository.UserRepository
 import uqu.drawbridge.platform.security.JwtService
+import java.time.LocalDateTime
+import java.util.UUID
 
 @Service
 class UserService(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
-    private val jwtService: JwtService
+    private val jwtService: JwtService,
+    private val emailService: EmailService,
+    private val passwordResetTokenRepository: PasswordResetTokenRepository
 ) {
 
     fun register(request: RegisterRequest): AuthResponse {
@@ -28,7 +35,9 @@ class UserService(
         // Create new user using apply for cleaner initialization
         val user = User(
             email = request.email,
-            passwordHash = passwordEncoder.encode(request.password) ?: "", // Handle potential null safely
+            passwordHash = requireNotNull(passwordEncoder.encode(request.password)) {
+                "Password encoding failed during registration"
+            },
             phoneNumber = request.phoneNumber,
             role = request.role,
             businessName = request.businessName ?: "",
@@ -115,6 +124,67 @@ class UserService(
 
         val savedUser = userRepository.save(user)
         return savedUser.toDto()
+    }
+
+    fun changePassword(id: String, request: uqu.drawbridge.platform.ChangePasswordRequest): Boolean {
+        val user = getUserById(id) ?: return false
+
+        if (!passwordEncoder.matches(request.currentPassword, user.passwordHash)) {
+            throw uqu.drawbridge.platform.exception.InvalidCredentialsException("Current password is incorrect")
+        }
+
+        user.passwordHash = requireNotNull(passwordEncoder.encode(request.newPassword)) {
+            "Password encoding failed; password was not changed"
+        }
+        userRepository.save(user)
+        return true
+    }
+
+    @Transactional
+    fun initiateForgotPassword(email: String) {
+        // Look up the user silently; do not reveal whether the email exists
+        val user = userRepository.findByEmail(email) ?: return
+
+        // Invalidate any existing tokens for this user
+        passwordResetTokenRepository.deleteAllByUserId(user.id!!)
+
+        // Create a new 1-hour token
+        val token = PasswordResetToken(
+            token = UUID.randomUUID().toString(),
+            userId = user.id!!,
+            expiresAt = LocalDateTime.now().plusHours(1)
+        )
+        passwordResetTokenRepository.save(token)
+
+        emailService.sendPasswordResetEmail(
+            toEmail = user.email,
+            recipientName = user.representative.name,
+            resetToken = token.token
+        )
+    }
+
+    @Transactional
+    fun resetPassword(token: String, newPassword: String) {
+        val resetToken = passwordResetTokenRepository.findByToken(token)
+            ?: throw IllegalArgumentException("Invalid or expired password reset token")
+
+        if (resetToken.used) {
+            throw IllegalArgumentException("This reset link has already been used")
+        }
+        if (resetToken.expiresAt.isBefore(LocalDateTime.now())) {
+            throw IllegalArgumentException("This reset link has expired")
+        }
+
+        val user = getUserById(resetToken.userId)
+            ?: throw IllegalArgumentException("User not found")
+
+        user.passwordHash = requireNotNull(passwordEncoder.encode(newPassword)) {
+            "Password encoding failed; password was not changed"
+        }
+        userRepository.save(user)
+
+        resetToken.used = true
+        passwordResetTokenRepository.save(resetToken)
     }
 
     private fun User.toDto(): uqu.drawbridge.platform.UserDTO {

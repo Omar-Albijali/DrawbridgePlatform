@@ -116,3 +116,11 @@ data class UpdateUserProfileRequest(
     val commercialRegister: String?,
     val representative: RepresentativeDto
 )
+
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+data class ChangePasswordRequest(
+    val currentPassword: String,
+    val newPassword: String
+)
+
