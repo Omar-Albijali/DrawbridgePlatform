@@ -8,7 +8,10 @@ const Login: React.FC = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
+    const [info, setInfo] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isResending, setIsResending] = useState(false);
+    const [showResend, setShowResend] = useState(false);
 
     const { login } = useAuth();
     const navigate = useNavigate();
@@ -16,17 +19,52 @@ const Login: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setInfo('');
+        setShowResend(false);
         setIsSubmitting(true);
 
-        const success = await login(email, password);
+        const result = await login(email, password);
 
-        if (success) {
+        if (result.success) {
             navigate('/dashboard');
+        } else if (result.reason === 'unverified') {
+            setError('Your email is not verified yet.');
+            setShowResend(Boolean(email.trim()));
         } else {
             setError('Invalid email or password. Use retailer@test.com / wholesaler@test.com and password: password');
         }
 
         setIsSubmitting(false);
+    };
+
+    const handleResendVerification = async () => {
+        setError('');
+        setInfo('');
+
+        if (!email.trim()) {
+            setError('Enter your email to resend the verification link.');
+            return;
+        }
+
+        setIsResending(true);
+        try {
+            const res = await fetch('/api/auth/resend-verification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email.trim() })
+            });
+
+            if (!res.ok) {
+                setError('Unable to resend the verification link. Please try again.');
+                return;
+            }
+
+            setInfo("If your account exists and is unverified, we've sent a new verification link.");
+        } catch {
+            setError('Unable to resend the verification link. Please try again.');
+        } finally {
+            setIsResending(false);
+        }
     };
 
     return (
@@ -53,7 +91,22 @@ const Login: React.FC = () => {
 
                     {error && (
                         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                            {error}
+                            <span>{error}</span>
+                            {showResend && (
+                                <button
+                                    type="button"
+                                    onClick={handleResendVerification}
+                                    disabled={isResending}
+                                    className="ml-1 inline-flex items-center text-primary-700 hover:text-primary-800 font-medium disabled:opacity-50"
+                                >
+                                    {isResending ? 'Sending verification link…' : 'Resend verification link'}
+                                </button>
+                            )}
+                        </div>
+                    )}
+                    {info && (
+                        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                            {info}
                         </div>
                     )}
 

@@ -15,11 +15,17 @@ function safeParseJson<T>(value: string | null): T | null {
     }
 }
 
+interface LoginResult {
+    success: boolean;
+    reason?: 'unverified' | 'invalid' | 'unknown';
+    message?: string;
+}
+
 interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-    login: (email: string, password: string) => Promise<boolean>;
+    login: (email: string, password: string) => Promise<LoginResult>;
     register: (request: RegisterRequest) => Promise<boolean>;
     logout: () => void;
     refreshUser: () => Promise<void>;
@@ -54,7 +60,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             : null
     }) as unknown as User;
 
-    const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    const extractErrorMessage = (error: unknown): string => {
+        if (!(error instanceof Error)) return '';
+        const message = error.message ?? '';
+        const parts = message.split(' - ');
+        const rawBody = parts[parts.length - 1];
+        try {
+            const parsed = JSON.parse(rawBody);
+            if (typeof parsed?.message === 'string') {
+                return parsed.message;
+            }
+        } catch {
+            // Ignore JSON parse errors and fall back to raw message.
+        }
+        return message;
+    };
+
+    const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
         setIsLoading(prev => prev + 1);
 
         try {
@@ -86,9 +108,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(finalUser));
             setUser(finalUser);
-            return true;
-        } catch {
-            return false;
+            return { success: true };
+        } catch (error) {
+            const errorMessage = extractErrorMessage(error);
+            if (errorMessage.toLowerCase().includes('email not verified')) {
+                return { success: false, reason: 'unverified', message: errorMessage };
+            }
+            return { success: false, reason: 'invalid', message: errorMessage || 'Invalid email or password' };
         } finally {
             setIsLoading(prev => prev - 1);
         }

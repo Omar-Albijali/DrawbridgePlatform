@@ -114,7 +114,8 @@ const Register: React.FC = () => {
         } as RegisterRequest);
 
         if (success) {
-            navigate(formData.role === UserRole.WHOLESALER ? '/dashboard' : '/marketplace');
+            const emailParam = encodeURIComponent(formData.email);
+            navigate(`/verify-email?sent=1&email=${emailParam}`);
         } else {
             setError('Registration failed. Please try again.');
         }

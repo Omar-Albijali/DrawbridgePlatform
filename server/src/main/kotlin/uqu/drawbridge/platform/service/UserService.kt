@@ -7,9 +7,11 @@ import uqu.drawbridge.platform.AuthResponse
 import uqu.drawbridge.platform.LoginRequest
 import uqu.drawbridge.platform.RegisterRequest
 import uqu.drawbridge.platform.model.Address
+import uqu.drawbridge.platform.model.EmailVerificationToken
 import uqu.drawbridge.platform.model.PasswordResetToken
 import uqu.drawbridge.platform.model.Representative
 import uqu.drawbridge.platform.model.User
+import uqu.drawbridge.platform.repository.EmailVerificationTokenRepository
 import uqu.drawbridge.platform.repository.PasswordResetTokenRepository
 import uqu.drawbridge.platform.repository.UserRepository
 import uqu.drawbridge.platform.security.JwtService
@@ -22,7 +24,8 @@ class UserService(
     private val passwordEncoder: PasswordEncoder,
     private val jwtService: JwtService,
     private val emailService: EmailService,
-    private val passwordResetTokenRepository: PasswordResetTokenRepository
+    private val passwordResetTokenRepository: PasswordResetTokenRepository,
+    private val emailVerificationTokenRepository: EmailVerificationTokenRepository
 ) {
 
     private fun normalizeEmail(email: String): String = email.trim().lowercase()
@@ -69,6 +72,8 @@ class UserService(
 
         val savedUser = userRepository.save(user)
 
+        initiateEmailVerification(savedUser)
+
         // Generate JWT token
         val token = jwtService.generateToken(savedUser)
 
@@ -87,6 +92,10 @@ class UserService(
 
         if (!passwordEncoder.matches(request.password, user.passwordHash)) {
             throw uqu.drawbridge.platform.exception.InvalidCredentialsException("Invalid email or password")
+        }
+
+        if (!user.verificationStatus) {
+            throw uqu.drawbridge.platform.exception.InvalidCredentialsException("Email not verified")
         }
 
         val token = jwtService.generateToken(user)
@@ -188,6 +197,56 @@ class UserService(
 
         resetToken.used = true
         passwordResetTokenRepository.save(resetToken)
+    }
+
+    @Transactional
+    fun resendEmailVerification(email: String) {
+        val user = userRepository.findByEmail(normalizeEmail(email)) ?: return
+        if (user.verificationStatus) return
+
+        initiateEmailVerification(user)
+    }
+
+    @Transactional
+    fun verifyEmail(token: String) {
+        val verificationToken = emailVerificationTokenRepository.findByToken(token)
+            ?: throw IllegalArgumentException("Invalid or expired verification token")
+
+        if (verificationToken.used) {
+            throw IllegalArgumentException("This verification link has already been used")
+        }
+        if (verificationToken.expiresAt.isBefore(LocalDateTime.now())) {
+            throw IllegalArgumentException("This verification link has expired")
+        }
+
+        val user = getUserById(verificationToken.userId)
+            ?: throw IllegalArgumentException("User not found")
+
+        if (!user.verificationStatus) {
+            user.verificationStatus = true
+            userRepository.save(user)
+        }
+
+        verificationToken.used = true
+        emailVerificationTokenRepository.save(verificationToken)
+    }
+
+    @Transactional
+    private fun initiateEmailVerification(user: User) {
+        emailVerificationTokenRepository.deleteAllByUserId(user.id!!)
+
+        val token = EmailVerificationToken(
+            token = UUID.randomUUID().toString(),
+            userId = user.id!!,
+            expiresAt = LocalDateTime.now().plusHours(24)
+        )
+        emailVerificationTokenRepository.save(token)
+
+        emailService.sendEmailVerificationEmail(
+            toEmail = user.email,
+            recipientName = user.representative.name,
+            verificationToken = token.token
+        )
     }
 
     private fun User.toDto(): uqu.drawbridge.platform.UserDTO {
