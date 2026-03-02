@@ -45,4 +45,22 @@ class AuthController(
             ResponseEntity.status(400).build()
         }
     }
+
+    @PostMapping("/verify-email")
+    fun verifyEmail(@RequestBody body: Map<String, String>): ResponseEntity<Void> {
+        val token = body["token"] ?: return ResponseEntity.badRequest().build()
+        return try {
+            userService.verifyEmail(token)
+            ResponseEntity.ok().build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(400).build()
+        }
+    }
+
+    @PostMapping("/resend-verification")
+    fun resendVerification(@RequestBody body: Map<String, String>): ResponseEntity<Void> {
+        val email = body["email"] ?: return ResponseEntity.badRequest().build()
+        userService.resendEmailVerification(email)
+        return ResponseEntity.ok().build()
+    }
 }

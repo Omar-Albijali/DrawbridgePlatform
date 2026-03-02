@@ -52,5 +52,28 @@ class EmailService(
             client.sendingApi().emails().send(mail)
         }
     }
-}
 
+    fun sendEmailVerificationEmail(toEmail: String, recipientName: String, verificationToken: String) {
+        val verifyUrl = "$baseUrl/verify-email?token=$verificationToken"
+
+        val ctx = Context().apply {
+            setVariable("name", recipientName)
+            setVariable("verifyUrl", verifyUrl)
+        }
+
+        val htmlBody = templateEngine.process("email/verify-email", ctx)
+
+        val mail = MailtrapMail.builder()
+            .from(Address(fromEmail, fromName))
+            .to(listOf(Address(toEmail, recipientName)))
+            .subject("Verify your Drawbridge email")
+            .html(htmlBody)
+            .build()
+
+        if (sandbox && inboxId > 0) {
+            client.testingApi().emails().send(mail, inboxId)
+        } else {
+            client.sendingApi().emails().send(mail)
+        }
+    }
+}

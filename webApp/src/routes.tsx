@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import Marketplace from './pages/Marketplace';
 import Inventory from './pages/Inventory';
@@ -62,6 +63,10 @@ export const router = createBrowserRouter([
     {
         path: '/reset-password',
         element: <ResetPassword />
+    },
+    {
+        path: '/verify-email',
+        element: <VerifyEmail />
     },
     {
         path: '/',
