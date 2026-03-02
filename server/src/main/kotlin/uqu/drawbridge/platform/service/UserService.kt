@@ -25,16 +25,20 @@ class UserService(
     private val passwordResetTokenRepository: PasswordResetTokenRepository
 ) {
 
+    private fun normalizeEmail(email: String): String = email.trim().lowercase()
+
     fun register(request: RegisterRequest): AuthResponse {
-        // Check if email already exists
-        if (userRepository.existsByEmail(request.email)) {
+        val normalizedEmail = normalizeEmail(request.email)
+
+        // Check if email already exists (case-insensitive)
+        if (userRepository.existsByEmail(normalizedEmail)) {
             throw IllegalArgumentException("Email already registered")
         }
 
         // Create new user
         // Create new user using apply for cleaner initialization
         val user = User(
-            email = request.email,
+            email = normalizedEmail,
             passwordHash = requireNotNull(passwordEncoder.encode(request.password)) {
                 "Password encoding failed during registration"
             },
@@ -78,7 +82,7 @@ class UserService(
     }
 
     fun login(request: LoginRequest): AuthResponse {
-        val user = userRepository.findByEmail(request.email)
+        val user = userRepository.findByEmail(normalizeEmail(request.email))
             ?: throw uqu.drawbridge.platform.exception.InvalidCredentialsException("Invalid email or password")
 
         if (!passwordEncoder.matches(request.password, user.passwordHash)) {
@@ -101,7 +105,7 @@ class UserService(
     }
 
     fun getUserByEmail(email: String): User? {
-        return userRepository.findByEmail(email)
+        return userRepository.findByEmail(normalizeEmail(email))
     }
 
     fun getUserDTOById(id: String): uqu.drawbridge.platform.UserDTO? {
@@ -142,8 +146,7 @@ class UserService(
 
     @Transactional
     fun initiateForgotPassword(email: String) {
-        // Look up the user silently; do not reveal whether the email exists
-        val user = userRepository.findByEmail(email) ?: return
+        val user = userRepository.findByEmail(normalizeEmail(email)) ?: return
 
         // Invalidate any existing tokens for this user
         passwordResetTokenRepository.deleteAllByUserId(user.id!!)

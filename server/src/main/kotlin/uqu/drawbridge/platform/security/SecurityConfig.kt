@@ -24,7 +24,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
     private val userDetailsService: UserDetailsService,
-    @Value("\${app.cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
+    @Value("\${app.cors.allowed-origins}")
     private val allowedOriginsProperty: String
 ) {
 
