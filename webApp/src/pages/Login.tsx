@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { authService } from '../services/authService';
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 
 const Login: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [info, setInfo] = useState('');
@@ -23,7 +25,7 @@ const Login: React.FC = () => {
         setShowResend(false);
         setIsSubmitting(true);
 
-        const result = await login(email, password);
+        const result = await login(email, password, rememberMe);
 
         if (result.success) {
             navigate('/dashboard');
@@ -48,17 +50,7 @@ const Login: React.FC = () => {
 
         setIsResending(true);
         try {
-            const res = await fetch('/api/auth/resend-verification', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: email.trim() })
-            });
-
-            if (!res.ok) {
-                setError('Unable to resend the verification link. Please try again.');
-                return;
-            }
-
+            await authService.resendVerification(email.trim());
             setInfo("If your account exists and is unverified, we've sent a new verification link.");
         } catch {
             setError('Unable to resend the verification link. Please try again.');
@@ -152,7 +144,12 @@ const Login: React.FC = () => {
 
                         <div className="flex items-center justify-between">
                             <label className="flex items-center gap-2">
-                                <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                                <input
+                                    type="checkbox"
+                                    checked={rememberMe}
+                                    onChange={(e) => setRememberMe(e.target.checked)}
+                                    className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                />
                                 <span className="text-sm text-navy-600">Remember me</span>
                             </label>
                             <Link to="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700 font-medium">

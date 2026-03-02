@@ -7,8 +7,8 @@ interface RequestOptions extends RequestInit {
 export async function fetchApi<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const { token, headers, ...customConfig } = options;
 
-    // Get token from localStorage if not provided
-    const authToken = token || localStorage.getItem('drawbridge_token');
+    const storedToken = localStorage.getItem('drawbridge_token') || sessionStorage.getItem('drawbridge_token');
+    const authToken = token || storedToken;
 
     const config: RequestInit = {
         ...customConfig,

@@ -58,7 +58,8 @@ data class UserDTO(
 @JsExport
 data class LoginRequest(
     val email: String,
-    val password: String
+    val password: String,
+    val rememberMe: Boolean = false
 )
 
 @OptIn(ExperimentalJsExport::class)
@@ -85,6 +86,37 @@ data class AuthResponse(
     val email: String,
     val name: String,
     val role: UserRole
+)
+
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+data class ForgotPasswordRequest(
+    val email: String
+)
+
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+data class ResetPasswordRequest(
+    val token: String,
+    val newPassword: String
+)
+
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+data class VerifyEmailRequest(
+    val token: String
+)
+
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+data class ResendVerificationRequest(
+    val email: String
+)
+
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+data class LogoutRequest(
+    val token: String
 )
 
 @OptIn(ExperimentalJsExport::class)
@@ -123,4 +155,3 @@ data class ChangePasswordRequest(
     val currentPassword: String,
     val newPassword: String
 )
-
