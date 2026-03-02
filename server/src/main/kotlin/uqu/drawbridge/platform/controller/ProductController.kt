@@ -18,7 +18,7 @@ class ProductController(
 
     @GetMapping
     fun getAllProducts(): ResponseEntity<List<ProductDTO>> {
-        return ResponseEntity.ok(productService.getAllProductsDTO())
+        return ResponseEntity.ok(productService.getPublishedProductsDTO())
     }
 
     @GetMapping("/{id}")
@@ -38,22 +38,22 @@ class ProductController(
 
     @GetMapping("/category/{categoryId}")
     fun getProductsByCategory(@PathVariable categoryId: String): ResponseEntity<List<ProductDTO>> {
-        return ResponseEntity.ok(productService.getProductsDTOByCategory(categoryId))
+        return ResponseEntity.ok(productService.getPublishedProductsDTOByCategory(categoryId))
     }
 
     @GetMapping("/search")
     fun searchProducts(@RequestParam q: String): ResponseEntity<List<ProductDTO>> {
-        return ResponseEntity.ok(productService.searchProductsDTO(q))
+        return ResponseEntity.ok(productService.searchPublishedProductsDTO(q))
     }
 
     @PostMapping
-    fun createProduct(@RequestBody product: Product): ResponseEntity<ProductDTO> {
-        return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProductDTO(product))
+    fun createProduct(@RequestBody request: CreateProductRequest): ResponseEntity<ProductDTO> {
+        return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProductFromRequest(request))
     }
 
     @PutMapping("/{id}")
-    fun updateProduct(@PathVariable id: String, @RequestBody product: Product): ResponseEntity<ProductDTO> {
-        val updated = productService.updateProductDTO(id, product)
+    fun updateProduct(@PathVariable id: String, @RequestBody request: CreateProductRequest): ResponseEntity<ProductDTO> {
+        val updated = productService.updateProductFromRequest(id, request)
         return if (updated != null) {
             ResponseEntity.ok(updated)
         } else {
@@ -65,6 +65,16 @@ class ProductController(
     fun deleteProduct(@PathVariable id: String): ResponseEntity<Void> {
         return if (productService.deleteProduct(id)) {
             ResponseEntity.ok().build()
+        } else {
+            ResponseEntity.notFound().build()
+        }
+    }
+
+    @PatchMapping("/{id}/toggle-published")
+    fun togglePublished(@PathVariable id: String): ResponseEntity<ProductDTO> {
+        val updated = productService.togglePublished(id)
+        return if (updated != null) {
+            ResponseEntity.ok(updated)
         } else {
             ResponseEntity.notFound().build()
         }

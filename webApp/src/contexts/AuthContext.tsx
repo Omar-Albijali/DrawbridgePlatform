@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { User, AuthResponse, ErrorResponse, UserRole, VerificationStatus } from '../types';
+import { User, AuthResponse, ErrorResponse, UserRole, VerificationStatus, RegisterRequest } from '../types';
 
 const STORAGE_USER_KEY = 'drawbridge_user';
 const STORAGE_TOKEN_KEY = 'drawbridge_token';
@@ -18,7 +18,7 @@ interface AuthContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (email: string, password: string) => Promise<boolean>;
-    register: (userData: Partial<User> & { password: string }) => Promise<boolean>;
+    register: (request: RegisterRequest) => Promise<boolean>;
     logout: () => void;
     refreshUser: () => Promise<void>;
 }
@@ -118,7 +118,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     }, []);
 
-    const register = useCallback(async (userData: Partial<User> & { password: string }): Promise<boolean> => {
+    const register = useCallback(async (request: RegisterRequest): Promise<boolean> => {
         setIsLoading(prev => prev + 1);
 
         try {
@@ -126,18 +126,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    email: userData.email ?? '',
-                    password: userData.password,
-                    phoneNumber: userData.phone ?? '',
-                    role: userData.role,
-                    businessName: userData.company ?? null,
-                    commercialRegistrationNumber: userData.commercialRegister ?? '',
-                    // Representative fields (flattened)
-                    repName: userData.representative?.name ?? '',
-                    repJobTitle: userData.representative?.jobTitle ?? '',
-                    repPhoneNumber: userData.representative?.phoneNumber ?? '',
-                    repEmail: userData.representative?.email ?? '',
-                    addresses: userData.addresses ?? []
+                    ...request,
+                    role: (request.role as any).name
                 })
             });
 
@@ -156,14 +146,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 id: data.userId,
                 name: data.name,
                 email: data.email,
-                role: data.role,
-                company: userData.company ?? '',
-                phone: userData.phone ?? null,
-                addresses: userData.addresses ?? null,
-                representative: userData.representative ?? null,
-                commercialRegister: userData.commercialRegister ?? null,
-                verificationStatus: userData.verificationStatus ?? null,
-                avatar: userData.avatar ?? null
+                role: UserRole.valueOf(data.role as unknown as string),
+                company: request.businessName ?? '',
+                phone: request.phoneNumber ?? null,
+                addresses: request.addresses ?? null,
+                representative: {
+                    name: request.repName,
+                    jobTitle: request.repJobTitle,
+                    phoneNumber: request.repPhoneNumber,
+                    email: request.repEmail
+                },
+                commercialRegister: request.commercialRegistrationNumber ?? null,
+                verificationStatus: null, // Initial status
+                avatar: null
             } as unknown as User;
 
             localStorage.setItem(STORAGE_TOKEN_KEY, data.token);

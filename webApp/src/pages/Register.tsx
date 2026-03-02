@@ -6,7 +6,7 @@ import {
     Eye, EyeOff, ArrowRight, ArrowLeft, Briefcase
 } from 'lucide-react';
 
-import { VerificationStatus, UserRole, AddressDto, RepresentativeDto } from '../types';
+import { VerificationStatus, UserRole, AddressDto, RegisterRequest } from '../types';
 
 interface FormData {
     role: UserRole;
@@ -94,19 +94,15 @@ const Register: React.FC = () => {
 
         const success = await register({
             email: formData.email,
-            role: formData.role,
-            company: formData.companyName,
-            phone: formData.phone,
-            commercialRegister: formData.commercialRegister,
             password: formData.password,
-            verificationStatus: formData.role === UserRole.WHOLESALER ? VerificationStatus.PENDING : undefined,
-
-            representative: {
-                name: formData.repName,
-                jobTitle: formData.repJob,
-                phoneNumber: formData.repPhone,
-                email: formData.repEmail
-            } as unknown as RepresentativeDto,
+            phoneNumber: formData.phone,
+            role: formData.role,
+            businessName: formData.companyName || null,
+            commercialRegistrationNumber: formData.commercialRegister,
+            repName: formData.repName,
+            repJobTitle: formData.repJob,
+            repPhoneNumber: formData.repPhone,
+            repEmail: formData.repEmail,
             addresses: [{
                 id: null,
                 street: formData.street,
@@ -115,7 +111,7 @@ const Register: React.FC = () => {
                 zipCode: formData.zipCode,
                 country: formData.country
             } as unknown as AddressDto]
-        });
+        } as RegisterRequest);
 
         if (success) {
             navigate(formData.role === UserRole.WHOLESALER ? '/dashboard' : '/marketplace');
