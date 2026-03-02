@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { authService } from '../services/authService';
 
 const ForgotPassword: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -14,18 +15,7 @@ const ForgotPassword: React.FC = () => {
         setIsSubmitting(true);
 
         try {
-            const res = await fetch('/api/auth/forgot-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email }),
-            });
-
-            if (!res.ok && res.status !== 404) {
-                setError('Something went wrong. Please try again later.');
-                return;
-            }
-
-            // Show the confirmation regardless (prevents email enumeration)
+            await authService.forgotPassword(email);
             setSubmitted(true);
         } catch {
             setError('Something went wrong. Please try again later.');
@@ -130,5 +120,4 @@ const ForgotPassword: React.FC = () => {
 };
 
 export default ForgotPassword;
-
 

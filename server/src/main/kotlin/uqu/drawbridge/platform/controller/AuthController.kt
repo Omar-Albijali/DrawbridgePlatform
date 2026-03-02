@@ -2,16 +2,24 @@ package uqu.drawbridge.platform.controller
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import uqu.drawbridge.platform.AuthResponse
 import uqu.drawbridge.platform.LoginRequest
 import uqu.drawbridge.platform.RegisterRequest
+import uqu.drawbridge.platform.ForgotPasswordRequest
+import uqu.drawbridge.platform.ResetPasswordRequest
+import uqu.drawbridge.platform.VerifyEmailRequest
+import uqu.drawbridge.platform.ResendVerificationRequest
+import uqu.drawbridge.platform.LogoutRequest
+import uqu.drawbridge.platform.security.JwtService
 import uqu.drawbridge.platform.service.UserService
 
 @RestController
 @RequestMapping("/api/auth")
 class AuthController(
-    private val userService: UserService
+    private val userService: UserService,
+    private val jwtService: JwtService
 ) {
 
     @PostMapping("/register")
@@ -26,20 +34,31 @@ class AuthController(
         return ResponseEntity.ok(response)
     }
 
+    @PostMapping("/logout")
+    fun logout(@RequestBody request: LogoutRequest, authentication: Authentication): ResponseEntity<Void> {
+        val tokenUser = jwtService.extractUsername(request.token) ?: return ResponseEntity.badRequest().build()
+        if (tokenUser != authentication.name) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        }
+        return try {
+            jwtService.revokeToken(request.token)
+            ResponseEntity.ok().build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.badRequest().build()
+        }
+    }
+
     @PostMapping("/forgot-password")
-    fun forgotPassword(@RequestBody body: Map<String, String>): ResponseEntity<Void> {
-        val email = body["email"] ?: return ResponseEntity.badRequest().build()
+    fun forgotPassword(@RequestBody request: ForgotPasswordRequest): ResponseEntity<Void> {
         // Trigger reset flow; always return 200 to prevent email enumeration
-        userService.initiateForgotPassword(email)
+        userService.initiateForgotPassword(request.email)
         return ResponseEntity.ok().build()
     }
 
     @PostMapping("/reset-password")
-    fun resetPassword(@RequestBody body: Map<String, String>): ResponseEntity<Void> {
-        val token = body["token"] ?: return ResponseEntity.badRequest().build()
-        val newPassword = body["newPassword"] ?: return ResponseEntity.badRequest().build()
+    fun resetPassword(@RequestBody request: ResetPasswordRequest): ResponseEntity<Void> {
         return try {
-            userService.resetPassword(token, newPassword)
+            userService.resetPassword(request.token, request.newPassword)
             ResponseEntity.ok().build()
         } catch (_: IllegalArgumentException) {
             ResponseEntity.status(400).build()
@@ -47,10 +66,9 @@ class AuthController(
     }
 
     @PostMapping("/verify-email")
-    fun verifyEmail(@RequestBody body: Map<String, String>): ResponseEntity<Void> {
-        val token = body["token"] ?: return ResponseEntity.badRequest().build()
+    fun verifyEmail(@RequestBody request: VerifyEmailRequest): ResponseEntity<Void> {
         return try {
-            userService.verifyEmail(token)
+            userService.verifyEmail(request.token)
             ResponseEntity.ok().build()
         } catch (_: IllegalArgumentException) {
             ResponseEntity.status(400).build()
@@ -58,9 +76,8 @@ class AuthController(
     }
 
     @PostMapping("/resend-verification")
-    fun resendVerification(@RequestBody body: Map<String, String>): ResponseEntity<Void> {
-        val email = body["email"] ?: return ResponseEntity.badRequest().build()
-        userService.resendEmailVerification(email)
+    fun resendVerification(@RequestBody request: ResendVerificationRequest): ResponseEntity<Void> {
+        userService.resendEmailVerification(request.email)
         return ResponseEntity.ok().build()
     }
 }

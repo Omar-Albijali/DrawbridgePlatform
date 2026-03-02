@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle, AlertTriangle, MailCheck } from 'lucide-react';
+import { authService } from '../services/authService';
 
 const VerifyEmail: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -19,17 +20,7 @@ const VerifyEmail: React.FC = () => {
         const verify = async () => {
             setIsSubmitting(true);
             try {
-                const res = await fetch('/api/auth/verify-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token })
-                });
-
-                if (!res.ok) {
-                    setStatus('error');
-                    return;
-                }
-
+                await authService.verifyEmail(token);
                 setStatus('success');
             } catch {
                 setStatus('error');

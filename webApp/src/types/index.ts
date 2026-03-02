@@ -36,6 +36,11 @@ import {
     ProductImageResponse,
     AddressResponseDto,
     CreateAddressRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    VerifyEmailRequest,
+    ResendVerificationRequest,
+    LogoutRequest,
 
     // Payment DTOs
     PaymentDTO,
@@ -104,6 +109,11 @@ export {
     ProductImageResponse,
     AddressResponseDto,
     CreateAddressRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    VerifyEmailRequest,
+    ResendVerificationRequest,
+    LogoutRequest,
     PaymentDTO,
     InvoiceDTO,
     PaymentMethodDTO,

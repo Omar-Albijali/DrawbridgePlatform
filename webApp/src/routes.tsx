@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { useAuth } from './contexts/AuthContext';
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
@@ -43,18 +44,36 @@ const ReportsPage = () => (
     </div>
 );
 
+const RootRedirect = () => {
+    const { isAuthenticated } = useAuth();
+    return <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />;
+};
+
+const RedirectIfAuthenticated = ({ children }: { children: JSX.Element }) => {
+    const { isAuthenticated } = useAuth();
+    return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
+};
+
 export const router = createBrowserRouter([
     {
         path: '/',
-        element: <Navigate to="/login" replace />
+        element: <RootRedirect />
     },
     {
         path: '/login',
-        element: <Login />
+        element: (
+            <RedirectIfAuthenticated>
+                <Login />
+            </RedirectIfAuthenticated>
+        )
     },
     {
         path: '/register',
-        element: <Register />
+        element: (
+            <RedirectIfAuthenticated>
+                <Register />
+            </RedirectIfAuthenticated>
+        )
     },
     {
         path: '/forgot-password',

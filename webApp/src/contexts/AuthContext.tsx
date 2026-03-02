@@ -25,9 +25,9 @@ interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-    login: (email: string, password: string) => Promise<LoginResult>;
+    login: (email: string, password: string, rememberMe: boolean) => Promise<LoginResult>;
     register: (request: RegisterRequest) => Promise<boolean>;
-    logout: () => void;
+    logout: () => Promise<void>;
     refreshUser: () => Promise<void>;
 }
 
@@ -46,9 +46,32 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+    const getStorageForToken = (): Storage | null => {
+        if (localStorage.getItem(STORAGE_TOKEN_KEY)) return localStorage;
+        if (sessionStorage.getItem(STORAGE_TOKEN_KEY)) return sessionStorage;
+        return null;
+    };
+
+    const getStoredUser = (): User | null => {
+        const storage = getStorageForToken();
+        if (!storage) return null;
+        return safeParseJson<User>(storage.getItem(STORAGE_USER_KEY));
+    };
+
+    const clearStoredAuth = () => {
+        localStorage.removeItem(STORAGE_USER_KEY);
+        localStorage.removeItem(STORAGE_TOKEN_KEY);
+        sessionStorage.removeItem(STORAGE_USER_KEY);
+        sessionStorage.removeItem(STORAGE_TOKEN_KEY);
+    };
+
+    const setStoredAuth = (storage: Storage, token: string, nextUser: User) => {
+        storage.setItem(STORAGE_TOKEN_KEY, token);
+        storage.setItem(STORAGE_USER_KEY, JSON.stringify(nextUser));
+    };
+
     const [user, setUser] = useState<User | null>(() => {
-        // Check for saved user in localStorage
-        return safeParseJson<User>(localStorage.getItem(STORAGE_USER_KEY));
+        return getStoredUser();
     });
     const [isLoading, setIsLoading] = useState(0);
 
@@ -76,14 +99,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return message;
     };
 
-    const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
+    const login = useCallback(async (email: string, password: string, rememberMe: boolean): Promise<LoginResult> => {
         setIsLoading(prev => prev + 1);
 
         try {
-            const authData = await authService.login(email, password);
+            const authData = await authService.login(email, password, rememberMe);
             const token = authData.token;
 
-            localStorage.setItem(STORAGE_TOKEN_KEY, token);
+            const storage = rememberMe ? localStorage : sessionStorage;
+            clearStoredAuth();
 
             let finalUser: User;
             try {
@@ -106,7 +130,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 } as unknown as User;
             }
 
-            localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(finalUser));
+            setStoredAuth(storage, token, finalUser);
             setUser(finalUser);
             return { success: true };
         } catch (error) {
@@ -145,8 +169,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 avatar: null
             } as unknown as User;
 
-            localStorage.setItem(STORAGE_TOKEN_KEY, data.token);
-            localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(newUser));
+            clearStoredAuth();
+            setStoredAuth(localStorage, data.token, newUser);
             setUser(newUser);
             return true;
         } catch {
@@ -156,10 +180,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     }, []);
 
-    const logout = useCallback(() => {
-        setUser(null);
-        localStorage.removeItem(STORAGE_USER_KEY);
-        localStorage.removeItem(STORAGE_TOKEN_KEY);
+    const logout = useCallback(async () => {
+        const token = localStorage.getItem(STORAGE_TOKEN_KEY) || sessionStorage.getItem(STORAGE_TOKEN_KEY) || '';
+        try {
+            if (token) {
+                await authService.logout(token);
+            }
+        } catch (error) {
+            console.warn('Failed to invalidate session on logout', error);
+        } finally {
+            clearStoredAuth();
+            setUser(null);
+        }
     }, []);
 
     const refreshUser = useCallback(async () => {
@@ -167,13 +199,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         setIsLoading(prev => prev + 1);
         try {
-            const token = localStorage.getItem(STORAGE_TOKEN_KEY);
-            if (!token) return;
+            const tokenStorage = getStorageForToken();
+            const token = tokenStorage?.getItem(STORAGE_TOKEN_KEY);
+            if (!tokenStorage || !token) return;
 
             const userJson = await userService.getById(user.id);
             const updatedUser = mapUserEnums(userJson);
 
-            localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updatedUser));
+            tokenStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updatedUser));
             setUser(updatedUser);
         } catch (error) {
             console.error("Failed to refresh user profile", error);
