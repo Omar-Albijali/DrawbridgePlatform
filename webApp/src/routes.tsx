@@ -7,6 +7,8 @@ import SettingsLayout from './pages/settings/SettingsLayout';
 // Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Marketplace from './pages/Marketplace';
 import Inventory from './pages/Inventory';
@@ -52,6 +54,14 @@ export const router = createBrowserRouter([
     {
         path: '/register',
         element: <Register />
+    },
+    {
+        path: '/forgot-password',
+        element: <ForgotPassword />
+    },
+    {
+        path: '/reset-password',
+        element: <ResetPassword />
     },
     {
         path: '/',

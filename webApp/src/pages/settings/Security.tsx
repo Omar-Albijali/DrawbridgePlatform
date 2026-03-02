@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { Lock, Shield, Eye, EyeOff, Smartphone } from 'lucide-react';
+import { Lock, Shield, Eye, EyeOff, Smartphone, CheckCircle, XCircle } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { userService } from '../../services/userService';
 
 const Security: React.FC = () => {
+    const { user } = useAuth();
+
     const [showPasswords, setShowPasswords] = useState({
         current: false,
         new: false,
@@ -15,23 +19,42 @@ const Security: React.FC = () => {
     });
 
     const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setPasswords(prev => ({ ...prev, [name]: value }));
+        setFeedback(null);
     };
 
     const togglePasswordVisibility = (field: 'current' | 'new' | 'confirm') => {
         setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }));
     };
 
-    const handleUpdatePassword = () => {
-        // Mock password update
-        alert('Password updated successfully!');
-        setPasswords({ current: '', new: '', confirm: '' });
+    const handleUpdatePassword = async () => {
+        if (!user?.id) return;
+        setIsSubmitting(true);
+        setFeedback(null);
+        try {
+            await userService.changePassword(user.id, passwords.current, passwords.new);
+            setFeedback({ type: 'success', message: 'Password updated successfully.' });
+            setPasswords({ current: '', new: '', confirm: '' });
+        } catch (err: any) {
+            const msg = err?.message?.includes('403')
+                ? 'Current password is incorrect.'
+                : 'Failed to update password. Please try again.';
+            setFeedback({ type: 'error', message: msg });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
-    const isPasswordValid = passwords.current && passwords.new && passwords.confirm && passwords.new === passwords.confirm;
+    const isPasswordValid =
+        passwords.current &&
+        passwords.new &&
+        passwords.confirm &&
+        passwords.new === passwords.confirm;
 
     return (
         <div className="space-y-6">
@@ -117,12 +140,24 @@ const Security: React.FC = () => {
                         )}
                     </div>
 
+                    {feedback && (
+                        <div className={`flex items-center gap-2 p-3 rounded-lg text-sm ${feedback.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                            {feedback.type === 'success'
+                                ? <CheckCircle className="w-4 h-4 shrink-0" />
+                                : <XCircle className="w-4 h-4 shrink-0" />}
+                            {feedback.message}
+                        </div>
+                    )}
+
                     <button
                         onClick={handleUpdatePassword}
-                        disabled={!isPasswordValid}
-                        className={`btn-primary px-6 py-2.5 mt-2 ${!isPasswordValid ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={!isPasswordValid || isSubmitting}
+                        className={`btn-primary px-6 py-2.5 mt-2 flex items-center gap-2 ${(!isPasswordValid || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                        Update Password
+                        {isSubmitting && (
+                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        )}
+                        {isSubmitting ? 'Updating…' : 'Update Password'}
                     </button>
                 </div>
             </div>

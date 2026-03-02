@@ -2,6 +2,7 @@ package uqu.drawbridge.platform.controller
 
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import uqu.drawbridge.platform.ChangePasswordRequest
 import uqu.drawbridge.platform.UserDTO
 import uqu.drawbridge.platform.service.UserService
 
@@ -31,6 +32,20 @@ class UserController(
             ResponseEntity.ok(updatedUser)
         } else {
             ResponseEntity.notFound().build()
+        }
+    }
+
+    @PatchMapping("/{id}/password")
+    fun changePassword(
+        @PathVariable id: String,
+        @RequestBody request: ChangePasswordRequest
+    ): ResponseEntity<Void> {
+        return try {
+            val success = userService.changePassword(id, request)
+            if (success) ResponseEntity.noContent().build()
+            else ResponseEntity.notFound().build()
+        } catch (_: uqu.drawbridge.platform.exception.InvalidCredentialsException) {
+            ResponseEntity.status(403).build()
         }
     }
 }

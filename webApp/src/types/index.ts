@@ -65,7 +65,8 @@ import {
     AddToCartRequest,
 
     // User Request DTOs
-    UpdateUserProfileRequest
+    UpdateUserProfileRequest,
+    ChangePasswordRequest
 } from 'shared';
 
 // Re-export all shared enums and types for use throughout the webapp
@@ -118,7 +119,8 @@ export {
     UpdateAutoOrderConfigRequest,
     AddToCartRequest,
     UpdateOrderTrackingRequest,
-    UpdateUserProfileRequest
+    UpdateUserProfileRequest,
+    ChangePasswordRequest
 };
 
 // Define type aliases to match the shared DTO structures
