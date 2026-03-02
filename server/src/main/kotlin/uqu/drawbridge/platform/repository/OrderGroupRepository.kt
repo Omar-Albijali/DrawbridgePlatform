@@ -6,6 +6,8 @@ import uqu.drawbridge.platform.PaymentStatus
 
 interface OrderGroupRepository : JpaRepository<OrderGroup, String> {
     fun findByRetailerId(retailerId: String): List<OrderGroup>
+
+    fun findTopByRetailerIdOrderByCreatedAtDesc(retailerId: String): OrderGroup?
     fun findByPaymentStatus(paymentStatus: PaymentStatus): List<OrderGroup>
     fun findByRetailerIdAndPaymentStatus(retailerId: String, paymentStatus: PaymentStatus): List<OrderGroup>
 }

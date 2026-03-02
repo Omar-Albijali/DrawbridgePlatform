@@ -1,83 +1,152 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { Bot } from "lucide-react";
 
-const quickQuestions = [
-    "Check my order status",
-    "Return policy",
-    "Contact support",
-    "Other"
+interface Message {
+  sender: "bot" | "user";
+  text: string;
+}
+
+const quickOptions = [
+  { label: "Track my order" },
+  { label: "Request a refund" },
+  { label: "Technical issue" },
+  { label: "Pricing & subscription" },
+  { label: "Other" }
 ];
 
-export default function AssistantPage() {
+const intentMap: Record<string, string> = {
+  "Track my order": "track_order",
+  "Request a refund": "refund",
+  "Technical issue": "technical_issue",
+  "Pricing & subscription": "pricing",
+  "Other": "other"
+};
 
-    const [messages, setMessages] = useState([
-        {
-            sender: "bot",
-            text: "Hello 👋 I'm your Drawbridge Assistant. How can I help you today?"
-        }
-    ]);
+const AssistantPage = () => {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      sender: "bot",
+      text: "Hello! I'm your virtual assistant. Please select one of the options below so I can assist you."
+    }
+  ]);
 
-    const [allowTyping, setAllowTyping] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
 
-    const handleQuestion = async (question: string) => {
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-        setMessages(prev => [...prev, { sender: "user", text: question }]);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
 
-        if (question === "Other") {
-            setAllowTyping(true);
-            setMessages(prev => [
-                ...prev,
-                { sender: "bot", text: "Please type your issue and we will forward it to support." }
-            ]);
-            return;
-        }
+  const handleOptionClick = async (label: string) => {
+    setMessages(prev => [...prev, { sender: "user", text: label }]);
+    setShowOptions(false);
+    setIsTyping(true);
 
-        const res = await fetch("/chatbot", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: question })
-        });
+    try {
+      const token = localStorage.getItem("drawbridge_token");
 
-        const data = await res.json();
+      const res = await fetch("http://localhost:8080/api/assistant", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          intent: intentMap[label] ?? "other"
+        })
+      });
 
-        setMessages(prev => [...prev, { sender: "bot", text: data.reply }]);
-    };
+      if (!res.ok) {
+        const errText = await res.text();
+        setIsTyping(false);
+        setMessages(prev => [
+          ...prev,
+          { sender: "bot", text: `Assistant service error (${res.status}). ${errText}` }
+        ]);
+        return;
+      }
 
-    return (
-        <div className="p-6 h-full flex flex-col">
+      const data = await res.json();
 
-            <div className="flex-1 overflow-y-auto space-y-4">
+      setIsTyping(false);
+      setMessages(prev => [...prev, { sender: "bot", text: data.reply ?? "No reply returned." }]);
+    } catch (e) {
+      setIsTyping(false);
+      setMessages(prev => [...prev, { sender: "bot", text: "Unable to connect to assistant service." }]);
+    }
+  };
 
-                {messages.map((msg, index) => (
-                    <div
-                        key={index}
-                        className={`p-3 rounded-lg max-w-md ${
-                            msg.sender === "bot"
-                                ? "bg-gray-200"
-                                : "bg-blue-500 text-white ml-auto"
-                        }`}
-                    >
-                        {msg.text}
-                    </div>
-                ))}
-
-            </div>
-
-            {!allowTyping && (
-                <div className="mt-4 grid grid-cols-2 gap-2">
-
-                    {quickQuestions.map(q => (
-                        <button
-                            key={q}
-                            onClick={() => handleQuestion(q)}
-                            className="p-3 border rounded-lg hover:bg-gray-100"
-                        >
-                            {q}
-                        </button>
-                    ))}
-
-                </div>
-            )}
-
+  return (
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Header */}
+      <div className="p-4 border-b bg-white flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+          <Bot className="w-5 h-5 text-white" />
         </div>
-    );
-}
+        <div>
+          <h1 className="font-semibold text-lg">Assistant</h1>
+          <p className="text-xs text-gray-500">Online</p>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 p-6 overflow-y-auto space-y-4">
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`max-w-md px-4 py-3 rounded-2xl text-sm shadow-sm transition whitespace-pre-line ${
+                msg.sender === "user"
+                  ? "bg-blue-600 text-white"
+                  : "bg-white border text-gray-800"
+              }`}
+            >
+              {msg.text}
+            </div>
+          </div>
+        ))}
+
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="bg-white border px-4 py-3 rounded-2xl text-sm text-gray-500 shadow-sm">
+              Assistant is typing...
+            </div>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Fake Input */}
+      <div className="p-4 border-t bg-white">
+        <div
+          onClick={() => setShowOptions(prev => !prev)}
+          className="w-full border rounded-xl px-4 py-3 text-gray-400 cursor-pointer hover:bg-gray-50 transition"
+        >
+          Type your message...
+        </div>
+      </div>
+
+      {/* Quick Options */}
+      {showOptions && (
+        <div className="p-4 border-t bg-gray-50 grid gap-3">
+          {quickOptions.map((option, index) => (
+            <button
+              key={index}
+              onClick={() => handleOptionClick(option.label)}
+              className="bg-white border rounded-xl px-4 py-3 text-left hover:bg-gray-100 transition shadow-sm"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AssistantPage;

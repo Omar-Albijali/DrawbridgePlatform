@@ -43,6 +43,15 @@ class OrderService(
         return orderGroupRepository.findByRetailerIdAndPaymentStatus(retailerId, paymentStatus)
     }
 
+    @Transactional(readOnly = true)
+    fun getLatestOrdersDTOForRetailer(retailerId: String): List<uqu.drawbridge.platform.OrderDTO> {
+        val latestGroup = orderGroupRepository.findTopByRetailerIdOrderByCreatedAtDesc(retailerId)
+            ?: return emptyList()
+
+        val orders = orderRepository.findByOrderGroupId(latestGroup.id!!)
+        return orders.map { it.toDTO() }
+    }
+
     @Transactional
     fun createOrderGroup(orderGroup: OrderGroup): OrderGroup {
         return orderGroupRepository.save(orderGroup)
@@ -315,10 +324,12 @@ class OrderService(
     fun getOrdersDTOByWholesaler(wholesalerId: String): List<uqu.drawbridge.platform.OrderDTO> {
         return getOrdersByWholesaler(wholesalerId).map { it.toDTO() }
     }
-    
+
     @Transactional(readOnly = true)
     fun getOrdersDTOByRetailer(retailerId: String): List<uqu.drawbridge.platform.OrderDTO> {
-        return getOrdersByRetailer(retailerId).map { it.toDTO() }
+        return getOrdersByRetailer(retailerId)
+            .sortedByDescending { it.id }  // UUID string، ترتيب تقريبي
+            .map { it.toDTO() }
     }
     
     @Transactional(readOnly = true)
