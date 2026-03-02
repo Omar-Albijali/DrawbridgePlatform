@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { User, AuthResponse, ErrorResponse, UserRole, VerificationStatus, RegisterRequest } from '../types';
+import { User, UserRole, VerificationStatus, RegisterRequest } from '../types';
+import { authService } from '../services/authService';
+import { userService } from '../services/userService';
 
 const STORAGE_USER_KEY = 'drawbridge_user';
 const STORAGE_TOKEN_KEY = 'drawbridge_token';
@@ -44,54 +46,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
     const [isLoading, setIsLoading] = useState(0);
 
+    const mapUserEnums = (userJson: any): User => ({
+        ...userJson,
+        role: UserRole.valueOf(userJson.role as unknown as string),
+        verificationStatus: userJson.verificationStatus
+            ? VerificationStatus.valueOf(userJson.verificationStatus as unknown as string)
+            : null
+    }) as unknown as User;
+
     const login = useCallback(async (email: string, password: string): Promise<boolean> => {
         setIsLoading(prev => prev + 1);
 
         try {
-            const res = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-
-            if (!res.ok) {
-                // Best-effort to read server error for debugging, but keep UI behavior simple.
-                try {
-                    await res.json() as ErrorResponse;
-                } catch {
-                    // ignore
-                }
-                return false;
-            }
-
-            const authData = await res.json() as AuthResponse;
+            const authData = await authService.login(email, password);
             const token = authData.token;
+
+            localStorage.setItem(STORAGE_TOKEN_KEY, token);
+
             let finalUser: User;
-
-            // Fetch full profile
             try {
-                const userRes = await fetch(`/api/users/${authData.userId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (userRes.ok) {
-                    // We need to properly instantiate the User object or at least map Enums
-                    // The JSON will return strings for Enums, but our TypeScript types expect Enum objects
-                    const userJson = await userRes.json();
-                    finalUser = {
-                        ...userJson,
-                        role: UserRole.valueOf(userJson.role as unknown as string),
-                        verificationStatus: userJson.verificationStatus ? VerificationStatus.valueOf(userJson.verificationStatus as unknown as string) : null
-                    } as unknown as User;
-                } else {
-                    // Fallback to auth data if fetch fails
-                    throw new Error('Failed to fetch profile');
-                }
+                const userJson = await userService.getById(authData.userId);
+                finalUser = mapUserEnums(userJson);
             } catch (e) {
                 console.warn("Falling back to basic auth data", e);
-                // Fallback: Cast plain object to User (imperfect but better than nothing)
                 finalUser = {
                     id: authData.userId,
                     name: authData.name,
@@ -107,7 +84,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 } as unknown as User;
             }
 
-            localStorage.setItem(STORAGE_TOKEN_KEY, token);
             localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(finalUser));
             setUser(finalUser);
             return true;
@@ -122,25 +98,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setIsLoading(prev => prev + 1);
 
         try {
-            const res = await fetch('/api/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...request,
-                    role: (request.role as any).name
-                })
-            });
-
-            if (!res.ok) {
-                try {
-                    await res.json() as ErrorResponse;
-                } catch {
-                    // ignore
-                }
-                return false;
-            }
-
-            const data = await res.json() as AuthResponse;
+            const data = await authService.register(request);
 
             const newUser: User = {
                 id: data.userId,
@@ -186,23 +144,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const token = localStorage.getItem(STORAGE_TOKEN_KEY);
             if (!token) return;
 
-            const userRes = await fetch(`/api/users/${user.id}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            const userJson = await userService.getById(user.id);
+            const updatedUser = mapUserEnums(userJson);
 
-            if (userRes.ok) {
-                const userJson = await userRes.json();
-                const updatedUser = {
-                    ...userJson,
-                    role: UserRole.valueOf(userJson.role as unknown as string),
-                    verificationStatus: userJson.verificationStatus ? VerificationStatus.valueOf(userJson.verificationStatus as unknown as string) : null
-                } as unknown as User;
-
-                localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updatedUser));
-                setUser(updatedUser);
-            }
+            localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updatedUser));
+            setUser(updatedUser);
         } catch (error) {
             console.error("Failed to refresh user profile", error);
         } finally {
