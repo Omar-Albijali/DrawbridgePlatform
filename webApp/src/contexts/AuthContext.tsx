@@ -108,6 +108,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             const storage = rememberMe ? localStorage : sessionStorage;
             clearStoredAuth();
+            storage.setItem(STORAGE_TOKEN_KEY, token);
 
             let finalUser: User;
             try {

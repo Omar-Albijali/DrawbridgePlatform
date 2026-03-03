@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole } from '../../types';
 import { userService } from '../../services/userService';
@@ -7,6 +7,9 @@ import { Camera, Check, Building2, FileText, BadgeCheck } from 'lucide-react';
 const Profile: React.FC = () => {
     const { user, refreshUser } = useAuth();
     const isRetailer = user?.role === UserRole.RETAILER;
+
+    const avatarInputRef = useRef<HTMLInputElement | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -68,6 +71,29 @@ const Profile: React.FC = () => {
         }
     };
 
+    const triggerAvatarUpload = () => {
+        if (!isUploading) {
+            avatarInputRef.current?.click();
+        }
+    };
+
+    const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !user?.id) return;
+
+        try {
+            setIsUploading(true);
+            await userService.uploadProfileImage(user.id, file);
+            await refreshUser();
+        } catch (error) {
+            console.error('Failed to upload profile image', error);
+            alert('Failed to upload image');
+        } finally {
+            setIsUploading(false);
+            e.target.value = '';
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -104,9 +130,22 @@ const Profile: React.FC = () => {
                                 </span>
                             )}
                         </div>
-                        <button className="absolute -bottom-1 -right-1 w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-primary-700 transition-colors">
+                        <button
+                            type="button"
+                            onClick={triggerAvatarUpload}
+                            disabled={isUploading}
+                            className="absolute -bottom-1 -right-1 w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-primary-700 transition-colors disabled:opacity-60"
+                            title="Upload avatar"
+                        >
                             <Camera className="w-4 h-4" />
                         </button>
+                        <input
+                            ref={avatarInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleProfileImageChange}
+                        />
                     </div>
                     <div>
                         <div>
@@ -115,10 +154,6 @@ const Profile: React.FC = () => {
                                 {user?.role?.toString()} Account
                             </p>
                             <p className="text-sm text-navy-400 mt-1">Rep: {formData.repName}</p>
-
-                            <button className="mt-3 text-sm text-primary-600 hover:text-primary-700 font-medium border border-primary-200 rounded-lg px-3 py-1 bg-primary-50">
-                                Upload Logo
-                            </button>
                         </div>
                     </div>
                 </div>
