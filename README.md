@@ -206,14 +206,14 @@ I've updated the priority list for you. Every issue previously marked as Low (gr
 
 ### **1. Account Management**
 
-* 🔴 **Password change is a mocked browser alert** (no actual change).
-* 🔴 **"Forgot Password" link is a dead `#` link**.
-* 🟠 Duplicate email registration is not blocked.
-* 🟠 Email verification workflow is missing.
-* 🟡 "Remember Me" checkbox has no logic.
-* 🟡 Two-Factor Authentication toggle is non-functional.
-* 🟡 **Avatar/Logo upload buttons do nothing**.
-* 🟡 **Server-side session invalidation on logout is missing**.
+* 🟢 ~~**Password change is a mocked browser alert** (no actual change).~~
+* 🟢 ~~**"Forgot Password" link is a dead `#` link**.~~
+* 🟢 ~~Duplicate email registration is not blocked.~~
+* 🟢 ~~Email verification workflow is missing.~~
+* 🟢 ~~"Remember Me" checkbox has no logic.~~
+* 🟢 ~~**Avatar/Logo upload buttons do nothing**.~~
+* 🟢 ~~**Server-side session invalidation on logout is missing**.~~
+* 🟡 Two-Factor Authentication is missing.
 
 ### **2. Product Market**
 
