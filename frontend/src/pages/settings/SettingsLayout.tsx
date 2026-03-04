@@ -1,32 +1,55 @@
+import { Bell, CreditCard, MapPin, Shield, User } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 
-const settingsLinks = [
-  { to: '/settings/profile', label: 'Profile' },
-  { to: '/settings/security', label: 'Security' },
-  { to: '/settings/payments', label: 'Payments' },
-  { to: '/settings/addresses', label: 'Addresses' },
-  { to: '/settings/notifications', label: 'Notifications' },
-] as const;
+interface NavItemProps {
+  to: string;
+  icon: JSX.Element;
+  label: string;
+}
+
+function NavItem({ to, icon, label }: NavItemProps): JSX.Element {
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+          isActive
+            ? 'bg-primary-600 text-white shadow-md'
+            : 'text-navy-600 hover:bg-navy-100 hover:text-navy-800'
+        }`
+      }
+    >
+      {icon}
+      <span>{label}</span>
+    </NavLink>
+  );
+}
 
 export default function SettingsLayout(): JSX.Element {
+  const navItems = [
+    { to: '/settings/profile', icon: <User className="w-5 h-5" />, label: 'My Profile' },
+    { to: '/settings/security', icon: <Shield className="w-5 h-5" />, label: 'Login & Security' },
+    { to: '/settings/payments', icon: <CreditCard className="w-5 h-5" />, label: 'Payment Methods' },
+    { to: '/settings/addresses', icon: <MapPin className="w-5 h-5" />, label: 'Address Management' },
+    { to: '/settings/notifications', icon: <Bell className="w-5 h-5" />, label: 'Notification Preferences' },
+  ];
+
   return (
-    <section className="settings-layout">
-      <aside className="settings-layout__menu">
-        {settingsLinks.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              isActive ? 'settings-layout__link settings-layout__link--active' : 'settings-layout__link'
-            }
-          >
-            {item.label}
-          </NavLink>
-        ))}
+    <div className="flex gap-8">
+      <aside className="w-72 flex-shrink-0">
+        <div className="card sticky top-6">
+          <h2 className="text-lg font-semibold text-navy-800 mb-4 px-4">Settings</h2>
+          <nav className="space-y-1">
+            {navItems.map((item) => (
+              <NavItem key={item.to} {...item} />
+            ))}
+          </nav>
+        </div>
       </aside>
-      <div className="settings-layout__panel">
+
+      <main className="flex-1 min-w-0">
         <Outlet />
-      </div>
-    </section>
+      </main>
+    </div>
   );
 }

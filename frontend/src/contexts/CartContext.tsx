@@ -7,15 +7,10 @@ import {
   type ReactNode,
 } from 'react';
 import { useAuth } from './AuthContext';
+import type { Product } from '../types';
 
 const STORAGE_CART_KEY = 'drawbridge_cart';
 const TAX_RATE = 0.15;
-
-export interface Product {
-  id: string;
-  name: string;
-  price: number;
-}
 
 export interface CartItem {
   product: Product;

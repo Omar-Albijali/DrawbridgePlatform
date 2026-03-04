@@ -1,4 +1,5 @@
 import { fetchApi } from './api';
+import { UserRole } from 'shared';
 import {
     AuthResponse,
     LoginRequest,
@@ -9,6 +10,20 @@ import {
     ResendVerificationRequest,
     LogoutRequest
 } from '../types';
+
+const getRoleName = (role: unknown): string => {
+    const enumName = (role as { name?: string } | null | undefined)?.name;
+    if (enumName) {
+        return enumName;
+    }
+
+    if (typeof role === 'string' && role.trim().length > 0) {
+        return role;
+    }
+
+    // Runtime fallback to a known shared enum value.
+    return UserRole.RETAILER.name;
+};
 
 export const authService = {
     login: (email: string, password: string, rememberMe: boolean) =>
@@ -21,7 +36,7 @@ export const authService = {
     register: (request: RegisterRequest) => {
         const body = {
             ...request,
-            role: (request.role as any).name
+            role: getRoleName(request.role)
         };
         return fetchApi<AuthResponse>('/auth/register', {
             method: 'POST',
