@@ -18,6 +18,7 @@ import {
   Truck,
   XCircle,
 } from 'lucide-react';
+import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { orderService } from '../services/orderService';
 import { Order, OrderStatus, UserRole } from '../types';
@@ -201,15 +202,10 @@ export default function Orders(): JSX.Element {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-800">{isWholesaler ? 'Customer Orders' : 'My Orders'}</h1>
-          <p className="text-navy-500 mt-1">
-            {isWholesaler ? 'Manage and fulfill customer orders' : 'Track your order history and status'}
-          </p>
-        </div>
-      </div>
+    <PageShell
+      title={isWholesaler ? 'Customer Orders' : 'My Orders'}
+      description={isWholesaler ? 'Manage and fulfill customer orders' : 'Track your order history and status'}
+    >
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
@@ -417,43 +413,43 @@ export default function Orders(): JSX.Element {
                             menuPosition &&
                             createPortal(
                               <div
-                                className="fixed w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-[9999] animate-in fade-in slide-in-from-top-2 duration-200"
+                                className="fixed w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-[9999] animate-in fade-in slide-in-from-top-2 duration-200 dark:border-white/10 dark:bg-slate-900"
                                 style={{ top: menuPosition.top, left: menuPosition.left }}
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <button
-                                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors"
+                                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors dark:text-slate-200 dark:hover:bg-slate-800"
                                   onClick={() => {
                                     setOpenMenuId(null);
                                     navigate(`/orders/${order.id}`);
                                   }}
                                 >
-                                  <Eye className="w-4 h-4 text-navy-400" />
+                                  <Eye className="w-4 h-4 text-navy-400 dark:text-slate-400" />
                                   View Details
                                 </button>
                                 <button
-                                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors"
+                                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors dark:text-slate-200 dark:hover:bg-slate-800"
                                   onClick={() => {
                                     alert('Download invoice feature coming soon!');
                                     setOpenMenuId(null);
                                   }}
                                 >
-                                  <FileText className="w-4 h-4 text-navy-400" />
+                                  <FileText className="w-4 h-4 text-navy-400 dark:text-slate-400" />
                                   Download Invoice
                                 </button>
                                 <button
-                                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors"
+                                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors dark:text-slate-200 dark:hover:bg-slate-800"
                                   onClick={() => {
                                     alert('Support feature coming soon!');
                                     setOpenMenuId(null);
                                   }}
                                 >
-                                  <MessageSquare className="w-4 h-4 text-navy-400" />
+                                  <MessageSquare className="w-4 h-4 text-navy-400 dark:text-slate-400" />
                                   Contact Support
                                 </button>
                                 {!isWholesaler && !['DELIVERED', 'SHIPPED', 'CANCELLED'].includes(status) && (
                                   <button
-                                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-50 mt-1"
+                                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-50 mt-1 dark:border-white/10 dark:hover:bg-red-500/15"
                                     onClick={(e) => {
                                       void handleAction('cancel', order.id, e);
                                       setOpenMenuId(null);
@@ -478,6 +474,6 @@ export default function Orders(): JSX.Element {
           {filteredOrders.length === 0 && <div className="p-8 text-center text-navy-500">No orders found matching your criteria.</div>}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

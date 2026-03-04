@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CheckCircle2, CreditCard, Lock, MapPin, Package } from 'lucide-react';
+import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { addressService } from '../services/addressService';
@@ -169,13 +170,9 @@ export default function Checkout(): JSX.Element {
   const selectedPaymentMethod = paymentMethods.find((method) => method.id === selectedPaymentMethodId);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-navy-800">Checkout</h1>
-        <p className="text-navy-500 mt-1">Complete your order</p>
-      </div>
+    <PageShell title="Checkout" description="Complete your order" className="page-shell--narrow buyer-checkout">
 
-      <div className="bg-white rounded-xl shadow-card p-6">
+      <div className="buyer-checkout__stepper bg-white rounded-xl shadow-card p-6">
         <div className="flex items-center justify-between">
           {[
             { id: 'shipping', label: 'Shipping', icon: MapPin },
@@ -195,7 +192,9 @@ export default function Checkout(): JSX.Element {
                 >
                   {currentStepIndex > index ? <CheckCircle2 className="w-5 h-5" /> : <step.icon className="w-5 h-5" />}
                 </div>
-                <span className={`font-medium hidden sm:block ${step.id === currentStep ? 'text-primary-600' : 'text-navy-500'}`}>
+                <span
+                  className={`buyer-checkout__step-label font-medium hidden sm:block ${step.id === currentStep ? 'text-primary-600' : 'text-navy-500'}`}
+                >
                   {step.label}
                 </span>
               </div>
@@ -210,7 +209,7 @@ export default function Checkout(): JSX.Element {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           {currentStep === 'shipping' && (
-            <div className="bg-white rounded-xl shadow-card p-6">
+            <div className="buyer-checkout__panel bg-white rounded-xl shadow-card p-6">
               <h2 className="text-lg font-semibold text-navy-800 mb-6 flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-primary-600" />
                 Shipping Address
@@ -219,13 +218,13 @@ export default function Checkout(): JSX.Element {
               {!showAddressForm ? (
                 <div className="space-y-4">
                   {addresses.length === 0 && <p className="text-gray-500 text-center py-4">No saved addresses found.</p>}
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="buyer-checkout__option-grid grid grid-cols-1 gap-4">
                     {addresses.map((address) => (
                       <button
                         key={address.id}
                         type="button"
                         onClick={() => setSelectedAddressId(address.id ?? null)}
-                        className={`p-4 border rounded-lg text-left transition-colors ${
+                        className={`buyer-checkout__option p-4 border rounded-lg text-left transition-colors ${
                           selectedAddressId === address.id ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
@@ -355,7 +354,7 @@ export default function Checkout(): JSX.Element {
           )}
 
           {currentStep === 'payment' && (
-            <div className="bg-white rounded-xl shadow-card p-6">
+            <div className="buyer-checkout__panel bg-white rounded-xl shadow-card p-6">
               <h2 className="text-lg font-semibold text-navy-800 mb-6 flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-primary-600" />
                 Payment Method
@@ -366,13 +365,13 @@ export default function Checkout(): JSX.Element {
                   {paymentMethods.length === 0 && (
                     <p className="text-gray-500 text-center py-4">No saved payment methods found.</p>
                   )}
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="buyer-checkout__option-grid grid grid-cols-1 gap-4">
                     {paymentMethods.map((method) => (
                       <button
                         key={method.id}
                         type="button"
                         onClick={() => setSelectedPaymentMethodId(method.id)}
-                        className={`p-4 border rounded-lg text-left transition-colors ${
+                        className={`buyer-checkout__option p-4 border rounded-lg text-left transition-colors ${
                           selectedPaymentMethodId === method.id ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
@@ -483,7 +482,7 @@ export default function Checkout(): JSX.Element {
                       />
                     </div>
                   </div>
-                  <div className="mt-6 p-4 bg-gray-50 rounded-lg flex items-center gap-3">
+                  <div className="buyer-checkout__secure-note mt-6 p-4 bg-gray-50 rounded-lg flex items-center gap-3">
                     <Lock className="w-5 h-5 text-green-600" />
                     <p className="text-sm text-navy-600">Your payment is secure. We use 256-bit SSL encryption.</p>
                   </div>
@@ -502,7 +501,7 @@ export default function Checkout(): JSX.Element {
           )}
 
           {currentStep === 'confirmation' && (
-            <div className="bg-white rounded-xl shadow-card p-6">
+            <div className="buyer-checkout__panel bg-white rounded-xl shadow-card p-6">
               <div className="text-center mb-8">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 className="w-8 h-8 text-green-600" />
@@ -511,7 +510,7 @@ export default function Checkout(): JSX.Element {
                 <p className="text-navy-500">Please review your order before placing it</p>
               </div>
 
-              <div className="border border-gray-200 rounded-lg p-4 mb-4">
+              <div className="buyer-checkout__review-card border border-gray-200 rounded-lg p-4 mb-4">
                 <h3 className="font-semibold text-navy-800 mb-2 flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-primary-600" />
                   Shipping Address
@@ -527,7 +526,7 @@ export default function Checkout(): JSX.Element {
                 )}
               </div>
 
-              <div className="border border-gray-200 rounded-lg p-4 mb-4">
+              <div className="buyer-checkout__review-card border border-gray-200 rounded-lg p-4 mb-4">
                 <h3 className="font-semibold text-navy-800 mb-2 flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-primary-600" />
                   Payment Method
@@ -535,7 +534,7 @@ export default function Checkout(): JSX.Element {
                 {selectedPaymentMethod && <p className="text-navy-600">{selectedPaymentMethod.maskedDetails}</p>}
               </div>
 
-              <div className="border border-gray-200 rounded-lg p-4">
+              <div className="buyer-checkout__review-card border border-gray-200 rounded-lg p-4">
                 <h3 className="font-semibold text-navy-800 mb-4 flex items-center gap-2">
                   <Package className="w-4 h-4 text-primary-600" />
                   Order Items ({items.length})
@@ -568,7 +567,7 @@ export default function Checkout(): JSX.Element {
         </div>
 
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl shadow-card p-6 sticky top-24">
+          <div className="buyer-checkout__summary bg-white rounded-xl shadow-card p-6 sticky top-24">
             <h3 className="text-lg font-semibold text-navy-800 mb-4">Order Summary</h3>
 
             <div className="space-y-3 mb-6">
@@ -611,6 +610,6 @@ export default function Checkout(): JSX.Element {
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

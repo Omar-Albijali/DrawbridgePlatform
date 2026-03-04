@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Edit2, Package, Plus, RefreshCw, Search, Settings, Trash2, XCircle } from 'lucide-react';
 import AddInventoryModal from '../components/AddInventoryModal/AddInventoryModal';
 import AutoRestockModal from '../components/AutoRestockModal/AutoRestockModal';
+import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { inventoryService } from '../services/inventoryService';
 import type { AutoOrderConfigDTO, CreateInventoryItemRequest, InventoryItem } from '../types';
-import { InventoryStatus, ScheduleType } from '../types';
+import { InventoryStatus, ScheduleType, UserRole } from '../types';
 
 export default function Inventory(): JSX.Element {
   const { user } = useAuth();
+
+  const isRetailer = user?.role === UserRole.RETAILER;
+  if (!isRetailer) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -162,17 +170,16 @@ export default function Inventory(): JSX.Element {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-800">Inventory Management</h1>
-          <p className="text-navy-500 mt-1">Track and manage your stock levels</p>
-        </div>
+    <PageShell
+      title="Inventory Management"
+      description="Track and manage your stock levels"
+      actions={
         <button type="button" onClick={() => setIsAddModalOpen(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           Add Product
         </button>
-      </div>
+      }
+    >
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card !p-4">
@@ -345,6 +352,6 @@ export default function Inventory(): JSX.Element {
       <AutoRestockModal item={selectedItem} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveConfig} />
 
       <AddInventoryModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddInventory} />
-    </div>
+    </PageShell>
   );
 }

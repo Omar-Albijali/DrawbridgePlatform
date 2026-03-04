@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Edit2, Eye, EyeOff, Package, PackagePlus, Plus, Search, Star, Trash2 } from 'lucide-react';
+import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { productService } from '../services/productService';
 import type { Product } from '../types';
@@ -78,17 +79,16 @@ export default function ManageProducts(): JSX.Element {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-800">Manage Products</h1>
-          <p className="text-navy-500 mt-1">Create, edit, and manage your product listings</p>
-        </div>
+    <PageShell
+      title="Manage Products"
+      description="Create, edit, and manage your product listings"
+      actions={
         <button type="button" onClick={() => navigate('/products/new')} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           Add Product
         </button>
-      </div>
+      }
+    >
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card !p-4">
@@ -276,6 +276,6 @@ export default function ManageProducts(): JSX.Element {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

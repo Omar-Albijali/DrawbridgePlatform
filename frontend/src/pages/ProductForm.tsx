@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Package, Plus, Save, Star, Trash2, Upload } from 'lucide-react';
+import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { productService } from '../services/productService';
 import type { Category, CreateProductRequest } from '../types';
@@ -259,9 +260,11 @@ export default function ProductForm(): JSX.Element {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <PageShell
+      title={isEditMode ? 'Edit Product' : 'Add New Product'}
+      description={isEditMode ? 'Update product details and images' : 'Fill in the product details below'}
+      actions={
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate('/products')}
@@ -269,12 +272,6 @@ export default function ProductForm(): JSX.Element {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-navy-800">{isEditMode ? 'Edit Product' : 'Add New Product'}</h1>
-            <p className="text-navy-500 mt-0.5">{isEditMode ? 'Update product details and images' : 'Fill in the product details below'}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
           <button type="button" onClick={() => navigate('/products')} className="btn-secondary" disabled={isSubmitting}>
             Cancel
           </button>
@@ -283,7 +280,8 @@ export default function ProductForm(): JSX.Element {
             {isSubmitting ? (isEditMode ? 'Saving...' : 'Creating...') : isEditMode ? 'Save Changes' : 'Create Product'}
           </button>
         </div>
-      </div>
+      }
+    >
 
       {error && <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>}
 
@@ -511,6 +509,6 @@ export default function ProductForm(): JSX.Element {
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

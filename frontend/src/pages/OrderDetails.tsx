@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Download, MapPin, Package, Truck } from 'lucide-react';
+import PageShell from '../components/PageShell';
 import { orderService } from '../services/orderService';
 import { Order } from '../types';
 
@@ -53,33 +54,30 @@ export default function OrderDetails(): JSX.Element {
   }
 
   return (
-    <div className="space-y-6">
-      <button
-        onClick={() => navigate('/orders')}
-        className="flex items-center gap-2 text-navy-500 hover:text-navy-800 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Orders
-      </button>
-
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-800">Order #{order.id}</h1>
-          <div className="flex items-center gap-2 text-navy-500 mt-1">
-            <Calendar className="w-4 h-4" />
-            <span>Placed on {new Date(order.placedAt).toLocaleString()}</span>
-            <span className="mx-2">•</span>
-            <span className="bg-gray-100 px-2 py-0.5 rounded text-sm font-medium text-navy-700 capitalize">
-              {statusName(order.status).toLowerCase().replace('_', ' ')}
-            </span>
-          </div>
-        </div>
-        <div className="flex gap-2">
+    <PageShell
+      title={`Order #${order.id}`}
+      description={`Placed on ${new Date(order.placedAt).toLocaleString()}`}
+      actions={
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/orders')}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-navy-600 hover:bg-gray-50 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
           <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-navy-600 hover:bg-gray-50 transition-colors">
             <Download className="w-4 h-4" />
             Download Invoice
           </button>
         </div>
+      }
+    >
+      <div className="inline-flex items-center gap-2 text-navy-500 text-sm -mt-2">
+        <Calendar className="w-4 h-4" />
+        <span className="bg-gray-100 px-2 py-0.5 rounded text-sm font-medium text-navy-700 capitalize">
+          {statusName(order.status).toLowerCase().replace('_', ' ')}
+        </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -190,6 +188,6 @@ export default function OrderDetails(): JSX.Element {
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

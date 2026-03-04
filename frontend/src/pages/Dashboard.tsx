@@ -22,10 +22,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { inventoryCompositionData, monthlyExpensesData, monthlySalesData, orderStatusData } from '../data/constants';
 import { orderService } from '../services/orderService';
-import { NotificationType, type Notification, type Order, type OrderStatus } from '../types';
+import { NotificationType, UserRole, type Notification, type Order, type OrderStatus } from '../types';
 
 interface KpiCardProps {
   title: string;
@@ -58,7 +59,7 @@ function KpiCard({ title, value, change, icon, iconBg, valueColor }: KpiCardProp
 
 export default function Dashboard(): JSX.Element {
   const { user } = useAuth();
-  const isRetailer = (user?.role as { name?: string } | string | undefined) === 'RETAILER' || user?.role?.name === 'RETAILER';
+  const isRetailer = user?.role === UserRole.RETAILER;
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [notifications] = useState<Notification[]>([
@@ -79,13 +80,6 @@ export default function Dashboard(): JSX.Element {
   ]);
 
   useEffect(() => {
-    const getRoleName = (role: { name?: string } | string | undefined): string => {
-      if (!role) {
-        return '';
-      }
-      return typeof role === 'string' ? role : (role.name ?? '');
-    };
-
     const fetchData = async (): Promise<void> => {
       if (!user?.id) {
         setIsLoading(false);
@@ -93,8 +87,9 @@ export default function Dashboard(): JSX.Element {
       }
 
       try {
-        const roleName = getRoleName(user.role as { name?: string } | string | undefined);
-        const data = roleName === 'WHOLESALER' ? await orderService.getByWholesaler(user.id) : await orderService.getByRetailer(user.id);
+        const data = user.role === UserRole.WHOLESALER
+          ? await orderService.getByWholesaler(user.id)
+          : await orderService.getByRetailer(user.id);
         setOrders(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Failed to fetch dashboard data', error);
@@ -206,11 +201,10 @@ export default function Dashboard(): JSX.Element {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-navy-800">Welcome back, {user?.name?.split(' ')[0]}!</h1>
-        <p className="text-navy-500 mt-1">Here&apos;s what&apos;s happening with your {isRetailer ? 'business' : 'store'} today.</p>
-      </div>
+    <PageShell
+      title={`Welcome back, ${user?.name?.split(' ')[0] ?? 'there'}!`}
+      description={`Here's what's happening with your ${isRetailer ? 'business' : 'store'} today.`}
+    >
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpis.map((kpi) => (
@@ -323,6 +317,6 @@ export default function Dashboard(): JSX.Element {
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

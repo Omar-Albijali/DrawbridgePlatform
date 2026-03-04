@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useAuth } from './AuthContext';
-import type { Product } from '../types';
+import { UserRole, type Product } from '../types';
 
 const STORAGE_CART_KEY = 'drawbridge_cart';
 const TAX_RATE = 0.15;
@@ -46,7 +46,8 @@ function readStoredCart(): CartItem[] {
 }
 
 export function CartProvider({ children }: { children: ReactNode }): JSX.Element {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isWholesaler = user?.role === UserRole.WHOLESALER;
   const [items, setItems] = useState<CartItem[]>(() => readStoredCart());
 
   const saveItems = useCallback((nextItems: CartItem[]) => {
@@ -56,6 +57,10 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
 
   const addToCart = useCallback(
     async (product: Product, quantity = 1): Promise<void> => {
+      if (!isAuthenticated || isWholesaler) {
+        return;
+      }
+
       const existingIndex = items.findIndex((item) => item.product.id === product.id);
       if (existingIndex >= 0) {
         const nextItems = [...items];
@@ -70,7 +75,7 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
 
       saveItems([...items, { product, quantity }]);
     },
-    [items, saveItems],
+    [isAuthenticated, isWholesaler, items, saveItems],
   );
 
   const removeFromCart = useCallback(
@@ -106,13 +111,13 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
   }, [saveItems]);
 
   const checkout = useCallback(async (): Promise<boolean> => {
-    if (!isAuthenticated || items.length === 0) {
+    if (!isAuthenticated || isWholesaler || items.length === 0) {
       return false;
     }
 
     saveItems([]);
     return true;
-  }, [isAuthenticated, items.length, saveItems]);
+  }, [isAuthenticated, isWholesaler, items.length, saveItems]);
 
   const itemCount = items.reduce((totalItems, item) => totalItems + item.quantity, 0);
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);

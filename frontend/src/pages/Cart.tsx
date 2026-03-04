@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import PageShell from '../components/PageShell';
 import { useCart } from '../contexts/CartContext';
 
 export default function Cart(): JSX.Element {
@@ -7,8 +8,8 @@ export default function Cart(): JSX.Element {
 
   if (items.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center py-16">
+      <PageShell title="Shopping Cart" description="Your cart is currently empty." className="buyer-cart">
+        <div className="buyer-cart__empty text-center py-16">
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <ShoppingBag className="w-12 h-12 text-navy-400" />
           </div>
@@ -22,17 +23,16 @@ export default function Cart(): JSX.Element {
             Browse Marketplace
           </Link>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-800">Shopping Cart</h1>
-          <p className="text-navy-500 mt-1">{itemCount} items in your cart</p>
-        </div>
+    <PageShell
+      title="Shopping Cart"
+      description={`${itemCount} items in your cart`}
+      className="buyer-cart"
+      actions={
         <button
           type="button"
           onClick={() => void clearCart()}
@@ -41,12 +41,13 @@ export default function Cart(): JSX.Element {
           <Trash2 className="w-4 h-4" />
           Clear Cart
         </button>
-      </div>
+      }
+    >
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="buyer-cart__layout grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           {items.map((item) => (
-            <div key={item.product.id} className="bg-white rounded-xl shadow-card p-4 flex gap-4">
+            <div key={item.product.id} className="buyer-cart__item bg-white rounded-xl shadow-card p-4 flex gap-4">
               <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                 <img src={item.product.image} alt={item.product.name} className="w-full h-full object-cover" />
               </div>
@@ -86,7 +87,7 @@ export default function Cart(): JSX.Element {
                     </button>
                   </div>
 
-                  <div className="text-right">
+                  <div className="buyer-cart__price text-right">
                     <p className="text-sm text-navy-500">SAR {item.product.price.toFixed(2)} each</p>
                     <p className="font-bold text-navy-800">SAR {(item.product.price * item.quantity).toFixed(2)}</p>
                   </div>
@@ -97,7 +98,7 @@ export default function Cart(): JSX.Element {
         </div>
 
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl shadow-card p-6 sticky top-24">
+          <div className="buyer-cart__summary bg-white rounded-xl shadow-card p-6 sticky top-24">
             <h3 className="text-lg font-semibold text-navy-800 mb-4">Order Summary</h3>
 
             <div className="space-y-3 mb-6">
@@ -144,6 +145,6 @@ export default function Cart(): JSX.Element {
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

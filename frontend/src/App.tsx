@@ -1,6 +1,11 @@
 import { RouterProvider } from 'react-router-dom';
+import MotionLayer from './components/MotionLayer';
 import { router } from './routes';
 
 export default function App(): JSX.Element {
-  return <RouterProvider router={router} />;
+  return (
+    <MotionLayer>
+      <RouterProvider router={router} />
+    </MotionLayer>
+  );
 }

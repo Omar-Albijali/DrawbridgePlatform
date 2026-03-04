@@ -13,18 +13,19 @@ interface ToggleSwitchProps {
 
 function ToggleSwitch({ enabled, onChange, label, description, channel }: ToggleSwitchProps): JSX.Element {
   return (
-    <div className="flex items-center justify-between py-4 border-b border-gray-100 last:border-0">
+    <div className="flex items-center justify-between border-b border-gray-100 py-4 last:border-0 dark:border-white/10">
       <div className="flex-1">
         <div className="flex items-center gap-2">
-          <h4 className="font-medium text-navy-800">{label}</h4>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-navy-500">{channel}</span>
+          <h4 className="font-medium text-navy-800 dark:text-slate-100">{label}</h4>
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-navy-500 dark:bg-slate-800 dark:text-slate-300">{channel}</span>
         </div>
-        <p className="text-sm text-navy-500 mt-0.5">{description}</p>
+        <p className="mt-0.5 text-sm text-navy-500 dark:text-slate-300">{description}</p>
       </div>
       <button
+        type="button"
         onClick={() => onChange(!enabled)}
         className={`relative w-12 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ml-4 ${
-          enabled ? 'bg-primary-600' : 'bg-gray-300'
+          enabled ? 'bg-primary-600' : 'bg-gray-300 dark:bg-slate-600'
         }`}
       >
         <span
@@ -126,25 +127,25 @@ export default function Notifications(): JSX.Element {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-navy-800">Notification Preferences</h1>
-        <p className="text-navy-500 mt-1">Control what emails and notifications you receive</p>
+        <h1 className="text-2xl font-bold text-navy-800 dark:text-slate-100">Notification Preferences</h1>
+        <p className="mt-1 text-navy-500 dark:text-slate-300">Control what emails and notifications you receive</p>
       </div>
 
-      <div className="card bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-100">
+      <div className="card border border-primary-100 bg-gradient-to-r from-primary-50 to-blue-50 dark:border-white/10 dark:from-slate-900 dark:to-slate-800">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-500/20">
             <Bell className="w-6 h-6 text-primary-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-navy-800">Notification Channels</h3>
+            <h3 className="font-semibold text-navy-800 dark:text-slate-100">Notification Channels</h3>
             <div className="flex items-center gap-4 mt-1">
-              <span className="flex items-center gap-1.5 text-sm text-navy-600">
+              <span className="flex items-center gap-1.5 text-sm text-navy-600 dark:text-slate-300">
                 <Mail className="w-4 h-4" /> Email
               </span>
-              <span className="flex items-center gap-1.5 text-sm text-navy-600">
+              <span className="flex items-center gap-1.5 text-sm text-navy-600 dark:text-slate-300">
                 <MessageSquare className="w-4 h-4" /> SMS
               </span>
-              <span className="flex items-center gap-1.5 text-sm text-navy-600">
+              <span className="flex items-center gap-1.5 text-sm text-navy-600 dark:text-slate-300">
                 <Bell className="w-4 h-4" /> Push
               </span>
             </div>
@@ -154,9 +155,9 @@ export default function Notifications(): JSX.Element {
 
       {sections.map((section) => (
         <div key={section.id} className="card">
-          <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-200">
+          <div className="mb-4 flex items-center gap-2 border-b border-gray-200 pb-4 dark:border-white/10">
             {section.icon}
-            <h3 className="text-lg font-semibold text-navy-800">{section.title}</h3>
+            <h3 className="text-lg font-semibold text-navy-800 dark:text-slate-100">{section.title}</h3>
           </div>
           <div>
             {section.items.map((item) => (

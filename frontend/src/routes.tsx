@@ -25,14 +25,11 @@ import Security from './pages/settings/Security';
 import SettingsLayout from './pages/settings/SettingsLayout';
 import Support from './pages/Support';
 import Reports from './pages/Reports';
+import Landing from './pages/Landing';
+import { UserRole } from './types';
 
 function withTransition(element: ReactElement): ReactElement {
   return <PageTransition>{element}</PageTransition>;
-}
-
-function RootRedirect(): JSX.Element {
-  const { isAuthenticated } = useAuth();
-  return <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />;
 }
 
 function RedirectIfAuthenticated({ children }: { children: ReactElement }): ReactElement {
@@ -40,10 +37,34 @@ function RedirectIfAuthenticated({ children }: { children: ReactElement }): Reac
   return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
 }
 
+function BlockWholesalerInventory({ children }: { children: ReactElement }): ReactElement {
+  const { user } = useAuth();
+  if (user?.role !== UserRole.RETAILER) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+}
+
+function BlockRetailerProducts({ children }: { children: ReactElement }): ReactElement {
+  const { user } = useAuth();
+  if (user?.role !== UserRole.WHOLESALER) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+}
+
+function BlockWholesalerCart({ children }: { children: ReactElement }): ReactElement {
+  const { user } = useAuth();
+  if (user?.role === UserRole.WHOLESALER) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+}
+
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <RootRedirect />,
+    element: withTransition(<Landing />),
   },
   {
     path: '/login',
@@ -75,19 +96,70 @@ export const router = createBrowserRouter([
   },
   {
     path: '/',
+    element: <MainLayout requireAuth={false} />,
+    children: [
+      {
+        path: 'marketplace',
+        element: withTransition(<Marketplace />),
+      },
+    ],
+  },
+  {
+    path: '/',
     element: <MainLayout />,
     children: [
       { path: 'dashboard', element: withTransition(<Dashboard />) },
-      { path: 'marketplace', element: withTransition(<Marketplace />) },
-      { path: 'inventory', element: withTransition(<Inventory />) },
+      {
+        path: 'inventory',
+        element: withTransition(
+          <BlockWholesalerInventory>
+            <Inventory />
+          </BlockWholesalerInventory>,
+        ),
+      },
       { path: 'orders', element: withTransition(<Orders />) },
       { path: 'orders/:id', element: withTransition(<OrderDetails />) },
-      { path: 'cart', element: withTransition(<Cart />) },
-      { path: 'checkout', element: withTransition(<Checkout />) },
+      {
+        path: 'cart',
+        element: withTransition(
+          <BlockWholesalerCart>
+            <Cart />
+          </BlockWholesalerCart>,
+        ),
+      },
+      {
+        path: 'checkout',
+        element: withTransition(
+          <BlockWholesalerCart>
+            <Checkout />
+          </BlockWholesalerCart>,
+        ),
+      },
       { path: 'support', element: withTransition(<Support />) },
-      { path: 'products', element: withTransition(<ManageProducts />) },
-      { path: 'products/new', element: withTransition(<ProductForm />) },
-      { path: 'products/edit/:id', element: withTransition(<ProductForm />) },
+      {
+        path: 'products',
+        element: withTransition(
+          <BlockRetailerProducts>
+            <ManageProducts />
+          </BlockRetailerProducts>,
+        ),
+      },
+      {
+        path: 'products/new',
+        element: withTransition(
+          <BlockRetailerProducts>
+            <ProductForm />
+          </BlockRetailerProducts>,
+        ),
+      },
+      {
+        path: 'products/edit/:id',
+        element: withTransition(
+          <BlockRetailerProducts>
+            <ProductForm />
+          </BlockRetailerProducts>,
+        ),
+      },
       { path: 'reports', element: withTransition(<Reports />) },
       {
         path: 'settings',
