@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
+    "frontend",
     "webApp",
     "shared/build/dist/js/developmentLibrary"
   ],
   "scripts": {
     "build": "cd webApp && npm run build",
-    "start": "cd webApp && npm run start"
+    "start": "cd webApp && npm run start",
+    "build:frontend": "cd frontend && npm run build",
+    "start:frontend": "cd frontend && npm run dev"
   }
 }
