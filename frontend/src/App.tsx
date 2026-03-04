@@ -1,8 +1,6 @@
+import { RouterProvider } from 'react-router-dom';
+import { router } from './routes';
+
 export default function App(): JSX.Element {
-  return (
-    <main className="app-container">
-      <h1>Drawbridge Frontend</h1>
-      <p>Frontend migration scaffold is ready.</p>
-    </main>
-  );
+  return <RouterProvider router={router} />;
 }
