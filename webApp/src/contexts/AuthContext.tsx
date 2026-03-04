@@ -46,6 +46,27 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+    const getEnumToken = (value: unknown, fieldName: 'role' | 'verificationStatus'): string => {
+        if (typeof value === 'string' && value.trim().length > 0) {
+            return value.trim();
+        }
+
+        throw new Error(`Invalid ${fieldName} value: ${String(value)}`);
+    };
+
+    function mapUserEnums(userJson: any): User {
+        const roleToken = getEnumToken(userJson.role, 'role');
+        const verificationToken = userJson.verificationStatus == null
+            ? null
+            : getEnumToken(userJson.verificationStatus, 'verificationStatus');
+
+        return {
+            ...userJson,
+            role: UserRole.valueOf(roleToken),
+            verificationStatus: verificationToken ? VerificationStatus.valueOf(verificationToken) : null
+        } as unknown as User;
+    }
+
     const getStorageForToken = (): Storage | null => {
         if (localStorage.getItem(STORAGE_TOKEN_KEY)) return localStorage;
         if (sessionStorage.getItem(STORAGE_TOKEN_KEY)) return sessionStorage;
@@ -55,7 +76,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const getStoredUser = (): User | null => {
         const storage = getStorageForToken();
         if (!storage) return null;
-        return safeParseJson<User>(storage.getItem(STORAGE_USER_KEY));
+        const parsed = safeParseJson<any>(storage.getItem(STORAGE_USER_KEY));
+        if (!parsed) {
+            return null;
+        }
+
+        try {
+            return mapUserEnums(parsed);
+        } catch {
+            clearStoredAuth();
+            return null;
+        }
     };
 
     const clearStoredAuth = () => {
@@ -66,22 +97,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const setStoredAuth = (storage: Storage, token: string, nextUser: User) => {
+        const serializedUser = {
+            ...nextUser,
+            role: nextUser.role.name,
+            verificationStatus: nextUser.verificationStatus?.name ?? null
+        };
+
         storage.setItem(STORAGE_TOKEN_KEY, token);
-        storage.setItem(STORAGE_USER_KEY, JSON.stringify(nextUser));
+        storage.setItem(STORAGE_USER_KEY, JSON.stringify(serializedUser));
     };
 
     const [user, setUser] = useState<User | null>(() => {
         return getStoredUser();
     });
     const [isLoading, setIsLoading] = useState(0);
-
-    const mapUserEnums = (userJson: any): User => ({
-        ...userJson,
-        role: UserRole.valueOf(userJson.role as unknown as string),
-        verificationStatus: userJson.verificationStatus
-            ? VerificationStatus.valueOf(userJson.verificationStatus as unknown as string)
-            : null
-    }) as unknown as User;
 
     const extractErrorMessage = (error: unknown): string => {
         if (!(error instanceof Error)) return '';
@@ -116,11 +145,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 finalUser = mapUserEnums(userJson);
             } catch (e) {
                 console.warn("Falling back to basic auth data", e);
-                finalUser = {
+                finalUser = mapUserEnums({
                     id: authData.userId,
                     name: authData.name,
                     email: authData.email,
-                    role: UserRole.valueOf(authData.role as unknown as string),
+                    role: authData.role,
                     company: '',
                     phone: null,
                     addresses: null,
@@ -128,7 +157,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     commercialRegister: null,
                     verificationStatus: null,
                     avatar: null
-                } as unknown as User;
+                });
             }
 
             setStoredAuth(storage, token, finalUser);
@@ -151,11 +180,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
             const data = await authService.register(request);
 
-            const newUser: User = {
+            const newUser = mapUserEnums({
                 id: data.userId,
                 name: data.name,
                 email: data.email,
-                role: UserRole.valueOf(data.role as unknown as string),
+                role: data.role,
                 company: request.businessName ?? '',
                 phone: request.phoneNumber ?? null,
                 addresses: request.addresses ?? null,
@@ -168,7 +197,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 commercialRegister: request.commercialRegistrationNumber ?? null,
                 verificationStatus: null, // Initial status
                 avatar: null
-            } as unknown as User;
+            });
 
             clearStoredAuth();
             setStoredAuth(localStorage, data.token, newUser);

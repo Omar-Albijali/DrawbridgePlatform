@@ -10,7 +10,6 @@
   "scripts": {
     "build": "cd webApp && npm run build",
     "start": "cd webApp && npm run start",
-    "build:frontend": "cd frontend && npm run build",
-    "start:frontend": "cd frontend && npm run dev"
+    "dev": "cd webApp && npm run dev"
   }
 }

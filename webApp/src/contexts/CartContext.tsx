@@ -1,230 +1,152 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { Product, UserRole } from '../types';
-import { cartService } from '../services/cartService';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useAuth } from './AuthContext';
+import { UserRole, type Product } from '../types';
+
+const STORAGE_CART_KEY = 'drawbridge_cart';
+const TAX_RATE = 0.15;
 
 export interface CartItem {
-    product: Product;
-    quantity: number;
+  product: Product;
+  quantity: number;
 }
 
 interface CartContextType {
-    items: CartItem[];
-    itemCount: number;
-    subtotal: number;
-    tax: number;
-    total: number;
-    addToCart: (product: Product, quantity?: number) => Promise<void>;
-    removeFromCart: (productId: string) => Promise<void>;
-    updateQuantity: (productId: string, quantity: number) => Promise<void>;
-    clearCart: () => Promise<void>;
-    checkout: () => Promise<boolean>;
+  items: CartItem[];
+  itemCount: number;
+  subtotal: number;
+  tax: number;
+  total: number;
+  addToCart: (product: Product, quantity?: number) => Promise<void>;
+  removeFromCart: (productId: string) => Promise<void>;
+  updateQuantity: (productId: string, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
+  checkout: () => Promise<boolean>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-export const useCart = () => {
-    const context = useContext(CartContext);
-    if (!context) {
-        throw new Error('useCart must be used within a CartProvider');
-    }
-    return context;
-};
+function readStoredCart(): CartItem[] {
+  const rawValue = localStorage.getItem(STORAGE_CART_KEY);
+  if (!rawValue) {
+    return [];
+  }
 
-interface CartProviderProps {
-    children: ReactNode;
+  try {
+    return JSON.parse(rawValue) as CartItem[];
+  } catch {
+    return [];
+  }
 }
 
-const TAX_RATE = 0.15; // 15% VAT
+export function CartProvider({ children }: { children: ReactNode }): JSX.Element {
+  const { isAuthenticated, user } = useAuth();
+  const isWholesaler = user?.role === UserRole.WHOLESALER;
+  const [items, setItems] = useState<CartItem[]>(() => readStoredCart());
 
-export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
-    const { user } = useAuth();
-    const [items, setItems] = useState<CartItem[]>(() => {
-        // Initial state from local storage for guests or first load
-        const savedCart = localStorage.getItem('drawbridge_cart');
-        return savedCart ? JSON.parse(savedCart) : [];
-    });
+  const saveItems = useCallback((nextItems: CartItem[]) => {
+    setItems(nextItems);
+    localStorage.setItem(STORAGE_CART_KEY, JSON.stringify(nextItems));
+  }, []);
 
-    // Helper to sync local storage, mainly for guest users or cache
-    const saveLocally = (newItems: CartItem[]) => {
-        setItems(newItems);
-        localStorage.setItem('drawbridge_cart', JSON.stringify(newItems));
-    };
+  const addToCart = useCallback(
+    async (product: Product, quantity = 1): Promise<void> => {
+      if (!isAuthenticated || isWholesaler) {
+        return;
+      }
 
-    // Sync from Server on Login
-    useEffect(() => {
-        const fetchRemoteCart = async () => {
-            if (user?.id && user.role === UserRole.RETAILER) {
-                try {
-                    const retailerId = user.id;
-                    await cartService.getItems(retailerId);
-
-                    // Note: Ideally we would map the remote items (which are just IDs) 
-                    // to full Product objects here. For now, we trust the local optimistic state 
-                    // or assume products are loaded elsewhere.
-                    // This limitation is noted for future refactoring.
-
-                } catch (e) {
-                    console.error("Failed to sync cart", e);
-                }
-            }
+      const existingIndex = items.findIndex((item) => item.product.id === product.id);
+      if (existingIndex >= 0) {
+        const nextItems = [...items];
+        const currentItem = nextItems[existingIndex];
+        nextItems[existingIndex] = {
+          ...currentItem,
+          quantity: currentItem.quantity + quantity,
         };
-        fetchRemoteCart();
-    }, [user]);
+        saveItems(nextItems);
+        return;
+      }
 
-    const addToCart = useCallback(async (product: Product, quantity: number = 1) => {
-        // Optimistic update
-        const currentItems = [...items];
-        const existingItemIndex = currentItems.findIndex(item => item.product.id === product.id);
+      saveItems([...items, { product, quantity }]);
+    },
+    [isAuthenticated, isWholesaler, items, saveItems],
+  );
 
-        let newItems: CartItem[];
-        if (existingItemIndex >= 0) {
-            const updatedItem = { ...currentItems[existingItemIndex] };
-            updatedItem.quantity += quantity;
-            newItems = [...currentItems];
-            newItems[existingItemIndex] = updatedItem;
-        } else {
-            newItems = [...currentItems, { product, quantity }];
-        }
+  const removeFromCart = useCallback(
+    async (productId: string): Promise<void> => {
+      saveItems(items.filter((item) => item.product.id !== productId));
+    },
+    [items, saveItems],
+  );
 
-        saveLocally(newItems);
+  const updateQuantity = useCallback(
+    async (productId: string, quantity: number): Promise<void> => {
+      if (quantity <= 0) {
+        await removeFromCart(productId);
+        return;
+      }
 
-        // Server Sync
-        if (user?.id && user.role === UserRole.RETAILER) {
-            try {
-                await cartService.addItem(user.id, product.id, quantity);
-            } catch (error) {
-                console.error("Failed to add to server cart", error);
-            }
-        }
-    }, [items, user]);
+      saveItems(
+        items.map((item) =>
+          item.product.id === productId
+            ? {
+                ...item,
+                quantity,
+              }
+            : item,
+        ),
+      );
+    },
+    [items, removeFromCart, saveItems],
+  );
 
-    const removeFromCart = useCallback(async (productId: string) => {
-        const newItems = items.filter(item => item.product.id !== productId);
-        saveLocally(newItems);
+  const clearCart = useCallback(async (): Promise<void> => {
+    saveItems([]);
+  }, [saveItems]);
 
-        if (user?.id && user.role === UserRole.RETAILER) {
-            try {
-                await cartService.removeItem(user.id, productId);
-            } catch (error) {
-                console.error("Failed to remove from server cart", error);
-            }
-        }
-    }, [items, user]);
+  const checkout = useCallback(async (): Promise<boolean> => {
+    if (!isAuthenticated || isWholesaler || items.length === 0) {
+      return false;
+    }
 
-    const updateQuantity = useCallback(async (productId: string, quantity: number) => {
-        if (quantity <= 0) {
-            await removeFromCart(productId);
-            return;
-        }
+    saveItems([]);
+    return true;
+  }, [isAuthenticated, isWholesaler, items.length, saveItems]);
 
-        const newItems = items.map(item =>
-            item.product.id === productId
-                ? { ...item, quantity }
-                : item
-        );
-        saveLocally(newItems);
+  const itemCount = items.reduce((totalItems, item) => totalItems + item.quantity, 0);
+  const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const tax = subtotal * TAX_RATE;
+  const total = subtotal + tax;
 
-        if (user?.id && user.role === UserRole.RETAILER) {
-            try {
-                await cartService.updateQuantity(user.id, productId, quantity);
-            } catch (error) {
-                console.error("Failed to update server cart quantity", error);
-            }
-        }
-    }, [items, user, removeFromCart]);
+  const value = useMemo<CartContextType>(
+    () => ({
+      items,
+      itemCount,
+      subtotal,
+      tax,
+      total,
+      addToCart,
+      removeFromCart,
+      updateQuantity,
+      clearCart,
+      checkout,
+    }),
+    [addToCart, checkout, clearCart, itemCount, items, removeFromCart, subtotal, tax, total, updateQuantity],
+  );
 
-    const clearCart = useCallback(async () => {
-        saveLocally([]);
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+}
 
-        if (user?.id && user.role === UserRole.RETAILER) {
-            try {
-                await cartService.clear(user.id);
-            } catch (error) {
-                console.error("Failed to clear server cart", error);
-            }
-        }
-    }, [user]);
-
-    const checkout = useCallback(async () => {
-        if (!user?.id || user.role !== UserRole.RETAILER) return false;
-
-        try {
-            // Force sync local cart to server before checkout to ensure server has latest state
-            await cartService.clear(user.id);
-
-            let validItems: CartItem[] = [];
-            let invalidItemIds: string[] = [];
-
-            if (items.length > 0) {
-                // We use a for loop or Promise.all to map results
-                const syncResults = await Promise.all(items.map(async (item) => {
-                    try {
-                        await cartService.addItem(user.id, item.product.id, item.quantity);
-                        return { item, success: true };
-                    } catch (e) {
-                        console.warn(`Removing stale item from cart: ${item.product.id} (${item.product.name})`, e);
-                        return { item, success: false };
-                    }
-                }));
-
-                validItems = syncResults.filter(r => r.success).map(r => r.item);
-                invalidItemIds = syncResults.filter(r => !r.success).map(r => r.item.product.id);
-            }
-
-            // If we found invalid items, update local state immediately
-            if (invalidItemIds.length > 0) {
-                console.warn(`Removed ${invalidItemIds.length} invalid items from cart`);
-                saveLocally(validItems);
-                setItems(validItems);
-            }
-
-            if (validItems.length === 0 && items.length > 0) {
-                // All items failed were invalid
-                alert("Local cart data was out of sync with the server. Your cart has been refreshed and invalid items were removed. Please continue shopping.");
-                return false;
-            }
-
-            // If we have valid items (or originally had none, though logic prevents that path), proceed
-            if (validItems.length > 0) {
-                await cartService.checkout(user.id);
-
-                // Clear local cart after successful checkout
-                saveLocally([]);
-                setItems([]);
-                return true;
-            }
-
-            return false;
-        } catch (error) {
-            console.error("Checkout failed", error);
-            return false;
-        }
-    }, [user, items]);
-
-    const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-    const subtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-    const tax = subtotal * TAX_RATE;
-    const total = subtotal + tax;
-
-    const value: CartContextType = {
-        items,
-        itemCount,
-        subtotal,
-        tax,
-        total,
-        addToCart,
-        removeFromCart,
-        updateQuantity,
-        clearCart,
-        checkout
-    };
-
-    return (
-        <CartContext.Provider value={value}>
-            {children}
-        </CartContext.Provider>
-    );
-};
-
-export default CartContext;
+export function useCart(): CartContextType {
+  const context = useContext(CartContext);
+  if (!context) {
+    throw new Error('useCart must be used within a CartProvider');
+  }
+  return context;
+}

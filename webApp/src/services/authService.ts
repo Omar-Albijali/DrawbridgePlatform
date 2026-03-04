@@ -21,7 +21,7 @@ export const authService = {
     register: (request: RegisterRequest) => {
         const body = {
             ...request,
-            role: (request.role as any).name
+            role: request.role.name
         };
         return fetchApi<AuthResponse>('/auth/register', {
             method: 'POST',

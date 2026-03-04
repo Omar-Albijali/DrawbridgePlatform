@@ -1,229 +1,256 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Product } from '../types';
-import { productService } from '../services/productService';
-import ProductCard from '../components/ProductCard/ProductCard';
+import { useEffect, useMemo, useState } from 'react';
+import { Grid3X3, List, Search, SlidersHorizontal, X } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import FilterSidebar from '../components/FilterSidebar/FilterSidebar';
-import { Search, SlidersHorizontal, Grid3X3, List, X } from 'lucide-react';
+import PageShell from '../components/PageShell';
+import ProductCard from '../components/ProductCard/ProductCard';
+import { useAuth } from '../contexts/AuthContext';
+import { productService } from '../services/productService';
+import { UserRole, type Product } from '../types';
 
-const Marketplace: React.FC = () => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-    const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
-    const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000]);
-    const [sortBy, setSortBy] = useState('featured');
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-    const [showMobileFilters, setShowMobileFilters] = useState(false);
-    const [products, setProducts] = useState<Product[]>([]);
+export default function Marketplace(): JSX.Element {
+  const { isAuthenticated, user } = useAuth();
+  const isWholesaler = user?.role === UserRole.WHOLESALER;
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000]);
+  const [sortBy, setSortBy] = useState('featured');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
 
-    useEffect(() => {
-        const fetchProducts = async () => {
-            try {
-                const data = await productService.getAll();
-                setProducts(data);
-            } catch (error) {
-                console.error("Failed to fetch products", error);
-            }
-        };
-        fetchProducts();
-    }, []);
-
-    const filteredProducts = useMemo(() => {
-        return products.filter(product => {
-            // Search filter
-            if (searchQuery && !product.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-                !product.description.toLowerCase().includes(searchQuery.toLowerCase())) {
-                return false;
-            }
-
-            // Category filter
-            if (selectedCategories.length > 0 && !selectedCategories.includes(product.category)) {
-                return false;
-            }
-
-            // Brand filter
-            if (selectedBrands.length > 0 && !selectedBrands.includes(product.brand)) {
-                return false;
-            }
-
-            // Price filter
-            if (product.price < priceRange[0] || product.price > priceRange[1]) {
-                return false;
-            }
-
-            return true;
-        }).sort((a, b) => {
-            switch (sortBy) {
-                case 'price-low': return a.price - b.price;
-                case 'price-high': return b.price - a.price;
-                case 'rating': return b.rating - a.rating;
-                case 'newest': return b.id.localeCompare(a.id);
-                default: return 0;
-            }
-        });
-    }, [products, searchQuery, selectedCategories, selectedBrands, priceRange, sortBy]);
-
-    const clearFilters = () => {
-        setSelectedCategories([]);
-        setSelectedBrands([]);
-        setPriceRange([0, 5000]);
-        setSearchQuery('');
+  useEffect(() => {
+    const fetchProducts = async (): Promise<void> => {
+      try {
+        const data = await productService.getAll();
+        setProducts(data);
+      } catch (error) {
+        console.error('Failed to fetch products', error);
+      }
     };
 
-    const activeFilterCount = selectedCategories.length + selectedBrands.length +
-        (priceRange[0] > 0 || priceRange[1] < 5000 ? 1 : 0);
+    void fetchProducts();
+  }, []);
 
-    return (
-        <div className="space-y-6">
-            {/* Page Header */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-navy-800">Marketplace</h1>
-                    <p className="text-navy-500 mt-1">Discover products from trusted wholesalers</p>
-                </div>
-            </div>
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter((product) => {
+        if (
+          searchQuery &&
+          !product.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !product.description.toLowerCase().includes(searchQuery.toLowerCase())
+        ) {
+          return false;
+        }
 
-            {/* Search and Controls Bar */}
-            <div className="bg-white rounded-xl shadow-card p-4">
-                <div className="flex flex-col md:flex-row gap-4">
-                    {/* Search */}
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-navy-400" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search products..."
-                            className="w-full pl-10 pr-4 py-2.5 bg-gray-100 border border-transparent rounded-lg focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
-                        />
-                        {searchQuery && (
-                            <button
-                                onClick={() => setSearchQuery('')}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 hover:text-navy-600"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        )}
-                    </div>
+        if (selectedCategories.length > 0 && !selectedCategories.includes(product.category)) {
+          return false;
+        }
 
-                    {/* Sort */}
-                    <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value)}
-                        className="px-4 py-2.5 bg-gray-100 border border-transparent rounded-lg focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 text-navy-700"
-                    >
-                        <option value="featured">Featured</option>
-                        <option value="price-low">Price: Low to High</option>
-                        <option value="price-high">Price: High to Low</option>
-                        <option value="rating">Top Rated</option>
-                        <option value="newest">Newest</option>
-                    </select>
+        if (selectedBrands.length > 0 && !selectedBrands.includes(product.brand)) {
+          return false;
+        }
 
-                    {/* View Toggle */}
-                    <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white shadow-sm text-primary-600' : 'text-navy-500'}`}
-                        >
-                            <Grid3X3 className="w-5 h-5" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-primary-600' : 'text-navy-500'}`}
-                        >
-                            <List className="w-5 h-5" />
-                        </button>
-                    </div>
+        if (product.price < priceRange[0] || product.price > priceRange[1]) {
+          return false;
+        }
 
-                    {/* Mobile Filter Toggle */}
-                    <button
-                        onClick={() => setShowMobileFilters(true)}
-                        className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-gray-100 rounded-lg text-navy-700"
-                    >
-                        <SlidersHorizontal className="w-5 h-5" />
-                        Filters
-                        {activeFilterCount > 0 && (
-                            <span className="w-5 h-5 bg-primary-600 text-white text-xs rounded-full flex items-center justify-center">
-                                {activeFilterCount}
-                            </span>
-                        )}
-                    </button>
-                </div>
-            </div>
+        return true;
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'price-low':
+            return a.price - b.price;
+          case 'price-high':
+            return b.price - a.price;
+          case 'rating':
+            return (b.rating ?? 0) - (a.rating ?? 0);
+          case 'newest':
+            return b.id.localeCompare(a.id);
+          default:
+            return 0;
+        }
+      });
+  }, [priceRange, products, searchQuery, selectedBrands, selectedCategories, sortBy]);
 
-            {/* Main Content */}
-            <div className="flex gap-6">
-                {/* Filter Sidebar - Desktop */}
-                <div className="hidden lg:block w-72 flex-shrink-0">
-                    <FilterSidebar
-                        selectedCategories={selectedCategories}
-                        setSelectedCategories={setSelectedCategories}
-                        selectedBrands={selectedBrands}
-                        setSelectedBrands={setSelectedBrands}
-                        priceRange={priceRange}
-                        setPriceRange={setPriceRange}
-                        onClearFilters={clearFilters}
-                    />
-                </div>
+  const clearFilters = (): void => {
+    setSelectedCategories([]);
+    setSelectedBrands([]);
+    setPriceRange([0, 5000]);
+    setSearchQuery('');
+  };
 
-                {/* Product Grid */}
-                <div className="flex-1">
-                    {/* Results Count */}
-                    <div className="flex items-center justify-between mb-4">
-                        <p className="text-navy-600">
-                            Showing <span className="font-semibold">{filteredProducts.length}</span> products
-                        </p>
-                    </div>
+  const activeFilterCount =
+    selectedCategories.length + selectedBrands.length + (priceRange[0] > 0 || priceRange[1] < 5000 ? 1 : 0);
 
-                    {filteredProducts.length > 0 ? (
-                        <div className={`grid gap-6 ${viewMode === 'grid'
-                            ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'
-                            : 'grid-cols-1'
-                            }`}>
-                            {filteredProducts.map((product) => (
-                                <ProductCard key={product.id} product={product} />
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-16">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Search className="w-8 h-8 text-navy-400" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-navy-800 mb-2">No products found</h3>
-                            <p className="text-navy-500 mb-4">Try adjusting your search or filter criteria</p>
-                            <button onClick={clearFilters} className="btn-primary">
-                                Clear Filters
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
+  const redirectToLogin = (returnPath?: string): void => {
+    const currentPath = `${location.pathname}${location.search}${location.hash}`;
+    const nextPath = returnPath ?? currentPath;
+    navigate(`/login?returnTo=${encodeURIComponent(nextPath)}`, {
+      state: { from: { pathname: nextPath } },
+    });
+  };
 
-            {/* Mobile Filter Overlay */}
-            {showMobileFilters && (
-                <div className="fixed inset-0 bg-black/50 z-50 lg:hidden">
-                    <div className="absolute right-0 top-0 h-full w-80 bg-white overflow-y-auto">
-                        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                            <h3 className="font-semibold text-navy-800">Filters</h3>
-                            <button onClick={() => setShowMobileFilters(false)}>
-                                <X className="w-5 h-5 text-navy-600" />
-                            </button>
-                        </div>
-                        <div className="p-4">
-                            <FilterSidebar
-                                selectedCategories={selectedCategories}
-                                setSelectedCategories={setSelectedCategories}
-                                selectedBrands={selectedBrands}
-                                setSelectedBrands={setSelectedBrands}
-                                priceRange={priceRange}
-                                setPriceRange={setPriceRange}
-                                onClearFilters={clearFilters}
-                            />
-                        </div>
-                    </div>
-                </div>
+  return (
+    <PageShell
+      title="Marketplace"
+      description="Discover products from trusted wholesalers"
+      actions={
+        !isAuthenticated ? (
+          <button
+            type="button"
+            onClick={() => redirectToLogin()}
+            className="rounded-full border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-100"
+          >
+            Sign in to add items and checkout
+          </button>
+        ) : undefined
+      }
+    >
+      <div className="card p-4">
+        <div className="flex flex-col gap-4 md:flex-row">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-navy-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search products..."
+              className="w-full rounded-lg border border-transparent bg-gray-100 py-2.5 pl-10 pr-4 transition-colors focus:border-primary-500 focus:bg-white focus:ring-1 focus:ring-primary-500"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 hover:text-navy-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
-        </div>
-    );
-};
+          </div>
 
-export default Marketplace;
+          <select
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value)}
+            className="rounded-lg border border-transparent bg-gray-100 px-4 py-2.5 text-navy-700 focus:border-primary-500 focus:bg-white focus:ring-1 focus:ring-primary-500"
+          >
+            <option value="featured">Featured</option>
+            <option value="price-low">Price: Low to High</option>
+            <option value="price-high">Price: High to Low</option>
+            <option value="rating">Top Rated</option>
+            <option value="newest">Newest</option>
+          </select>
+
+          <div className="flex items-center rounded-lg bg-gray-100 p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`rounded-md p-2 transition-colors ${
+                viewMode === 'grid' ? 'bg-white text-primary-600 shadow-sm' : 'text-navy-500'
+              }`}
+            >
+              <Grid3X3 className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`rounded-md p-2 transition-colors ${
+                viewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-navy-500'
+              }`}
+            >
+              <List className="h-5 w-5" />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowMobileFilters(true)}
+            className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2.5 text-navy-700 lg:hidden"
+          >
+            <SlidersHorizontal className="h-5 w-5" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-xs text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-6">
+        <div className="hidden w-72 shrink-0 lg:block">
+          <FilterSidebar
+            selectedCategories={selectedCategories}
+            setSelectedCategories={setSelectedCategories}
+            selectedBrands={selectedBrands}
+            setSelectedBrands={setSelectedBrands}
+            priceRange={priceRange}
+            setPriceRange={setPriceRange}
+            onClearFilters={clearFilters}
+          />
+        </div>
+
+        <div className="flex-1">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-navy-600">
+              Showing <span className="font-semibold">{filteredProducts.length}</span> products
+            </p>
+          </div>
+
+          {filteredProducts.length > 0 ? (
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3' : 'space-y-4'}>
+              {filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  isAuthenticated={isAuthenticated}
+                  canAddToCart={!isWholesaler}
+                  onAuthRequired={redirectToLogin}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="card py-16 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+                <Search className="h-8 w-8 text-navy-400" />
+              </div>
+              <h3 className="mb-2 text-lg font-semibold text-navy-800">No products found</h3>
+              <p className="mb-4 text-navy-500">Try adjusting your search or filter criteria</p>
+              <button type="button" onClick={clearFilters} className="btn-primary">
+                Clear Filters
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showMobileFilters && (
+        <div className="fixed inset-0 z-50 bg-black/50 lg:hidden">
+          <div className="absolute right-0 top-0 h-full w-80 overflow-y-auto bg-white dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-white/10">
+              <h3 className="font-semibold text-navy-800 dark:text-slate-100">Filters</h3>
+              <button type="button" onClick={() => setShowMobileFilters(false)}>
+                <X className="h-5 w-5 text-navy-600 dark:text-slate-300" />
+              </button>
+            </div>
+            <div className="p-4">
+              <FilterSidebar
+                selectedCategories={selectedCategories}
+                setSelectedCategories={setSelectedCategories}
+                selectedBrands={selectedBrands}
+                setSelectedBrands={setSelectedBrands}
+                priceRange={priceRange}
+                setPriceRange={setPriceRange}
+                onClearFilters={clearFilters}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </PageShell>
+  );
+}
