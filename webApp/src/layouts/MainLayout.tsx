@@ -1,66 +1,39 @@
-import React, { useState, useEffect } from 'react';
-import { Outlet, Navigate, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import AppNavbar from '../components/AppNavbar';
 import { useAuth } from '../contexts/AuthContext';
-import Sidebar from '../components/Sidebar/Sidebar';
-import Header from '../components/Header/Header';
 
-const MainLayout: React.FC = () => {
-    const { isAuthenticated, isLoading } = useAuth();
-    const location = useLocation();
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+interface MainLayoutProps {
+  requireAuth?: boolean;
+}
 
-    const toggleSidebar = () => {
-        setSidebarCollapsed(prev => !prev);
-    };
+export default function MainLayout({ requireAuth = true }: MainLayoutProps): JSX.Element {
+  const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
 
-    // Listen for sidebar state changes
-    useEffect(() => {
-        const handleResize = () => {
-            if (window.innerWidth < 1024) {
-                setSidebarCollapsed(true);
-            }
-        };
-
-        window.addEventListener('resize', handleResize);
-        handleResize();
-
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    // Show loading state
-    if (isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-                    <p className="text-navy-600 font-medium">Loading...</p>
-                </div>
-            </div>
-        );
-    }
-
-    // Redirect to login if not authenticated
-    if (!isAuthenticated) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
-    }
-
+  if (requireAuth && isLoading) {
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Sidebar */}
-            <Sidebar isCollapsed={sidebarCollapsed} onToggle={toggleSidebar} />
-
-            {/* Main Content Area */}
-            <div className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
-                {/* Header */}
-                <Header />
-
-                {/* Page Content */}
-                <main className="p-6">
-                    <Outlet />
-                </main>
-            </div>
+      <div className="flex min-h-screen items-center justify-center px-4 text-slate-600 dark:text-slate-300">
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white/80 px-5 py-3 shadow-sm dark:border-white/10 dark:bg-slate-900/70">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
+          <p className="text-sm font-medium">Loading...</p>
         </div>
+      </div>
     );
-};
+  }
 
-export default MainLayout;
+  if (requireAuth && !isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return (
+    <div className="relative min-h-screen">
+      <div className="pointer-events-none fixed inset-0 bg-gradient-to-br from-primary-500/8 via-transparent to-cyan-400/10" />
+      <AppNavbar />
+      <main className="px-4 pb-10 pt-6 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl">
+          <Outlet />
+        </div>
+      </main>
+    </div>
+  );
+}
