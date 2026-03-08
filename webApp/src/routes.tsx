@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import PageTransition from './components/PageTransition';
 import { useAuth } from './contexts/AuthContext';
+import Wishlist from './pages/Wishlist';
 import MainLayout from './layouts/MainLayout';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -161,6 +162,14 @@ export const router = createBrowserRouter([
         ),
       },
       { path: 'reports', element: withTransition(<Reports />) },
+      {
+  path: 'wishlist',
+  element: withTransition(
+    <BlockWholesalerCart>
+      <Wishlist />
+    </BlockWholesalerCart>,
+  ),
+},
       {
         path: 'settings',
         element: withTransition(<SettingsLayout />),

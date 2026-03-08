@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { ShoppingCart, Star } from 'lucide-react';
+import { Heart, ShoppingCart, Star } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
-import type { Product } from '../../types';
+import { useWishlist } from '../../contexts/WishlistContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { UserRole, type Product } from '../../types';
 
 interface ProductCardProps {
   product: Product;
@@ -17,21 +19,29 @@ export default function ProductCard({
   onAuthRequired,
 }: ProductCardProps): JSX.Element {
   const { addToCart } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const { user } = useAuth();
+  const isRetailer = user?.role === UserRole.RETAILER;
   const [added, setAdded] = useState(false);
+  const inWishlist = isInWishlist(product.id);
 
   const handleAddToCart = (): void => {
-    if (!canAddToCart) {
-      return;
-    }
-
+    if (!canAddToCart) return;
     if (!isAuthenticated) {
       onAuthRequired?.('/marketplace');
       return;
     }
-
     void addToCart(product, 1);
     setAdded(true);
     setTimeout(() => setAdded(false), 1000);
+  };
+
+  const handleToggleWishlist = (): void => {
+    if (!isAuthenticated) {
+      onAuthRequired?.('/marketplace');
+      return;
+    }
+    void toggleWishlist(product.id);
   };
 
   const originalPrice = product.originalPrice ?? undefined;
@@ -41,7 +51,7 @@ export default function ProductCard({
       : 0;
 
   return (
-    <div className="buyer-product-card bg-white rounded-xl shadow-card overflow-hidden group hover:shadow-card-hover transition-all duration-300">
+    <div className="buyer-product-card bg-white rounded-xl shadow-card overflow-hidden group hover:shadow-card-hover transition-all duration-300 relative">
       <div className="buyer-product-card__media relative aspect-[4/3] overflow-hidden bg-gray-100">
         <img
           src={product.image}
@@ -59,6 +69,20 @@ export default function ProductCard({
           </span>
         )}
       </div>
+
+      {isRetailer && (
+        <button
+          type="button"
+          onClick={handleToggleWishlist}
+          className={`absolute top-3 right-3 z-20 pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${            inWishlist
+              ? 'bg-red-500 text-white scale-110'
+              : 'bg-white text-navy-400 hover:text-red-500 hover:scale-110'
+          }`}
+          title={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+        >
+          <Heart className={`w-4 h-4 transition-all duration-200 ${inWishlist ? 'fill-white' : ''}`} />
+        </button>
+      )}
 
       <div className="buyer-product-card__body p-4">
         <div className="flex items-center justify-between mb-2">
