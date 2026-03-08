@@ -1,283 +1,252 @@
-# Drawbridge Platform | منصة Drawbridge
+# Drawbridge Platform
 
-A comprehensive multi-platform retail and e-commerce solution built with Kotlin Multiplatform.
+Multi-platform retail and e-commerce platform built with Kotlin Multiplatform, Spring Boot, and React.
 
-حل متكامل للتجارة الإلكترونية والتجزئة متعدد المنصات مبني باستخدام تقنية Kotlin Multiplatform.
+## What You Will Run
 
----
+- Backend API: `http://localhost:8080`
+- Web app: `http://localhost:3000`
 
-## 🌐 Overview | نظرة عامة
+The web app proxies `/api` and `/uploads` to the backend, so both services should be running during normal web development.
 
-**Drawbridge Platform** is designed to provide a unified experience across Web, Mobile (Android & iOS), and Desktop. It leverages a shared Kotlin core for business logic and DTOs, ensuring consistency across all clients.
+## Project Modules
 
-تم تصميم **Drawbridge Platform** لتوفير تجربة موحدة عبر الويب (Web)، تطبيقات الجوال (Android & iOS)، وسطح المكتب (Desktop). تعتمد المنصة على نواة Kotlin مشتركة لمنطق الأعمال (Business Logic) وDTOs، مما يضمن التناسق بين جميع المنصات.
+- `server`: Spring Boot backend
+- `webApp`: React + Vite frontend
+- `shared`: Kotlin Multiplatform shared models and logic
+- `composeApp`: Compose Multiplatform UI module
+- `androidApp`: Android application entry point
+- `iosApp`: iOS application entry point
 
----
+## Prerequisites
 
-## ✨ Features | المميزات
+Install these before you start:
 
-- 🔐 **Authentication & User Management**: Secure login, registration, and profile management.
-  **إدارة الهوية والمستخدمين**: تسجيل دخول آمن، إنشاء حساب، وإدارة الملفات الشخصية.
-- 📦 **Inventory & Catalog**: Full control over products, categories, and stock levels.
-  **المخزون والكتالوج**: تحكم كامل في المنتجات، التصنيفات، ومستويات المخزون (Inventory).
-- 🛒 **Cart & Orders**: Seamless shopping experience and robust order processing.
-  **السلة والطلبات**: تجربة تسوق سلسة ومعالجة قوية للطلبات (Orders).
-- 💳 **Payment Integration**: Support for multiple payment methods and transaction tracking.
-  **تكامل الدفع**: دعم خيارات دفع متعددة وتتبع العمليات (Transactions).
-- 🎫 **Support System**: Integrated ticketing system for customer support.
-  **نظام الدعم**: نظام تذاكر مدمج لدعم العملاء (Support Tickets).
-- 📱 **Multi-platform UI**: Beautiful and responsive interfaces for all devices.
-  **واجهة متعددة المنصات**: واجهات جميلة ومتجاوبة لجميع الأجهزة.
+- JDK 21
+- Node.js 20+ and npm
+- Git
+- IntelliJ IDEA or Android Studio
+- Xcode if you will work on iOS
 
----
+Recommended checks in PowerShell:
 
-## 🏗️ Project Structure | هيكل المشروع
-
-- **`server`**: Spring Boot backend application providing the REST API.
-  **الجزء الخاص بالخادم (Backend)**: تطبيق مبني بـ Spring Boot يوفر REST API.
-- **`webApp`**: React frontend application for the web experience.
-  **تطبيق الويب (Frontend)**: تطبيق React لتجربة المتصفح.
-- **`shared`**: Kotlin Multiplatform module containing shared logic, DTOs, and types.
-  **الوحدة المشتركة (Shared)**: تحتوي على المنطق البرمجي المشترك، DTOs، والأنواع.
-- **`composeApp`**: Shared UI code for Android, Desktop, and iOS using Compose Multiplatform.
-  **واجهة الاستخدام المشتركة**: كود الواجهات المشترك لـ Android و Desktop و iOS.
-- **`iosApp`**: The native iOS entry point using SwiftUI.
-  **تطبيق iOS**: نقطة انطلاق التطبيق لنظام iOS باستخدام SwiftUI.
-
----
-
-## 🚀 Getting Started | البدء بالعمل
-
-### Team Local Standard (Recommended) | إعداد موحد للفريق
-
-Use the same local ports for everyone:
-استخدموا نفس المنافذ المحلية للجميع:
-
-- **Server**: `http://localhost:8080`
-- **Web App**: `http://localhost:3000`
-
-### 1) Create local env files | إنشاء ملفات الإعداد المحلية
-
-Linux / macOS:
-
-```bash
-./setup-env.bash
+```powershell
+java -version
+node -v
+npm -v
+git --version
 ```
 
-Windows:
+## Quick Start
 
-```cmd
-setup-env.cmd
+Open the repository root in PowerShell and run the steps in order.
+
+### 1. Clone the repository
+
+```powershell
+git clone <repository-url>
+cd DrawbridgePlatform
 ```
 
-Then open `server/.env` and set:
-ثم افتح `server/.env` واضبط القيم التالية:
+If you already cloned it, just open the root folder:
+
+```powershell
+cd <path-to-DrawbridgePlatform>
+```
+
+### 2. Create local environment files
+
+```powershell
+./setup-env.cmd
+```
+
+This creates these files if they do not already exist:
+
+- `server/.env`
+- `webApp/.env`
+
+Then open `server/.env` and set these required values:
 
 - `DB_USER`
 - `DB_PASSWORD`
 - `JWT_SECRET`
 
-The rest can stay as default for local team development.
-وباقي القيم يمكن أن تبقى افتراضية للتطوير المحلي للفريق.
+The remaining defaults are acceptable for normal local development unless the team tells you otherwise.
 
-### 2) Run backend | تشغيل الخادم
+### 3. Build the shared module
 
-Linux / macOS:
+Build the shared JS package before running the web app for the first time:
 
-```bash
-./gradlew :server:bootRun
+```powershell
+./gradlew.bat :shared:jsBrowserDevelopmentLibraryDistribution
 ```
 
-Windows:
+### 4. Install frontend dependencies
 
-```cmd
-gradlew.bat :server:bootRun
-```
-
-### 3) Run web app | تشغيل تطبيق الويب
-
-Linux / macOS:
-
-```bash
-cd webApp
+```powershell
 npm install
-npm run start
 ```
 
-Windows:
+### 5. Start the backend
 
-```cmd
-cd webApp
+In one PowerShell window:
+
+```powershell
+./gradlew.bat :server:bootRun
+```
+
+Wait until the server finishes starting, then confirm it is reachable at `http://localhost:8080`.
+
+### 6. Start the web app
+
+In a second PowerShell window:
+
+```powershell
+npm run dev
+```
+
+Then open `http://localhost:3000`.
+
+## First Run Checklist
+
+Use this if something does not start as expected.
+
+1. Confirm Java is version 21.
+2. Confirm `server/.env` exists and contains `DB_USER`, `DB_PASSWORD`, and `JWT_SECRET`.
+3. Confirm the shared module was built successfully before the first web run.
+4. Confirm `webApp/node_modules` exists after `npm install`.
+5. Confirm the backend is running on port `8080` before testing API-driven pages.
+6. Confirm the web app is running on port `3000`.
+
+## Useful Commands
+
+Use these when you need them. Run Gradle commands from the repository root.
+
+Build the shared module again after shared Kotlin changes:
+
+```powershell
+./gradlew.bat :shared:jsBrowserDevelopmentLibraryDistribution
+```
+
+Build the backend:
+
+```powershell
+./gradlew.bat :server:build
+```
+
+Run backend tests:
+
+```powershell
+./gradlew.bat :server:test
+```
+
+Build the web app:
+
+```powershell
+npm run build
+```
+
+## IDE Setup
+
+IntelliJ IDEA and Android Studio both work well for this repo.
+
+### Recommended IntelliJ or Android Studio setup
+
+1. Open the repository root as a Gradle project.
+2. Set the project JDK to Java 21.
+3. Let Gradle import all modules.
+4. Install Node.js support if your IDE asks for it.
+
+### Suggested run configurations
+
+Create these run configurations so the shared package and frontend dependencies are prepared before the web app starts.
+
+#### 1. Backend
+
+- Type: Gradle
+- Name: `server:bootRun`
+- Working directory: repository root
+- Tasks: `:server:bootRun`
+
+#### 2. Web app combined configuration
+
+- Type: npm
+- Name: `webApp dev`
+- Package.json: repository root `package.json`
+- Command: `run`
+- Script: `dev`
+- Before launch step 1: Gradle task `:shared:jsBrowserDevelopmentLibraryDistribution`
+- Before launch step 2: `npm install` from the repository root
+
+This keeps the first web run consistent and prevents the frontend from starting before the shared package is ready.
+
+#### 3. Optional full-stack compound configuration
+
+Create a compound configuration that starts:
+
+- `server:bootRun`
+- `webApp dev`
+
+Use this for day-to-day development when you want backend and frontend running together.
+
+## Git Workflow
+
+This repository prefers rebasing over merging for normal feature branch work. The goal is to keep history linear and easier to review.
+
+### Branching
+
+Create a short-lived feature branch for each task. Keep work isolated there instead of committing directly to `master`.
+
+### Updating your branch
+
+When `master` moves forward, update your branch with rebase. That reapplies your local commits on top of the latest remote history and avoids unnecessary merge commits.
+
+Recommended approach:
+
+```powershell
+git pull --rebase origin master
+```
+
+If a rebase stops on conflicts, resolve the files, stage them, and continue the rebase. If the rebase goes wrong, abort it and return to the previous state.
+
+### Pushing changes
+
+Most pushes should be normal pushes. After a rebase, Git may reject the push because your local history was rewritten. In that case, prefer `--force-with-lease` instead of `--force`.
+
+- `git push --force-with-lease` is the safe option because it refuses to overwrite remote commits you have not seen.
+- `git push --force` is riskier because it can overwrite someone else’s work on the remote branch.
+
+### Daily rule for this repo
+
+- Rebase is the preferred integration method for feature branches.
+- Avoid merge commits unless there is a specific reason to preserve them.
+- Avoid rebasing branches that multiple people are actively pushing to without coordinating first.
+
+## Troubleshooting
+
+### Port 8080 is already in use
+
+Another backend instance may still be running. Stop it, then start the server again.
+
+### Port 3000 is already in use
+
+Another Vite process may still be running in another terminal.
+
+### `npm run dev` fails immediately
+
+Run these again from the repository root:
+
+```powershell
 npm install
-npm run start
+npm run dev
 ```
 
-### 4) Build when needed | البناء عند الحاجة
+### Backend fails on startup
 
-Linux / macOS:
+Check these first:
 
-```bash
-./gradlew :shared:jsBrowserDevelopmentLibraryDistribution
-./gradlew :server:build
-cd webApp
-npm run build
-```
-
-Windows:
-
-```cmd
-gradlew.bat :shared:jsBrowserDevelopmentLibraryDistribution
-gradlew.bat :server:build
-cd webApp
-npm run build
-```
-
-### Build Commands | أوامر البناء
-
-Use the following commands to build the different parts of the project:
-استخدم الأوامر التالية لبناء الأجزاء المختلفة من المشروع:
-
-#### 1. Shared Module | الوحدة المشتركة
-
-Linux / macOS:
-
-```bash
-./gradlew :shared:jsBrowserDevelopmentLibraryDistribution
-```
-
-Windows:
-
-```cmd
-gradlew.bat :shared:jsBrowserDevelopmentLibraryDistribution
-```
-
-#### 2. Server | الخادم
-
-Linux / macOS:
-
-```bash
-./gradlew server:build
-```
-
-Windows:
-
-```cmd
-gradlew.bat :server:build
-```
-
-#### 3. Web Application | تطبيق الويب
-
-Linux / macOS:
-
-```bash
-cd webApp
-npm run build
-```
-
-Windows:
-
-```cmd
-cd webApp
-npm run build
-```
-
----
-
-## 🛠️ Development | التطوير
-
-### Prerequisites | المتطلبات الأساسية
-- **JDK 17+**
-- **Node.js & npm**
-- **Android Studio** or **IntelliJ IDEA**
-- **Xcode** (for iOS development)
-
----
-
-## 📄 License | الترخيص
-Internal project for Drawbridge Platform.
-مروع داخلي لمنصة Drawbridge.
-
----
-
-## 🚩 Project Status | حالة المشروع
-I've updated the priority list for you. Every issue previously marked as Low (green) has been moved up to Medium (yellow).
-
-### **Known Issues:**
-
-### **1. Account Management**
-
-* 🟢 ~~**Password change is a mocked browser alert** (no actual change).~~
-* 🟢 ~~**"Forgot Password" link is a dead `#` link**.~~
-* 🟢 ~~Duplicate email registration is not blocked.~~
-* 🟢 ~~Email verification workflow is missing.~~
-* 🟢 ~~"Remember Me" checkbox has no logic.~~
-* 🟢 ~~**Avatar/Logo upload buttons do nothing**.~~
-* 🟢 ~~**Server-side session invalidation on logout is missing**.~~
-* 🟡 Two-Factor Authentication is missing.
-
-### **2. Product Market**
-
-* 🔴 **Product detail pages do not exist** (cannot see specs/descriptions).
-* 🟠 Pagination is missing (performance risk for large catalogs).
-* 🟠 Minimum Order Quantities (MOQ) are not displayed.
-* 🟡 Category/Brand filters are hardcoded, not dynamic.
-* 🟡 "Featured" sort option has no logic.
-* 🟡 **Wishlist functionality is missing**.
-
-### **3. Inventory Management**
-
-* 🔴 **Edit (pencil) button has no click handler** (cannot adjust stock).
-* 🔴 **Manual stock level adjustment is impossible**.
-* 🟠 POS integration is completely missing.
-* 🟡 Stock history/audit logs are missing.
-* 🟡 Batch operations for multiple items are missing.
-* 🟡 **Wholesalers can access the Retailer Inventory route via URL**.
-
-### **4. Order Management**
-
-* 🔴 **Shipping address is not saved to the order during checkout**.
-* 🟠 "Download Invoice" button is a mocked alert.
-* 🟠 No UI exists for entering tracking numbers or carrier info.
-* 🟠 Return/Refund workflow is missing.
-* 🟡 "Contact Support" button is a mocked alert.
-* 🟡 Retailer delivery confirmation is missing.
-* 🟡 **Re-order functionality is missing**.
-
-### **5. Notifications**
-
-* 🔴 **Actual notification delivery (Email/SMS/Push) is missing**.
-* 🟠 Preference toggles do not save to the backend.
-* 🟠 Notification bell/inbox is missing from the header.
-* 🟡 Activity feed uses hardcoded mock notifications.
-
-### **6. Dashboard**
-
-* 🔴 **Bar and Pie charts use hardcoded static data** (not user data).
-* 🟠 KPI trend percentages are commented out in code.
-* 🟡 Date range filtering is missing.
-* 🟡 **Manual data refresh button is missing**.
-
-### **7. Support**
-
-* 🔴 **Support page is a static text placeholder**.
-* 🔴 **Ticket creation form is missing**.
-* 🟠 Ticket history list is missing.
-* 🟡 FAQ/Knowledge base is missing.
-
-### **8. Payment Management**
-
-* 🔴 **Real payment gateway integration is missing**.
-* 🟠 Card validation is minimal (no Luhn algorithm or past-date checks).
-* 🟠 Promo code "Apply" button has no handler.
-* 🟡 Payment history screen is missing.
-
-### **9. Product Management (Wholesaler)**
-
-* 🟢 **~~"Manage Products" page is a static text placeholder~~**.
-* 🟢 **~~Product creation and editing forms are missing~~**.
-* 🟢 **~~Product deletion capability is missing~~**.
-* 🟢 ~~Product image upload UI is missing~~.
-
----
+- Java version is 21
+- `server/.env` exists
+- required environment values are set
 
 
