@@ -66,10 +66,77 @@ export default function OrderDetails(): JSX.Element {
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-navy-600 hover:bg-gray-50 transition-colors">
-            <Download className="w-4 h-4" />
-            Download Invoice
-          </button>
+          <button
+  onClick={() => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Invoice - Order #${order.id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; color: #1a1a2e; }
+            h1 { font-size: 24px; margin-bottom: 4px; }
+            .subtitle { color: #666; margin-bottom: 32px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+            th { background: #f5f5f5; text-align: left; padding: 10px 12px; font-size: 13px; }
+            td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+            .total-row td { font-weight: bold; background: #f5f5f5; }
+            .header { display: flex; justify-content: space-between; margin-bottom: 32px; }
+            .company { font-size: 28px; font-weight: bold; color: #16a34a; }
+            .info { text-align: right; color: #666; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company">Drawbridge</div>
+            <div class="info">
+              <div>Invoice #${order.id}</div>
+              <div>Date: ${new Date(order.placedAt).toLocaleDateString()}</div>
+              <div>Status: ${statusName(order.status)}</div>
+            </div>
+          </div>
+          <div><strong>Retailer:</strong> ${order.retailerName}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Unit Price</th>
+                <th>Qty</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${order.items.map((item) => `
+                <tr>
+                  <td>${item.productName}</td>
+                  <td>${item.productCategory}</td>
+                  <td>SAR ${item.unitPrice.toFixed(2)}</td>
+                  <td>${item.quantity}</td>
+                  <td>SAR ${(item.unitPrice * item.quantity).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="4">Total</td>
+                <td>SAR ${order.subtotal.toFixed(2)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }}
+  className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-navy-600 hover:bg-gray-50 transition-colors"
+>
+  <Download className="w-4 h-4" />
+  Download Invoice
+</button>
         </div>
       }
     >
