@@ -2,23 +2,17 @@ import { Heart, ShoppingCart, Trash2, Package } from 'lucide-react';
 import PageShell from '../components/PageShell';
 import { useWishlist } from '../contexts/WishlistContext';
 import { useCart } from '../contexts/CartContext';
-import { useAuth } from '../contexts/AuthContext';
-import { UserRole } from '../types';
 
 export default function Wishlist(): JSX.Element {
   const { items, isLoading, removeFromWishlist } = useWishlist();
   const { addToCart } = useCart();
-  const { user } = useAuth();
-  const isRetailer = user?.role === UserRole.RETAILER;
-
   const handleMoveToCart = async (item: (typeof items)[0]): Promise<void> => {
+    if (!item.product) {
+      return;
+    }
+
     await addToCart(
-      {
-        id: item.productId,
-        name: item.productName,
-        price: item.productPrice,
-        images: item.productImage ? [{ url: item.productImage, altText: '', sortIndex: 0 }] : [],
-      } as never,
+      item.product,
       1,
     );
     await removeFromWishlist(item.productId);
@@ -52,10 +46,10 @@ export default function Wishlist(): JSX.Element {
           {items.map((item) => (
             <div key={item.id} className="card group hover:shadow-lg transition-shadow duration-200">
               <div className="relative mb-4">
-                {item.productImage ? (
+                {item.product?.image ? (
                   <img
-                    src={item.productImage}
-                    alt={item.productName}
+                    src={item.product.image}
+                    alt={item.product.name}
                     className="w-full h-48 object-cover rounded-xl"
                   />
                 ) : (
@@ -63,44 +57,35 @@ export default function Wishlist(): JSX.Element {
                     <Package className="w-12 h-12 text-gray-300" />
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => void removeFromWishlist(item.productId)}
-                  className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
-                >
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                </button>
               </div>
 
               <div className="space-y-3">
                 <div>
                   <h3 className="font-semibold text-navy-800 text-sm line-clamp-2 leading-snug">
-                    {item.productName}
+                    {item.product?.name ?? 'Product unavailable'}
                   </h3>
                   <p className="text-primary-600 font-bold text-base mt-1">
-                    SAR {Number(item.productPrice).toFixed(2)}
+                    {item.product ? `SAR ${Number(item.product.price).toFixed(2)}` : 'Unavailable'}
                   </p>
                 </div>
 
                 <div className="flex gap-2">
-                  {isRetailer && (
                     <button
-                      type="button"
-                      onClick={() => void handleMoveToCart(item)}
-                      className="flex-1 btn-primary text-xs py-2 flex items-center justify-center gap-1.5"
+                        type="button"
+                        onClick={() => void handleMoveToCart(item)}
+                        disabled={!item.product}
+                        className="flex-1 btn-primary text-xs py-2 flex items-center justify-center gap-1.5"
                     >
-                      <ShoppingCart className="w-3.5 h-3.5" />
-                      Move to Cart
+                        <ShoppingCart className="w-3.5 h-3.5" />
+                        Move to Cart
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => void removeFromWishlist(item.productId)}
-                    className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-red-50 hover:border-red-200 transition-colors"
-                    title="Remove from wishlist"
-                  >
-                    <Heart className="w-4 h-4 text-red-400 fill-red-400" />
-                  </button>
+                    <button
+                        type="button"
+                        onClick={() => void removeFromWishlist(item.productId)}
+                        className="top-2 right-2 w-8 h-8 rounded-full shadow-md flex items-center justify-center hover:bg-red-50 hover:border-red-200 transition-colors"
+                    >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                    </button>
                 </div>
               </div>
             </div>

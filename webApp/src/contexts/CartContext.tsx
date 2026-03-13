@@ -2,15 +2,22 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
 import { useAuth } from './AuthContext';
 import { UserRole, type Product } from '../types';
+import { productService } from '../services/productService';
 
 const STORAGE_CART_KEY = 'drawbridge_cart';
 const TAX_RATE = 0.15;
+
+interface StoredCartItem {
+  productId: string;
+  quantity: number;
+}
 
 export interface CartItem {
   product: Product;
@@ -32,28 +39,91 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-function readStoredCart(): CartItem[] {
+function readStoredCart(): StoredCartItem[] {
   const rawValue = localStorage.getItem(STORAGE_CART_KEY);
   if (!rawValue) {
     return [];
   }
 
   try {
-    return JSON.parse(rawValue) as CartItem[];
+    const parsed = JSON.parse(rawValue) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter(
+        (item): item is StoredCartItem =>
+          typeof item === 'object' &&
+          item !== null &&
+          'productId' in item &&
+          typeof item.productId === 'string' &&
+          item.productId.length > 0,
+      )
+      .map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity > 0 ? item.quantity : 1,
+      }));
   } catch {
     return [];
   }
 }
 
+function writeStoredCart(items: StoredCartItem[]): void {
+  localStorage.setItem(STORAGE_CART_KEY, JSON.stringify(items));
+}
+
 export function CartProvider({ children }: { children: ReactNode }): JSX.Element {
   const { isAuthenticated, user } = useAuth();
   const isWholesaler = user?.role === UserRole.WHOLESALER;
-  const [items, setItems] = useState<CartItem[]>(() => readStoredCart());
+  const [storedItems, setStoredItems] = useState<StoredCartItem[]>(() => readStoredCart());
+  const [productsById, setProductsById] = useState<Record<string, Product>>({});
 
-  const saveItems = useCallback((nextItems: CartItem[]) => {
-    setItems(nextItems);
-    localStorage.setItem(STORAGE_CART_KEY, JSON.stringify(nextItems));
+  const saveStoredItems = useCallback((nextItems: StoredCartItem[]) => {
+    setStoredItems(nextItems);
+    writeStoredCart(nextItems);
   }, []);
+
+  useEffect(() => {
+    // Persist migrated shape after first read to keep local storage normalized.
+    writeStoredCart(storedItems);
+  }, [storedItems]);
+
+  useEffect(() => {
+    if (storedItems.length === 0) {
+      return;
+    }
+
+    const missingIds = storedItems
+      .map((item) => item.productId)
+      .filter((productId) => !productsById[productId]);
+
+    if (missingIds.length === 0) {
+      return;
+    }
+
+    let isCancelled = false;
+    void Promise.allSettled(missingIds.map((productId) => productService.getById(productId))).then((results) => {
+      if (isCancelled) {
+        return;
+      }
+
+      const nextProducts: Record<string, Product> = {};
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          nextProducts[missingIds[index]] = result.value;
+        }
+      });
+
+      if (Object.keys(nextProducts).length > 0) {
+        setProductsById((prev) => ({ ...prev, ...nextProducts }));
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [productsById, storedItems]);
 
   const addToCart = useCallback(
     async (product: Product, quantity = 1): Promise<void> => {
@@ -61,28 +131,30 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
         return;
       }
 
-      const existingIndex = items.findIndex((item) => item.product.id === product.id);
+      setProductsById((prev) => ({ ...prev, [product.id]: product }));
+
+      const existingIndex = storedItems.findIndex((item) => item.productId === product.id);
       if (existingIndex >= 0) {
-        const nextItems = [...items];
+        const nextItems = [...storedItems];
         const currentItem = nextItems[existingIndex];
         nextItems[existingIndex] = {
           ...currentItem,
           quantity: currentItem.quantity + quantity,
         };
-        saveItems(nextItems);
+        saveStoredItems(nextItems);
         return;
       }
 
-      saveItems([...items, { product, quantity }]);
+      saveStoredItems([...storedItems, { productId: product.id, quantity }]);
     },
-    [isAuthenticated, isWholesaler, items, saveItems],
+    [isAuthenticated, isWholesaler, saveStoredItems, storedItems],
   );
 
   const removeFromCart = useCallback(
     async (productId: string): Promise<void> => {
-      saveItems(items.filter((item) => item.product.id !== productId));
+      saveStoredItems(storedItems.filter((item) => item.productId !== productId));
     },
-    [items, saveItems],
+    [saveStoredItems, storedItems],
   );
 
   const updateQuantity = useCallback(
@@ -92,9 +164,9 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
         return;
       }
 
-      saveItems(
-        items.map((item) =>
-          item.product.id === productId
+      saveStoredItems(
+        storedItems.map((item) =>
+          item.productId === productId
             ? {
                 ...item,
                 quantity,
@@ -103,23 +175,41 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
         ),
       );
     },
-    [items, removeFromCart, saveItems],
+    [removeFromCart, saveStoredItems, storedItems],
   );
 
   const clearCart = useCallback(async (): Promise<void> => {
-    saveItems([]);
-  }, [saveItems]);
+    saveStoredItems([]);
+  }, [saveStoredItems]);
 
   const checkout = useCallback(async (): Promise<boolean> => {
-    if (!isAuthenticated || isWholesaler || items.length === 0) {
+    if (!isAuthenticated || isWholesaler || storedItems.length === 0) {
       return false;
     }
 
-    saveItems([]);
+    saveStoredItems([]);
     return true;
-  }, [isAuthenticated, isWholesaler, items.length, saveItems]);
+  }, [isAuthenticated, isWholesaler, saveStoredItems, storedItems.length]);
 
-  const itemCount = items.reduce((totalItems, item) => totalItems + item.quantity, 0);
+  const items = useMemo<CartItem[]>(
+    () =>
+      storedItems
+        .map((item) => {
+          const product = productsById[item.productId];
+          if (!product) {
+            return null;
+          }
+
+          return {
+            product,
+            quantity: item.quantity,
+          };
+        })
+        .filter((item): item is CartItem => item !== null),
+    [productsById, storedItems],
+  );
+
+  const itemCount = storedItems.reduce((totalItems, item) => totalItems + item.quantity, 0);
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const tax = subtotal * TAX_RATE;
   const total = subtotal + tax;

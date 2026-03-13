@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import AnimatedBackground from './AnimatedBackground';
-import CustomCursor from './CustomCursor';
 
 function shouldReduceMotion(): boolean {
   if (typeof window === 'undefined') {
@@ -26,7 +25,6 @@ export default function MotionLayer({ children }: { children: ReactNode }): JSX.
   return (
     <div className="relative isolate min-h-screen">
       <AnimatedBackground animated={!reducedMotion} />
-      <CustomCursor />
       <div className="relative z-10">{children}</div>
     </div>
   );
