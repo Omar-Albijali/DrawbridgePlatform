@@ -3,31 +3,21 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useState,
   type ReactNode,
 } from 'react';
 import { useAuth } from './AuthContext';
 import { type Product } from '../types';
 import { productService } from '../services/productService';
+import { wishlistService, type WishlistItemDto } from '../services/wishlistService';
 
-interface WishlistApiItem {
-  id: string;
-  userId: string;
-  productId: string;
-  createdAt: string;
-}
-
-export interface WishlistItem {
-  id: string;
-  userId: string;
-  productId: string;
-  createdAt: string;
-  product: Product | null;
+export interface ProductWishlistItem {
+  wishlistItem: WishlistItemDto;
+  product: Product;
 }
 
 interface WishlistContextType {
-  items: WishlistItem[];
+  items: ProductWishlistItem[];
   itemCount: number;
   isLoading: boolean;
   addToWishlist: (productId: string) => Promise<void>;
@@ -38,85 +28,39 @@ interface WishlistContextType {
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
-const API_BASE = 'http://localhost:8080/api/wishlist';
-
-function toApiItem(raw: Partial<WishlistApiItem>, fallbackUserId: string, fallbackProductId: string): WishlistApiItem {
-  return {
-    id: raw.id ?? `${fallbackUserId}-${fallbackProductId}`,
-    userId: raw.userId ?? fallbackUserId,
-    productId: raw.productId ?? fallbackProductId,
-    createdAt: raw.createdAt ?? new Date().toISOString(),
-  };
-}
-
 export function WishlistProvider({ children }: { children: ReactNode }): JSX.Element {
   const { isAuthenticated, user } = useAuth();
-  const [entries, setEntries] = useState<WishlistApiItem[]>([]);
-  const [productsById, setProductsById] = useState<Record<string, Product>>({});
+  const [wishlistItems, setWishlistItems] = useState<ProductWishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchWishlist = useCallback(async (): Promise<void> => {
+  const refreshWishlistFromServer = useCallback(async (): Promise<void> => {
     if (!isAuthenticated || !user?.id) {
-      setEntries([]);
+      setWishlistItems([]);
       return;
     }
 
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('drawbridge_token') ?? sessionStorage.getItem('drawbridge_token') ?? '';
-      const response = await fetch(`${API_BASE}/${user.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = (await response.json()) as WishlistApiItem[];
-        setEntries(data);
-      }
+      const apiItems = await wishlistService.getByUser(user.id);
+      const products = await Promise.all(apiItems.map((item) => productService.getById(item.productId)));
+
+      setWishlistItems(
+        apiItems.map((item, index) => ({
+          wishlistItem: item,
+          product: products[index],
+        })),
+      );
     } catch (error) {
       console.error('Failed to fetch wishlist:', error);
+      setWishlistItems([]);
     } finally {
       setIsLoading(false);
     }
   }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
-    void fetchWishlist();
-  }, [fetchWishlist]);
-
-  useEffect(() => {
-    if (entries.length === 0) {
-      return;
-    }
-
-    const missingIds = entries
-      .map((entry) => entry.productId)
-      .filter((productId) => !productsById[productId]);
-
-    if (missingIds.length === 0) {
-      return;
-    }
-
-    let isCancelled = false;
-    void Promise.allSettled(missingIds.map((productId) => productService.getById(productId))).then((results) => {
-      if (isCancelled) {
-        return;
-      }
-
-      const nextProducts: Record<string, Product> = {};
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          nextProducts[missingIds[index]] = result.value;
-        }
-      });
-
-      if (Object.keys(nextProducts).length > 0) {
-        setProductsById((prev) => ({ ...prev, ...nextProducts }));
-      }
-    });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [entries, productsById]);
+    void refreshWishlistFromServer();
+  }, [refreshWishlistFromServer]);
 
   const addToWishlist = useCallback(
     async (productId: string): Promise<void> => {
@@ -125,22 +69,13 @@ export function WishlistProvider({ children }: { children: ReactNode }): JSX.Ele
       }
 
       try {
-        const token = localStorage.getItem('drawbridge_token') ?? sessionStorage.getItem('drawbridge_token') ?? '';
-        const response = await fetch(`${API_BASE}/${user.id}/${productId}`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (response.ok) {
-          const raw = (await response.json()) as Partial<WishlistApiItem>;
-          const nextItem = toApiItem(raw, user.id, productId);
-          setEntries((prev) => (prev.some((item) => item.productId === nextItem.productId) ? prev : [...prev, nextItem]));
-        }
+        await wishlistService.add(user.id, productId);
+        await refreshWishlistFromServer();
       } catch (error) {
         console.error('Failed to add to wishlist:', error);
       }
     },
-    [isAuthenticated, user?.id],
+    [isAuthenticated, refreshWishlistFromServer, user?.id],
   );
 
   const removeFromWishlist = useCallback(
@@ -150,24 +85,20 @@ export function WishlistProvider({ children }: { children: ReactNode }): JSX.Ele
       }
 
       try {
-        const token = localStorage.getItem('drawbridge_token') ?? sessionStorage.getItem('drawbridge_token') ?? '';
-        await fetch(`${API_BASE}/${user.id}/${productId}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setEntries((prev) => prev.filter((item) => item.productId !== productId));
+        await wishlistService.remove(user.id, productId);
+        await refreshWishlistFromServer();
       } catch (error) {
         console.error('Failed to remove from wishlist:', error);
       }
     },
-    [isAuthenticated, user?.id],
+    [isAuthenticated, refreshWishlistFromServer, user?.id],
   );
 
   const isInWishlist = useCallback(
     (productId: string): boolean => {
-      return entries.some((item) => item.productId === productId);
+      return wishlistItems.some((item) => item.wishlistItem.productId === productId);
     },
-    [entries],
+    [wishlistItems],
   );
 
   const toggleWishlist = useCallback(
@@ -181,29 +112,18 @@ export function WishlistProvider({ children }: { children: ReactNode }): JSX.Ele
     [isInWishlist, addToWishlist, removeFromWishlist],
   );
 
-  const items = useMemo<WishlistItem[]>(
-    () =>
-      entries.map((entry) => ({
-        ...entry,
-        product: productsById[entry.productId] ?? null,
-      })),
-    [entries, productsById],
-  );
+  const items = wishlistItems;
+  const itemCount = items.length;
 
-  const itemCount = entries.length;
-
-  const value = useMemo<WishlistContextType>(
-    () => ({
-      items,
-      itemCount,
-      isLoading,
-      addToWishlist,
-      removeFromWishlist,
-      isInWishlist,
-      toggleWishlist,
-    }),
-    [items, itemCount, isLoading, addToWishlist, removeFromWishlist, isInWishlist, toggleWishlist],
-  );
+  const value: WishlistContextType = {
+    items,
+    itemCount,
+    isLoading,
+    addToWishlist,
+    removeFromWishlist,
+    isInWishlist,
+    toggleWishlist,
+  };
 
   return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>;
 }

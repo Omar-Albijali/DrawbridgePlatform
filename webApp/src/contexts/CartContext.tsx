@@ -8,24 +8,25 @@ import {
   type ReactNode,
 } from 'react';
 import { useAuth } from './AuthContext';
-import { UserRole, type Product } from '../types';
+import { UserRole, type CartItem, type Product } from '../types';
 import { productService } from '../services/productService';
+import { cartService } from '../services/cartService';
 
-const STORAGE_CART_KEY = 'drawbridge_cart';
 const TAX_RATE = 0.15;
 
-interface StoredCartItem {
-  productId: string;
-  quantity: number;
-}
-
-export interface CartItem {
+// interface ServerCartItem {
+//   productId: string;
+//   quantity: number;
+// }
+//
+export interface ProductCartItem {
+  cartItem: CartItem;
   product: Product;
   quantity: number;
 }
 
 interface CartContextType {
-  items: CartItem[];
+  items: ProductCartItem[];
   itemCount: number;
   subtotal: number;
   tax: number;
@@ -34,182 +35,149 @@ interface CartContextType {
   removeFromCart: (productId: string) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
-  checkout: () => Promise<boolean>;
+  checkout: () => Promise<{ success: boolean; message?: string }>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-function readStoredCart(): StoredCartItem[] {
-  const rawValue = localStorage.getItem(STORAGE_CART_KEY);
-  if (!rawValue) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(rawValue) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .filter(
-        (item): item is StoredCartItem =>
-          typeof item === 'object' &&
-          item !== null &&
-          'productId' in item &&
-          typeof item.productId === 'string' &&
-          item.productId.length > 0,
-      )
-      .map((item) => ({
-        productId: item.productId,
-        quantity: item.quantity > 0 ? item.quantity : 1,
-      }));
-  } catch {
-    return [];
-  }
-}
-
-function writeStoredCart(items: StoredCartItem[]): void {
-  localStorage.setItem(STORAGE_CART_KEY, JSON.stringify(items));
-}
-
 export function CartProvider({ children }: { children: ReactNode }): JSX.Element {
   const { isAuthenticated, user } = useAuth();
   const isWholesaler = user?.role === UserRole.WHOLESALER;
-  const [storedItems, setStoredItems] = useState<StoredCartItem[]>(() => readStoredCart());
-  const [productsById, setProductsById] = useState<Record<string, Product>>({});
+  const [cartItems, setCartItems] = useState<ProductCartItem[]>([]);
+  // const [productsById, setProductsById] = useState<Record<string, Product>>({});
 
-  const saveStoredItems = useCallback((nextItems: StoredCartItem[]) => {
-    setStoredItems(nextItems);
-    writeStoredCart(nextItems);
-  }, []);
+/*  const normalizeApiItems = useCallback((items: ApiCartItem[]): ServerCartItem[] => {
+    return items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity > 0 ? item.quantity : 1,
+      }));
+  }, []);*/
 
-  useEffect(() => {
-    // Persist migrated shape after first read to keep local storage normalized.
-    writeStoredCart(storedItems);
-  }, [storedItems]);
-
-  useEffect(() => {
-    if (storedItems.length === 0) {
-      return;
-    }
-
-    const missingIds = storedItems
-      .map((item) => item.productId)
-      .filter((productId) => !productsById[productId]);
-
-    if (missingIds.length === 0) {
-      return;
-    }
-
-    let isCancelled = false;
-    void Promise.allSettled(missingIds.map((productId) => productService.getById(productId))).then((results) => {
-      if (isCancelled) {
+  const refreshCartFromServer = useCallback(async (): Promise<void> => {
+    if (!isAuthenticated || isWholesaler || !user?.id) {
         return;
-      }
+    }
 
-      const nextProducts: Record<string, Product> = {};
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          nextProducts[missingIds[index]] = result.value;
-        }
-      });
+    try {
+      const apiItems = await cartService.getItems(user.id);
+      const products = await Promise.all(apiItems.map((item) => productService.getById(item.productId)));
+      setCartItems(
+          apiItems.map((item, index) => (
+              {   cartItem: item,
+                  product: products[index],
+                  quantity: item.quantity}
+              )
+          )
+      );
+    } catch (error) {
+      console.error('Failed to fetch cart from server', error);
+      setCartItems([]);
+    }
+  }, [isAuthenticated, isWholesaler, user?.id]);
 
-      if (Object.keys(nextProducts).length > 0) {
-        setProductsById((prev) => ({ ...prev, ...nextProducts }));
-      }
-    });
+  useEffect(() => {
+    void refreshCartFromServer();
+  }, [refreshCartFromServer]);
 
-    return () => {
-      isCancelled = true;
-    };
-  }, [productsById, storedItems]);
 
   const addToCart = useCallback(
     async (product: Product, quantity = 1): Promise<void> => {
-      if (!isAuthenticated || isWholesaler) {
+      if (!isAuthenticated || isWholesaler || !user?.id) {
         return;
       }
-
-      setProductsById((prev) => ({ ...prev, [product.id]: product }));
-
-      const existingIndex = storedItems.findIndex((item) => item.productId === product.id);
-      if (existingIndex >= 0) {
-        const nextItems = [...storedItems];
-        const currentItem = nextItems[existingIndex];
-        nextItems[existingIndex] = {
-          ...currentItem,
-          quantity: currentItem.quantity + quantity,
-        };
-        saveStoredItems(nextItems);
-        return;
+      try {
+        await cartService.addItem(user.id, product.id, quantity);
+        await refreshCartFromServer();
+      } catch (error) {
+        console.error('Failed to add item to cart', error);
       }
-
-      saveStoredItems([...storedItems, { productId: product.id, quantity }]);
     },
-    [isAuthenticated, isWholesaler, saveStoredItems, storedItems],
+    [isAuthenticated, isWholesaler, refreshCartFromServer, user?.id],
   );
 
   const removeFromCart = useCallback(
     async (productId: string): Promise<void> => {
-      saveStoredItems(storedItems.filter((item) => item.productId !== productId));
+      if (!isAuthenticated || isWholesaler || !user?.id) {
+        return;
+      }
+
+      try {
+        await cartService.removeItem(user.id, productId);
+        await refreshCartFromServer();
+      } catch (error) {
+        console.error('Failed to remove item from cart', error);
+      }
     },
-    [saveStoredItems, storedItems],
+    [isAuthenticated, isWholesaler, refreshCartFromServer, user?.id],
   );
 
   const updateQuantity = useCallback(
     async (productId: string, quantity: number): Promise<void> => {
+      if (!isAuthenticated || isWholesaler || !user?.id) {
+        return;
+      }
+
       if (quantity <= 0) {
         await removeFromCart(productId);
         return;
       }
 
-      saveStoredItems(
-        storedItems.map((item) =>
-          item.productId === productId
-            ? {
-                ...item,
-                quantity,
-              }
-            : item,
-        ),
-      );
+      try {
+        await cartService.updateQuantity(user.id, productId, quantity);
+        await refreshCartFromServer();
+      } catch (error) {
+        console.error('Failed to update item quantity', error);
+      }
     },
-    [removeFromCart, saveStoredItems, storedItems],
+    [isAuthenticated, isWholesaler, refreshCartFromServer, removeFromCart, user?.id],
   );
 
   const clearCart = useCallback(async (): Promise<void> => {
-    saveStoredItems([]);
-  }, [saveStoredItems]);
-
-  const checkout = useCallback(async (): Promise<boolean> => {
-    if (!isAuthenticated || isWholesaler || storedItems.length === 0) {
-      return false;
+    if (!isAuthenticated || isWholesaler || !user?.id) {
+      return;
     }
 
-    saveStoredItems([]);
-    return true;
-  }, [isAuthenticated, isWholesaler, saveStoredItems, storedItems.length]);
+    try {
+      await cartService.clear(user.id);
+      await refreshCartFromServer();
+    } catch (error) {
+      console.error('Failed to clear cart', error);
+    }
+  }, [isAuthenticated, isWholesaler, user?.id]);
 
-  const items = useMemo<CartItem[]>(
-    () =>
-      storedItems
-        .map((item) => {
-          const product = productsById[item.productId];
-          if (!product) {
-            return null;
-          }
+  const items = cartItems;
 
-          return {
-            product,
-            quantity: item.quantity,
-          };
-        })
-        .filter((item): item is CartItem => item !== null),
-    [productsById, storedItems],
-  );
+  const checkout = useCallback(async (): Promise<{ success: boolean; message?: string }> => {
+    if (!isAuthenticated) {
+      return { success: false, message: 'Please sign in to continue checkout.' };
+    }
 
-  const itemCount = storedItems.reduce((totalItems, item) => totalItems + item.quantity, 0);
+    if (isWholesaler) {
+      return { success: false, message: 'Wholesale accounts cannot place retailer orders.' };
+    }
+
+    if (!user?.id) {
+      return { success: false, message: 'Missing user session. Please sign in again.' };
+    }
+
+    if (items.length === 0) {
+      return { success: false, message: 'Your cart is empty. Add items before checkout.' };
+    }
+
+    try {
+      await cartService.checkout(user.id);
+      await clearCart();
+      return { success: true };
+    } catch (error) {
+      console.error('Checkout failed', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Checkout failed. Please try again.',
+      };
+    }
+  }, [clearCart, isAuthenticated, isWholesaler, items.length, user?.id]);
+
+  const itemCount = items.reduce((totalItems, item) => totalItems + item.quantity, 0);
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const tax = subtotal * TAX_RATE;
   const total = subtotal + tax;
