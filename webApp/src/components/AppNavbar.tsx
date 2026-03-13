@@ -33,12 +33,6 @@ export default function AppNavbar(): JSX.Element {
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const displayName = (user?.name ?? '').trim() || 'Account';
-  const avatarInitials = displayName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent): void => {
@@ -153,9 +147,11 @@ export default function AppNavbar(): JSX.Element {
                   aria-haspopup="menu"
                   aria-expanded={isAccountOpen}
                 >
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-primary-500/20 text-[11px] font-bold text-primary-700 dark:text-primary-300">
-                    {avatarInitials || 'A'}
-                  </span>
+                  {user?.avatar ? (
+                      <img src={user.avatar} alt={user.name} className="object-cover max-w-8" />
+                  ) : (
+                      <span className="text-3xl font-bold text-white">{user?.name?.charAt(0) || 'U'}</span>
+                  )}
                   <span className="max-w-[13rem] truncate text-left">{displayName}</span>
                 </button>
 

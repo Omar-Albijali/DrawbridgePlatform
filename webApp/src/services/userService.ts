@@ -22,19 +22,9 @@ export const userService = {
         const formData = new FormData();
         formData.append('file', file);
 
-        const token = localStorage.getItem('drawbridge_token') || sessionStorage.getItem('drawbridge_token');
-        const response = await fetch(`/api/users/${id}/profile-image`, {
+        return fetchApi<ImageUploadResponse>(`/users/${id}/profile-image`, {
             method: 'POST',
-            headers: {
-                ...(token ? { Authorization: `Bearer ${token}` } : {})
-            },
             body: formData
         });
-
-        if (!response.ok) {
-            throw new Error(`Upload failed: ${response.status}`);
-        }
-
-        return response.json();
     }
 };

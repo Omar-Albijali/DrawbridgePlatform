@@ -10,13 +10,20 @@ export async function fetchApi<T>(endpoint: string, options: RequestOptions = {}
     const storedToken = localStorage.getItem('drawbridge_token') || sessionStorage.getItem('drawbridge_token');
     const authToken = token || storedToken;
 
+    const requestHeaders = new Headers(headers);
+    const isFormDataBody = customConfig.body instanceof FormData;
+
+    if (authToken && !requestHeaders.has('Authorization')) {
+        requestHeaders.set('Authorization', `Bearer ${authToken}`);
+    }
+
+    if (!isFormDataBody && !requestHeaders.has('Content-Type')) {
+        requestHeaders.set('Content-Type', 'application/json');
+    }
+
     const config: RequestInit = {
         ...customConfig,
-        headers: {
-            'Content-Type': 'application/json',
-            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-            ...headers,
-        },
+        headers: requestHeaders,
     };
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);

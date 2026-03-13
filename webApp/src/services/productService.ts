@@ -2,7 +2,6 @@ import { fetchApi } from './api';
 import { ImageUploadResponse, ProductImageResponse } from '../types';
 import { Product, Category, CreateProductRequest } from '../types';
 
-
 export const productService = {
     getAll: () => fetchApi<Product[]>('/products'),
 
@@ -40,19 +39,10 @@ export const productService = {
             formData.append('sortIndex', String(sortIndex));
         }
 
-        const token = localStorage.getItem('drawbridge_token');
-        const response = await fetch(`/api/products/${productId}/images`, {
+        return fetchApi<ImageUploadResponse>(`/products/${productId}/images`, {
             method: 'POST',
-            headers: {
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
             body: formData
         });
-
-        if (!response.ok) {
-            throw new Error(`Upload failed: ${response.status}`);
-        }
-        return response.json();
     },
 
     reorderImages: (productId: string, orderedImageIds: string[]) => fetchApi<void>(`/products/${productId}/images/reorder`, {
