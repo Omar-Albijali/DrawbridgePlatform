@@ -1,9 +1,8 @@
 {
-  "name": "DrawbridgePlatform ",
+  "name": "DrawbridgePlatform",
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "frontend",
     "webApp",
     "shared/build/dist/js/developmentLibrary"
   ],

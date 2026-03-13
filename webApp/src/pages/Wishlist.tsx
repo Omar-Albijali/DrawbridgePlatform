@@ -6,16 +6,10 @@ import { useCart } from '../contexts/CartContext';
 export default function Wishlist(): JSX.Element {
   const { items, isLoading, removeFromWishlist } = useWishlist();
   const { addToCart } = useCart();
-  const handleMoveToCart = async (item: (typeof items)[0]): Promise<void> => {
-    if (!item.product) {
-      return;
-    }
 
-    await addToCart(
-      item.product,
-      1,
-    );
-    await removeFromWishlist(item.productId);
+  const handleMoveToCart = async (item: (typeof items)[0]): Promise<void> => {
+    await addToCart(item.product, 1);
+    await removeFromWishlist(item.wishlistItem.productId);
   };
 
   if (isLoading) {
@@ -44,7 +38,7 @@ export default function Wishlist(): JSX.Element {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {items.map((item) => (
-            <div key={item.id} className="card group hover:shadow-lg transition-shadow duration-200">
+            <div key={item.wishlistItem.id} className="card group hover:shadow-lg transition-shadow duration-200">
               <div className="relative mb-4">
                 {item.product?.image ? (
                   <img
@@ -73,7 +67,6 @@ export default function Wishlist(): JSX.Element {
                     <button
                         type="button"
                         onClick={() => void handleMoveToCart(item)}
-                        disabled={!item.product}
                         className="flex-1 btn-primary text-xs py-2 flex items-center justify-center gap-1.5"
                     >
                         <ShoppingCart className="w-3.5 h-3.5" />
@@ -81,7 +74,7 @@ export default function Wishlist(): JSX.Element {
                     </button>
                     <button
                         type="button"
-                        onClick={() => void removeFromWishlist(item.productId)}
+                      onClick={() => void removeFromWishlist(item.wishlistItem.productId)}
                         className="top-2 right-2 w-8 h-8 rounded-full shadow-md flex items-center justify-center hover:bg-red-50 hover:border-red-200 transition-colors"
                     >
                         <Trash2 className="w-4 h-4 text-red-500" />

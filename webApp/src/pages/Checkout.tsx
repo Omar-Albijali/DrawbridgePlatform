@@ -135,15 +135,15 @@ export default function Checkout(): JSX.Element {
     }
 
     setIsProcessing(true);
-    const success = await checkout();
+    const result = await checkout();
     setIsProcessing(false);
 
-    if (success) {
+    if (result.success) {
       navigate('/orders');
       return;
     }
 
-    alert('Failed to place order. Please try again.');
+    alert(result.message ?? 'Failed to place order. Please try again.');
   };
 
   const formatCardNumber = (value: string): string => {
