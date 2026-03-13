@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { WishlistProvider } from './contexts/WishlistContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -16,8 +17,10 @@ ReactDOM.createRoot(rootElement).render(
     <ThemeProvider>
       <AuthProvider>
         <CartProvider>
+      <WishlistProvider>
           <App />
-        </CartProvider>
+  </WishlistProvider>
+</CartProvider>
       </AuthProvider>
     </ThemeProvider>
   </React.StrictMode>,

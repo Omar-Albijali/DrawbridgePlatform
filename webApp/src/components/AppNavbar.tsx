@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Moon, ReceiptText, Settings, ShoppingCart, Store, Sun } from 'lucide-react';
+import { Heart, LayoutDashboard, LogOut, Moon, ReceiptText, Settings, ShoppingCart, Store, Sun } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -119,21 +119,31 @@ export default function AppNavbar(): JSX.Element {
             </>
           ) : (
             <>
-              {!isWholesaler ? (
-                <Link
-                  to="/cart"
-                  className="relative grid h-10 w-10 place-items-center rounded-full border border-slate-300 bg-white text-slate-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary-400/40 dark:hover:text-primary-300"
-                  aria-label="Cart"
-                  title="Cart"
-                >
-                  <ShoppingCart className="h-4 w-4" />
-                  {itemCount > 0 ? (
-                    <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-primary-600 px-1 text-[10px] font-bold leading-none text-white">
-                      {itemCount > 99 ? '99+' : itemCount}
-                    </span>
-                  ) : null}
-                </Link>
-              ) : null}
+             {!isWholesaler ? (
+  <>
+    <Link
+      to="/wishlist"
+      className="relative grid h-10 w-10 place-items-center rounded-full border border-slate-300 bg-white text-slate-700 transition hover:border-red-300 hover:text-red-500 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200"
+      aria-label="Wishlist"
+      title="Wishlist"
+    >
+      <Heart className="h-4 w-4" />
+    </Link>
+    <Link
+      to="/cart"
+      className="relative grid h-10 w-10 place-items-center rounded-full border border-slate-300 bg-white text-slate-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary-400/40 dark:hover:text-primary-300"
+      aria-label="Cart"
+      title="Cart"
+    >
+      <ShoppingCart className="h-4 w-4" />
+      {itemCount > 0 ? (
+        <span className="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-primary-600 px-1 text-[10px] font-bold leading-none text-white">
+          {itemCount > 99 ? '99+' : itemCount}
+        </span>
+      ) : null}
+    </Link>
+  </>
+) : null}
 
               <div ref={accountMenuRef} className="relative">
                 <button

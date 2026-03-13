@@ -6,7 +6,7 @@ import { useCart } from '../contexts/CartContext';
 export default function Cart(): JSX.Element {
   const { items, itemCount, subtotal, tax, total, updateQuantity, removeFromCart, clearCart } = useCart();
 
-  if (items.length === 0) {
+  if (itemCount === 0) {
     return (
       <PageShell title="Shopping Cart" description="Your cart is currently empty." className="buyer-cart">
         <div className="buyer-cart__empty text-center py-16">
@@ -46,10 +46,17 @@ export default function Cart(): JSX.Element {
 
       <div className="buyer-cart__layout grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
+          {itemCount > 0 && items.length === 0 && (
+            <div className="bg-white rounded-xl shadow-card p-6 text-sm text-navy-500">Loading latest product details...</div>
+          )}
           {items.map((item) => (
             <div key={item.product.id} className="buyer-cart__item bg-white rounded-xl shadow-card p-4 flex gap-4">
               <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                <img src={item.product.image} alt={item.product.name} className="w-full h-full object-cover" />
+                {item.product.image ? (
+                  <img src={item.product.image} alt={item.product.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xs text-navy-400">No image</div>
+                )}
               </div>
 
               <div className="flex-1 min-w-0">

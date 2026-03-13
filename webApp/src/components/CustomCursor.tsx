@@ -49,10 +49,16 @@ export default function CustomCursor(): JSX.Element | null {
     const root = document.documentElement;
     if (enabled) {
       root.classList.add('has-custom-cursor');
-      return;
+      return () => {
+        root.classList.remove('has-custom-cursor');
+      };
     }
 
     root.classList.remove('has-custom-cursor');
+
+    return () => {
+      root.classList.remove('has-custom-cursor');
+    };
   }, [enabled]);
 
   useEffect(() => {

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Boxes, Globe2, ShieldCheck } from 'lucide-react';
 import LandingNavbar from '../components/LandingNavbar';
+import CustomCursor from '../components/CustomCursor';
 
 const landingFeatures = [
 	{
@@ -82,6 +83,7 @@ export default function Landing(): JSX.Element {
 
 	return (
 		<div className="relative">
+			<CustomCursor />
 			<LandingNavbar />
 
 			<section className="relative overflow-hidden px-4 pb-20 pt-40 sm:px-6 lg:px-8">

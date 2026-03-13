@@ -70,8 +70,12 @@ export default function Marketplace(): JSX.Element {
             return (b.rating ?? 0) - (a.rating ?? 0);
           case 'newest':
             return b.id.localeCompare(a.id);
-          default:
-            return 0;
+          case 'featured':
+  const aScore = (a.rating ?? 0) * Math.log1p(a.reviews ?? 0);
+  const bScore = (b.rating ?? 0) * Math.log1p(b.reviews ?? 0);
+  return bScore - aScore;
+default:
+  return 0;
         }
       });
   }, [priceRange, products, searchQuery, selectedBrands, selectedCategories, sortBy]);
