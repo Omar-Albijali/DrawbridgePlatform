@@ -123,6 +123,7 @@ class ProductService(
             category = category?.name ?: "",
             brand = "", // Brand is not in the entity
             stock = this.stockQuantity,
+            gtin = this.gtin,
             rating = this.averageRating.toDouble(),
             reviews = this.ratingCount,
             supplier = this.wholesaler.businessName,
@@ -176,6 +177,7 @@ class ProductService(
             categoryId = request.categoryId,
             price = BigDecimal.valueOf(request.price),
             stockQuantity = request.stock,
+            gtin = request.gtin,
             published = true
         )
         return createProduct(product).toDTO()
@@ -189,6 +191,7 @@ class ProductService(
         existing.categoryId = request.categoryId
         existing.price = BigDecimal.valueOf(request.price)
         existing.stockQuantity = request.stock
+        existing.gtin = request.gtin
         return productRepository.save(existing).toDTO()
     }
 

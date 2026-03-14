@@ -46,6 +46,9 @@ open class Product(
     open var stockQuantity: Int,
 
     @Column(nullable = false)
+    open var gtin: Int = 0,
+
+    @Column(nullable = false)
     open var published: Boolean,
 
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
