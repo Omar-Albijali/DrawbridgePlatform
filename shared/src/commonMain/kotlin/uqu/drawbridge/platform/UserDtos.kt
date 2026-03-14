@@ -2,9 +2,11 @@ package uqu.drawbridge.platform
 
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlinx.serialization.Serializable
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 enum class UserRole {
     RETAILER,
     WHOLESALER
@@ -12,6 +14,7 @@ enum class UserRole {
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class AddressDto(
     val id: String? = null,
     val street: String,
@@ -23,6 +26,7 @@ data class AddressDto(
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class RepresentativeDto(
     val name: String,
     val jobTitle: String,
@@ -32,6 +36,7 @@ data class RepresentativeDto(
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 enum class VerificationStatus {
     VERIFIED,
     PENDING,
@@ -40,6 +45,7 @@ enum class VerificationStatus {
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class UserDTO(
     val id: String,
     val name: String,
@@ -56,6 +62,7 @@ data class UserDTO(
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class LoginRequest(
     val email: String,
     val password: String,
@@ -64,6 +71,7 @@ data class LoginRequest(
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class RegisterRequest(
     val email: String,
     val password: String,
@@ -80,6 +88,7 @@ data class RegisterRequest(
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class AuthResponse(
     val token: String,
     val userId: String,
@@ -90,12 +99,14 @@ data class AuthResponse(
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class ForgotPasswordRequest(
     val email: String
 )
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class ResetPasswordRequest(
     val token: String,
     val newPassword: String
@@ -103,24 +114,28 @@ data class ResetPasswordRequest(
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class VerifyEmailRequest(
     val token: String
 )
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class ResendVerificationRequest(
     val email: String
 )
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class LogoutRequest(
     val token: String
 )
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class AddressResponseDto(
     val id: String,
     val street: String,
@@ -132,6 +147,7 @@ data class AddressResponseDto(
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class CreateAddressRequest(
     val street: String,
     val city: String,
@@ -142,6 +158,7 @@ data class CreateAddressRequest(
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class UpdateUserProfileRequest(
     val company: String,
     val phone: String?,
@@ -151,6 +168,7 @@ data class UpdateUserProfileRequest(
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class ChangePasswordRequest(
     val currentPassword: String,
     val newPassword: String
