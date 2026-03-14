@@ -18,7 +18,7 @@ data class ProductDTO(
     val category: String,
     val brand: String,
     val stock: Int,
-    val gtin: Int,
+    val gtin: String,
     val rating: Double,
     val reviews: Int,
     val supplier: String,
@@ -48,7 +48,7 @@ data class CreateProductRequest(
     val wholesalerId: String, // Long -> String
     val brand: String,
     val stock: Int,
-    val gtin: Int
+    val gtin: String
 )
 
 @OptIn(ExperimentalJsExport::class)

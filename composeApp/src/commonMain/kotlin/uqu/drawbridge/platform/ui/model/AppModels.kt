@@ -3,6 +3,7 @@ package uqu.drawbridge.platform.ui.model
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.ui.graphics.vector.ImageVector
 import uqu.drawbridge.platform.UserDTO
 import uqu.drawbridge.platform.UserRole
@@ -15,6 +16,7 @@ internal enum class AuthScreen(val title: String) {
 
 internal enum class MainTab(val title: String, val icon: ImageVector) {
     Dashboard("Dashboard", Icons.Default.Home),
+    POS("POS", Icons.Default.ShoppingCart),
     Account("Account", Icons.Default.Person),
 }
 

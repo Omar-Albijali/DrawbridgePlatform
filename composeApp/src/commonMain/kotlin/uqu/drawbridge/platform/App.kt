@@ -236,12 +236,38 @@ fun App() {
                                         },
                                     )
                                 }
+
+                                MainTab.POS -> {
+                                    PosMainScreen(
+                                        onScan = { gtin, onResult ->
+                                            val currentSession = session ?: return@PosMainScreen
+                                            coroutineScope.launch {
+                                                isBusy = true
+                                                val result = runCatching {
+                                                    api.scanBarcode(
+                                                        retailerId = currentSession.user.id,
+                                                        gtin = gtin,
+                                                        token = currentSession.token,
+                                                    )
+                                                }.getOrElse { err ->
+                                                    PosScanResponse(
+                                                        productName = "",
+                                                        newStock = 0,
+                                                        message = err.message ?: "Scan failed",
+                                                    )
+                                                }
+                                                onResult(result)
+                                                isBusy = false
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
                 }
-                
-                androidx.compose.animation.AnimatedVisibility(
+
+                AnimatedVisibility(
                     visible = isBusy,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically(),

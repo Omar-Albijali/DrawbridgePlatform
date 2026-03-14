@@ -8,4 +8,5 @@ interface ProductRepository : JpaRepository<Product, String> {
     fun findByCategoryId(categoryId: String): List<Product>
     fun findByPublishedTrue(): List<Product>
     fun findByNameContainingIgnoreCase(name: String): List<Product>
+    fun findByGtin(gtin: String): Product?
 }

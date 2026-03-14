@@ -12,7 +12,7 @@ import java.time.LocalDateTime
 @Service
 class InventoryService(
     private val inventoryItemRepository: InventoryItemRepository,
-    private val productRepository: uqu.drawbridge.platform.repository.ProductRepository
+    private val productRepository: ProductRepository
 ) {
 
     // ==================== INVENTORY ITEM OPERATIONS ====================
@@ -356,6 +356,31 @@ class InventoryService(
         }
     }
 
+
+    // ==================== POS SCAN ====================
+
+    @Transactional
+    fun scanByGtin(retailerId: String, gtin: String): PosScanResponse {
+        val product = productRepository.findByGtin(gtin)
+            ?: return PosScanResponse(productName = "", newStock = 0, message = "No product found for GTIN: $gtin")
+
+        val inventoryItem = inventoryItemRepository.findByRetailerIdAndProductId(retailerId, product.id!!)
+            ?: return PosScanResponse(productName = product.name, newStock = 0, message = "No inventory entry found for this product")
+
+        if (inventoryItem.currentQuantity <= 0) {
+            return PosScanResponse(productName = product.name, newStock = 0, message = "Out of stock")
+        }
+
+        inventoryItem.currentQuantity -= 1
+        inventoryItem.lastUpdated = LocalDateTime.now()
+        inventoryItemRepository.save(inventoryItem)
+
+        return PosScanResponse(
+            productName = product.name,
+            newStock = inventoryItem.currentQuantity,
+            message = "OK"
+        )
+    }
 
     private fun itemsToDTOs(items: List<InventoryItem>): List<uqu.drawbridge.platform.InventoryItemDTO> {
         if (items.isEmpty()) return emptyList()

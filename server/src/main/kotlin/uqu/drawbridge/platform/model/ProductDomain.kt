@@ -46,7 +46,7 @@ open class Product(
     open var stockQuantity: Int,
 
     @Column(nullable = false)
-    open var gtin: Int = 0,
+    open var gtin: String = "",
 
     @Column(nullable = false)
     open var published: Boolean,

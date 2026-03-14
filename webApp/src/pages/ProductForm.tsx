@@ -203,7 +203,7 @@ export default function ProductForm(): JSX.Element {
           wholesalerId: user.id,
           brand: '',
           stock: Number(stock),
-          gtin: Number(gtin),
+          gtin: gtin,
         };
 
         await productService.update(productId, updateRequest);
@@ -226,7 +226,7 @@ export default function ProductForm(): JSX.Element {
           wholesalerId: user.id,
           brand: '',
           stock: Number(stock),
-          gtin: Number(gtin),
+          gtin: gtin,
         } as unknown as CreateProductRequest;
 
         const created = await productService.create(request);

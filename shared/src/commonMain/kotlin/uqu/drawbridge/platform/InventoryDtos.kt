@@ -77,3 +77,20 @@ data class UpdateAutoOrderConfigRequest(
     val dayOfWeek: String?,
     val dayOfMonth: String?
 )
+
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+@Serializable
+data class PosScanRequest(
+    val retailerId: String,
+    val gtin: String
+)
+
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+@Serializable
+data class PosScanResponse(
+    val productName: String,
+    val newStock: Int,
+    val message: String
+)

@@ -124,6 +124,23 @@ class MobileAuthApi(
         return payload.toUserDto()
     }
 
+    suspend fun scanBarcode(retailerId: String, gtin: String, token: String): PosScanResponse {
+        val response = client.post(buildUrl("/inventory/scan")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(PosScanRequest(retailerId = retailerId, gtin = gtin))
+        }
+
+        val body = response.bodyAsText()
+        val parsed = json.parseToJsonElement(body).jsonObject
+        return PosScanResponse(
+            productName = parsed.stringValue("productName"),
+            newStock = parsed["newStock"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
+            message = parsed.stringValue("message"),
+        )
+    }
+
     private fun buildUrl(path: String): String = "${MobileApiConfig.baseUrl}${path}"
 
     private fun ensureSuccess(status: HttpStatusCode, body: String) {
