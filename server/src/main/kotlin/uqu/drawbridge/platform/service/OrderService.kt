@@ -3,6 +3,10 @@ package uqu.drawbridge.platform.service
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uqu.drawbridge.platform.model.*
+import uqu.drawbridge.platform.NotificationEntityType
+import uqu.drawbridge.platform.NotificationEventKey
+import uqu.drawbridge.platform.NotificationPreferenceKey
+import uqu.drawbridge.platform.NotificationType
 import uqu.drawbridge.platform.OrderStatus
 import uqu.drawbridge.platform.ShippingMethod
 import uqu.drawbridge.platform.PaymentStatus
@@ -18,7 +22,8 @@ class OrderService(
     private val userRepository: UserRepository,
     private val productRepository: ProductRepository,
     private val categoryRepository: CategoryRepository,
-    private val productImageRepository: ProductImageRepository
+    private val productImageRepository: ProductImageRepository,
+    private val notificationService: NotificationService
 ) {
 
     // ==================== ORDER GROUP OPERATIONS ====================
@@ -112,7 +117,33 @@ class OrderService(
     fun createOrderWithItems(order: Order, items: List<OrderItem>): Order {
         val savedOrder = orderRepository.save(order)
         savedOrder.orderItems = items.toMutableList()
-        return orderRepository.save(savedOrder)
+        val persisted = orderRepository.save(savedOrder)
+
+        notificationService.sendEventNotification(
+            recipientId = persisted.retailerId,
+            type = NotificationType.ORDER,
+            eventKey = NotificationEventKey.ORDER_CREATED,
+            entityType = NotificationEntityType.ORDER,
+            entityId = persisted.id,
+            preferenceKey = NotificationPreferenceKey.ORDER_CONFIRMATION,
+            title = "Order confirmed",
+            message = "Order ${persisted.id ?: ""} was created successfully.",
+            deepLink = "/orders/${persisted.id ?: ""}"
+        )
+
+        notificationService.sendEventNotification(
+            recipientId = persisted.wholesalerId,
+            type = NotificationType.ORDER,
+            eventKey = NotificationEventKey.ORDER_CREATED,
+            entityType = NotificationEntityType.ORDER,
+            entityId = persisted.id,
+            preferenceKey = NotificationPreferenceKey.ORDER_CONFIRMATION,
+            title = "New order received",
+            message = "A new order ${persisted.id ?: ""} was placed in your store.",
+            deepLink = "/orders/${persisted.id ?: ""}"
+        )
+
+        return persisted
     }
 
     @Transactional
@@ -127,7 +158,33 @@ class OrderService(
             else -> {}
         }
         
-        return orderRepository.save(order)
+        val savedOrder = orderRepository.save(order)
+
+        notificationService.sendEventNotification(
+            recipientId = savedOrder.retailerId,
+            type = NotificationType.ORDER,
+            eventKey = NotificationEventKey.ORDER_STATUS_UPDATED,
+            entityType = NotificationEntityType.ORDER,
+            entityId = savedOrder.id,
+            preferenceKey = NotificationPreferenceKey.SHIPPING_STATUS,
+            title = "Order status updated",
+            message = "Order ${savedOrder.id ?: ""} is now ${savedOrder.status.name}.",
+            deepLink = "/orders/${savedOrder.id ?: ""}"
+        )
+
+        notificationService.sendEventNotification(
+            recipientId = savedOrder.wholesalerId,
+            type = NotificationType.ORDER,
+            eventKey = NotificationEventKey.ORDER_STATUS_UPDATED,
+            entityType = NotificationEntityType.ORDER,
+            entityId = savedOrder.id,
+            preferenceKey = NotificationPreferenceKey.SHIPPING_STATUS,
+            title = "Order status updated",
+            message = "Order ${savedOrder.id ?: ""} is now ${savedOrder.status.name}.",
+            deepLink = "/orders/${savedOrder.id ?: ""}"
+        )
+
+        return savedOrder
     }
 
     @Transactional
