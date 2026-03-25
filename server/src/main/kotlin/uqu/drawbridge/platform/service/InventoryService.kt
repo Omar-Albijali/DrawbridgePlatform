@@ -12,7 +12,8 @@ import java.time.LocalDateTime
 @Service
 class InventoryService(
     private val inventoryItemRepository: InventoryItemRepository,
-    private val productRepository: uqu.drawbridge.platform.repository.ProductRepository
+    private val productRepository: uqu.drawbridge.platform.repository.ProductRepository,
+    private val notificationService: NotificationService
 ) {
 
     // ==================== INVENTORY ITEM OPERATIONS ====================
@@ -69,7 +70,9 @@ class InventoryService(
         val item = inventoryItemRepository.findById(id).orElse(null) ?: return null
         item.currentQuantity = newQuantity
         item.lastUpdated = LocalDateTime.now()
-        return inventoryItemRepository.save(item)
+        val savedItem = inventoryItemRepository.save(item)
+        maybeNotifyLowStock(savedItem)
+        return savedItem
     }
 
     @Transactional
@@ -77,7 +80,9 @@ class InventoryService(
         val item = inventoryItemRepository.findById(id).orElse(null) ?: return null
         item.currentQuantity += adjustment
         item.lastUpdated = LocalDateTime.now()
-        return inventoryItemRepository.save(item)
+        val savedItem = inventoryItemRepository.save(item)
+        maybeNotifyLowStock(savedItem)
+        return savedItem
     }
 
     @Transactional
@@ -145,7 +150,19 @@ class InventoryService(
         val config = item.autoOrderConfig
         config.lastTriggeredAt = LocalDateTime.now()
         calculateNextScheduledAt(config)
-        return inventoryItemRepository.save(item)
+        val savedItem = inventoryItemRepository.save(item)
+        notificationService.sendEventNotification(
+            recipientId = savedItem.retailerId,
+            type = NotificationType.STOCK,
+            eventKey = NotificationEventKey.AUTO_RESTOCK_TRIGGERED,
+            entityType = NotificationEntityType.INVENTORY_ITEM,
+            entityId = savedItem.id,
+            preferenceKey = NotificationPreferenceKey.AUTO_RESTOCK_CONFIRMATION,
+            title = "Auto-restock triggered",
+            message = "Auto-restock was triggered for product ${savedItem.productId}.",
+            deepLink = "/inventory"
+        )
+        return savedItem
     }
 
 
@@ -384,6 +401,23 @@ class InventoryService(
                 supplier = supplierName,
                 lastRestocked = item.lastUpdated.toString(),
                 reorderQuantity = item.autoOrderConfig.reorderQuantity
+            )
+        }
+    }
+
+    private fun maybeNotifyLowStock(item: InventoryItem) {
+        val minThreshold = item.autoOrderConfig.minThreshold
+        if (item.currentQuantity <= minThreshold) {
+            notificationService.sendEventNotification(
+                recipientId = item.retailerId,
+                type = NotificationType.STOCK,
+                eventKey = NotificationEventKey.LOW_STOCK_ALERT,
+                entityType = NotificationEntityType.INVENTORY_ITEM,
+                entityId = item.id,
+                preferenceKey = NotificationPreferenceKey.LOW_STOCK_WARNING,
+                title = "Low stock alert",
+                message = "Product ${item.productId} dropped to ${item.currentQuantity}, below threshold $minThreshold.",
+                deepLink = "/inventory"
             )
         }
     }

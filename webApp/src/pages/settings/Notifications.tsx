@@ -1,40 +1,60 @@
-import { useState, type ReactNode } from 'react';
-import { AlertTriangle, Bell, Mail, Megaphone, MessageSquare, Package } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AlertTriangle, Bell, CreditCard, Mail, MessageSquare, Package } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+  notificationService,
+  type NotificationChannelValue,
+  type NotificationPreferenceKeyValue,
+} from '../../services/notificationService';
 import { UserRole } from '../../types';
 
-interface ToggleSwitchProps {
+interface ChannelChipProps {
   enabled: boolean;
-  onChange: (enabled: boolean) => void;
-  label: string;
-  description: string;
-  channel: string;
+  loading: boolean;
+  onToggle: () => void;
+  channel: NotificationChannelValue;
 }
 
-function ToggleSwitch({ enabled, onChange, label, description, channel }: ToggleSwitchProps): JSX.Element {
+function channelLabel(channel: NotificationChannelValue): string {
+  if (channel === 'EMAIL') return 'Email';
+  if (channel === 'SMS') return 'SMS';
+  if (channel === 'PUSH') return 'Push';
+  return 'System';
+}
+
+function channelIcon(channel: NotificationChannelValue): ReactNode {
+  if (channel === 'EMAIL') return <Mail className="h-3.5 w-3.5" />;
+  if (channel === 'SMS') return <MessageSquare className="h-3.5 w-3.5" />;
+  if (channel === 'PUSH') return <Bell className="h-3.5 w-3.5" />;
+  return <Bell className="h-3.5 w-3.5" />;
+}
+
+function ChannelChip({ enabled, loading, onToggle, channel }: ChannelChipProps): JSX.Element {
+  const label = channelLabel(channel);
+  const activeColorClass =
+    channel === 'EMAIL'
+      ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-400/40 dark:bg-blue-500/15 dark:text-blue-200'
+      : channel === 'SMS'
+        ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-400/40 dark:bg-orange-500/15 dark:text-orange-200'
+        : 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-200';
+
   return (
-    <div className="flex items-center justify-between border-b border-gray-100 py-4 last:border-0 dark:border-white/10">
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <h4 className="font-medium text-navy-800 dark:text-slate-100">{label}</h4>
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-navy-500 dark:bg-slate-800 dark:text-slate-300">{channel}</span>
-        </div>
-        <p className="mt-0.5 text-sm text-navy-500 dark:text-slate-300">{description}</p>
-      </div>
-      <button
-        type="button"
-        onClick={() => onChange(!enabled)}
-        className={`relative w-12 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ml-4 ${
-          enabled ? 'bg-primary-600' : 'bg-gray-300 dark:bg-slate-600'
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
-            enabled ? 'translate-x-6' : 'translate-x-0'
-          }`}
-        />
-      </button>
-    </div>
+    <button
+      type="button"
+      disabled={loading}
+      onClick={onToggle}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+        enabled
+          ? activeColorClass
+          : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
+      } disabled:cursor-not-allowed disabled:opacity-60`}
+      aria-pressed={enabled}
+      aria-label={`${enabled ? 'Disable' : 'Enable'} ${label} channel`}
+    >
+      {channelIcon(channel)}
+      <span>{enabled ? '✓' : ''}</span>
+      <span>{label}</span>
+    </button>
   );
 }
 
@@ -42,28 +62,158 @@ interface NotificationSection {
   id: string;
   title: string;
   icon: ReactNode;
+  sectionClass: string;
+  iconWrapClass: string;
   items: {
     id: string;
     label: string;
     description: string;
-    channel: string;
+    preferenceKey: NotificationPreferenceKeyValue;
+    channels: NotificationChannelValue[];
   }[];
 }
 
 export default function Notifications(): JSX.Element {
   const { user } = useAuth();
   const isRetailer = user?.role === UserRole.RETAILER;
+  const [status, setStatus] = useState<string>('');
+  const [isSaving, setIsSaving] = useState<Record<string, boolean>>({});
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [isPushLoading, setIsPushLoading] = useState(false);
 
-  const [preferences, setPreferences] = useState<Record<string, boolean>>({
-    orderConfirmation: true,
-    shippingStatus: true,
-    lowStockWarning: true,
-    autoRestockConfirmation: false,
-    newWholesalers: true,
-  });
+  const [preferences, setPreferences] = useState<Record<string, boolean>>({});
 
-  const handleToggle = (id: string, enabled: boolean) => {
-    setPreferences((prev) => ({ ...prev, [id]: enabled }));
+  const preferenceItems = useMemo(
+    () => [
+      {
+        id: 'orderConfirmation',
+        label: 'Order Confirmation',
+        description: 'Receive confirmation when your order is placed',
+        preferenceKey: 'ORDER_CONFIRMATION' as NotificationPreferenceKeyValue,
+        channels: ['EMAIL', 'SMS', 'PUSH'] as NotificationChannelValue[],
+      },
+      {
+        id: 'shippingStatus',
+        label: 'Shipping Status Changes',
+        description: 'Get notified when your order ships or arrives',
+        preferenceKey: 'SHIPPING_STATUS' as NotificationPreferenceKeyValue,
+        channels: ['EMAIL', 'SMS', 'PUSH'] as NotificationChannelValue[],
+      },
+      {
+        id: 'lowStockWarning',
+        label: 'Low Stock Warning',
+        description: 'Alert when inventory falls below threshold',
+        preferenceKey: 'LOW_STOCK_WARNING' as NotificationPreferenceKeyValue,
+        channels: ['EMAIL', 'SMS', 'PUSH'] as NotificationChannelValue[],
+      },
+      {
+        id: 'autoRestockConfirmation',
+        label: 'Auto-Restock Confirmation',
+        description: 'Confirmation when auto-restock orders are placed',
+        preferenceKey: 'AUTO_RESTOCK_CONFIRMATION' as NotificationPreferenceKeyValue,
+        channels: ['EMAIL', 'SMS', 'PUSH'] as NotificationChannelValue[],
+      },
+      {
+        id: 'paymentStatus',
+        label: 'Payment Status Updates',
+        description: 'Get updates when payments are processed, completed, or refunded',
+        preferenceKey: 'PAYMENT_STATUS' as NotificationPreferenceKeyValue,
+        channels: ['EMAIL', 'SMS', 'PUSH'] as NotificationChannelValue[],
+      },
+    ],
+    [],
+  );
+
+  const preferenceDefaults = useMemo(() => {
+    const defaults: Record<string, boolean> = {};
+    preferenceItems.forEach((item) => {
+      item.channels.forEach((channel) => {
+        defaults[`${item.preferenceKey}:${channel}`] = channel !== 'SMS';
+      });
+    });
+    return defaults;
+  }, [preferenceItems]);
+
+  const handleToggle = async (
+    preferenceKey: NotificationPreferenceKeyValue,
+    channelValue: NotificationChannelValue,
+    enabled: boolean,
+  ): Promise<void> => {
+    if (!user?.id) {
+      return;
+    }
+
+    const stateKey = `${preferenceKey}:${channelValue}`;
+
+    const previous = preferences[stateKey] ?? false;
+    setPreferences((prev) => ({ ...prev, [stateKey]: enabled }));
+    setIsSaving((prev) => ({ ...prev, [stateKey]: true }));
+
+    try {
+      await notificationService.upsertPreference(
+        user.id,
+        notificationService.buildPreferenceRequest(preferenceKey, channelValue, enabled),
+      );
+      setStatus('Preferences saved successfully.');
+    } catch (_error) {
+      setPreferences((prev) => ({ ...prev, [stateKey]: previous }));
+      setStatus('Failed to save preference. Please try again.');
+    } finally {
+      setIsSaving((prev) => ({ ...prev, [stateKey]: false }));
+      window.setTimeout(() => setStatus(''), 2200);
+    }
+  };
+
+  useEffect(() => {
+    const load = async (): Promise<void> => {
+      if (!user?.id) {
+        return;
+      }
+
+      try {
+        const [savedPreferences, subscriptions] = await Promise.all([
+          notificationService.getPreferences(user.id),
+          notificationService.getPushSubscriptions(user.id),
+        ]);
+
+        const nextPrefs: Record<string, boolean> = { ...preferenceDefaults };
+
+        savedPreferences.forEach((item) => {
+          const key = `${item.preferenceKey}:${item.channel}`;
+          if (Object.prototype.hasOwnProperty.call(nextPrefs, key)) {
+            nextPrefs[key] = item.enabled;
+          }
+        });
+
+        setPreferences(nextPrefs);
+        setPushEnabled(subscriptions.length > 0);
+      } catch (_error) {
+        setStatus('Unable to load saved notification settings.');
+      }
+    };
+
+    void load();
+  }, [preferenceDefaults, user?.id]);
+
+  const handlePushToggle = async (): Promise<void> => {
+    if (!user?.id) return;
+    setIsPushLoading(true);
+    try {
+      if (!pushEnabled) {
+        const subscribed = await notificationService.subscribeBrowserPush(user.id);
+        setPushEnabled(subscribed);
+        setStatus(subscribed ? 'Browser push enabled.' : 'Unable to enable browser push notifications.');
+      } else {
+        const unsubscribed = await notificationService.unsubscribeBrowserPush();
+        setPushEnabled(!unsubscribed ? pushEnabled : false);
+        setStatus(unsubscribed ? 'Browser push disabled.' : 'Unable to disable browser push notifications.');
+      }
+    } catch (_error) {
+      setStatus(pushEnabled ? 'Unable to disable browser push notifications.' : 'Unable to enable browser push notifications.');
+    } finally {
+      setIsPushLoading(false);
+      window.setTimeout(() => setStatus(''), 2200);
+    }
   };
 
   const sections: NotificationSection[] = [
@@ -71,19 +221,11 @@ export default function Notifications(): JSX.Element {
       id: 'order',
       title: 'Order Updates',
       icon: <Package className="w-5 h-5 text-primary-600" />,
+      sectionClass: 'border-primary-100 bg-gradient-to-r from-primary-50 to-blue-50/80 dark:border-white/10 dark:from-slate-900 dark:to-slate-900/80',
+      iconWrapClass: 'bg-primary-100 dark:bg-primary-500/20',
       items: [
-        {
-          id: 'orderConfirmation',
-          label: 'Order Confirmation',
-          description: 'Receive confirmation when your order is placed',
-          channel: 'Email',
-        },
-        {
-          id: 'shippingStatus',
-          label: 'Shipping Status Changes',
-          description: 'Get notified when your order ships or arrives',
-          channel: 'SMS & Email',
-        },
+        preferenceItems[0],
+        preferenceItems[1],
       ],
     },
     ...(isRetailer
@@ -92,34 +234,23 @@ export default function Notifications(): JSX.Element {
             id: 'inventory',
             title: 'Inventory Alerts',
             icon: <AlertTriangle className="w-5 h-5 text-amber-500" />,
+            sectionClass: 'border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50/80 dark:border-white/10 dark:from-slate-900 dark:to-slate-900/80',
+            iconWrapClass: 'bg-amber-100 dark:bg-amber-500/20',
             items: [
-              {
-                id: 'lowStockWarning',
-                label: 'Low Stock Warning',
-                description: 'Alert when inventory falls below threshold',
-                channel: 'Push Notification',
-              },
-              {
-                id: 'autoRestockConfirmation',
-                label: 'Auto-Restock Confirmation',
-                description: 'Confirmation when auto-restock orders are placed',
-                channel: 'Email',
-              },
+              preferenceItems[2],
+              preferenceItems[3],
             ],
           },
         ]
       : []),
     {
-      id: 'marketing',
-      title: 'Marketing',
-      icon: <Megaphone className="w-5 h-5 text-green-500" />,
+      id: 'payments',
+      title: 'Payment Updates',
+      icon: <CreditCard className="w-5 h-5 text-emerald-600" />,
+      sectionClass: 'border-emerald-100 bg-gradient-to-r from-emerald-50 to-lime-50/80 dark:border-white/10 dark:from-slate-900 dark:to-slate-900/80',
+      iconWrapClass: 'bg-emerald-100 dark:bg-emerald-500/20',
       items: [
-        {
-          id: 'newWholesalers',
-          label: 'New Wholesaler Recommendations',
-          description: 'Discover new suppliers that match your needs',
-          channel: 'Email',
-        },
+        preferenceItems[4],
       ],
     },
   ];
@@ -128,7 +259,8 @@ export default function Notifications(): JSX.Element {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-navy-800 dark:text-slate-100">Notification Preferences</h1>
-        <p className="mt-1 text-navy-500 dark:text-slate-300">Control what emails and notifications you receive</p>
+        <p className="mt-1 text-navy-500 dark:text-slate-300">Control notification channels for each event</p>
+        {status ? <p className="mt-2 text-sm font-medium text-primary-700 dark:text-primary-300">{status}</p> : null}
       </div>
 
       <div className="card border border-primary-100 bg-gradient-to-r from-primary-50 to-blue-50 dark:border-white/10 dark:from-slate-900 dark:to-slate-800">
@@ -153,22 +285,62 @@ export default function Notifications(): JSX.Element {
         </div>
       </div>
 
+      <div className="card">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-navy-800 dark:text-slate-100">Browser Push Subscription</h3>
+            <p className="mt-1 text-sm text-navy-500 dark:text-slate-300">
+              Enable this device for real-time push notifications.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={isPushLoading}
+            onClick={() => void handlePushToggle()}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+              pushEnabled
+                ? 'bg-slate-200 text-slate-800 hover:bg-slate-300'
+                : 'bg-primary-600 text-white hover:bg-primary-700'
+            } disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            {isPushLoading ? 'Saving...' : pushEnabled ? 'Disable Push' : 'Enable Push'}
+          </button>
+        </div>
+      </div>
+
       {sections.map((section) => (
-        <div key={section.id} className="card">
+        <div key={section.id} className={`card border ${section.sectionClass}`}>
           <div className="mb-4 flex items-center gap-2 border-b border-gray-200 pb-4 dark:border-white/10">
-            {section.icon}
+            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${section.iconWrapClass}`}>
+              {section.icon}
+            </div>
             <h3 className="text-lg font-semibold text-navy-800 dark:text-slate-100">{section.title}</h3>
           </div>
           <div>
             {section.items.map((item) => (
-              <ToggleSwitch
-                key={item.id}
-                enabled={preferences[item.id] ?? false}
-                onChange={(enabled) => handleToggle(item.id, enabled)}
-                label={item.label}
-                description={item.description}
-                channel={item.channel}
-              />
+              <div key={item.id} className="border-b border-gray-100 py-4 last:border-0 dark:border-white/10">
+                <h4 className="font-medium text-navy-800 dark:text-slate-100">{item.label}</h4>
+                <p className="mt-0.5 text-sm text-navy-500 dark:text-slate-300">{item.description}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {item.channels.map((channel) => {
+                    const key = `${item.preferenceKey}:${channel}`;
+                    return (
+                      <ChannelChip
+                        key={key}
+                        channel={channel}
+                        enabled={preferences[key] ?? false}
+                        loading={isSaving[key] ?? false}
+                        onToggle={() =>
+                          void handleToggle(item.preferenceKey, channel, !(preferences[key] ?? false))
+                        }
+                      />
+                    );
+                  })}
+                </div>
+                {item.channels.some((channel) => isSaving[`${item.preferenceKey}:${channel}`]) ? (
+                  <p className="pb-1 pt-2 text-xs text-navy-500">Saving...</p>
+                ) : null}
+              </div>
             ))}
           </div>
         </div>

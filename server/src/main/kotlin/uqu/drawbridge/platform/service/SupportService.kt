@@ -1,21 +1,29 @@
 package uqu.drawbridge.platform.service
 
+import java.time.LocalDateTime
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import uqu.drawbridge.platform.model.*
-import uqu.drawbridge.platform.repository.NotificationRepository
+import uqu.drawbridge.platform.AddMessageRequest
+import uqu.drawbridge.platform.CreateTicketRequest
+import uqu.drawbridge.platform.NotificationEntityType
+import uqu.drawbridge.platform.NotificationEventKey
+import uqu.drawbridge.platform.NotificationPreferenceKey
+import uqu.drawbridge.platform.NotificationType
+import uqu.drawbridge.platform.SupportTicketChatDTO
+import uqu.drawbridge.platform.SupportTicketDTO
+import uqu.drawbridge.platform.TicketStatus
+import uqu.drawbridge.platform.model.SupportTicket
+import uqu.drawbridge.platform.model.SupportTicketChat
+import uqu.drawbridge.platform.repository.AdminRepository
 import uqu.drawbridge.platform.repository.SupportTicketChatRepository
 import uqu.drawbridge.platform.repository.SupportTicketRepository
-import uqu.drawbridge.platform.repository.AdminRepository
-import uqu.drawbridge.platform.*
-import java.time.LocalDateTime
 
 @Service
 class SupportService(
     private val supportTicketRepository: SupportTicketRepository,
     private val supportTicketChatRepository: SupportTicketChatRepository,
-    private val notificationRepository: NotificationRepository,
-    private val adminRepository: AdminRepository
+    private val adminRepository: AdminRepository,
+    private val notificationService: NotificationService
 ) {
 
     // ==================== SUPPORT TICKET OPERATIONS ====================
@@ -60,7 +68,19 @@ class SupportService(
             status = TicketStatus.OPEN,
             createdAt = LocalDateTime.now()
         )
-        return supportTicketRepository.save(ticket)
+        val saved = supportTicketRepository.save(ticket)
+        notificationService.sendEventNotification(
+            recipientId = userId,
+            type = NotificationType.SYSTEM,
+            eventKey = NotificationEventKey.SUPPORT_TICKET_OPENED,
+            entityType = NotificationEntityType.SUPPORT_TICKET,
+            entityId = saved.id,
+            preferenceKey = NotificationPreferenceKey.SUPPORT_UPDATES,
+            title = "Support ticket opened",
+            message = "Your support ticket '${saved.subject}' was created.",
+            deepLink = "/support"
+        )
+        return saved
     }
 
     @Transactional
@@ -107,7 +127,7 @@ class SupportService(
 
     private fun createAndAddChat(ticketId: String, adminId: String?, message: String): SupportTicketChat? {
         val ticket = supportTicketRepository.findById(ticketId).orElse(null) ?: return null
-        
+
         val chat = SupportTicketChat(
             adminId = adminId,
             message = message,
@@ -115,71 +135,18 @@ class SupportService(
         )
         ticket.chats.add(chat)
         val savedTicket = supportTicketRepository.save(ticket)
-        return savedTicket.chats.last()
-    }
-
-    // ==================== NOTIFICATION OPERATIONS ====================
-
-    fun getAllNotifications(): List<Notification> {
-        return notificationRepository.findAll()
-    }
-
-    fun getNotificationById(id: String): Notification? {
-        return notificationRepository.findById(id).orElse(null)
-    }
-
-    fun getNotificationsByRecipient(recipientId: String): List<Notification> {
-        return notificationRepository.findByRecipientIdOrderByCreatedAtDesc(recipientId)
-    }
-
-    fun getNotificationsByChannel(channel: NotificationChannel): List<Notification> {
-        return notificationRepository.findByChannel(channel)
-    }
-
-    fun getNotificationsByType(type: String): List<Notification> {
-        return notificationRepository.findByType(type)
-    }
-
-    @Transactional
-    fun createNotification(notification: Notification): Notification {
-        notification.createdAt = LocalDateTime.now()
-        return notificationRepository.save(notification)
-    }
-
-    @Transactional
-    fun sendNotification(
-        recipientId: String,
-        type: String,
-        title: String,
-        message: String,
-        channel: NotificationChannel = NotificationChannel.SYSTEM
-    ): Notification {
-        val notification = Notification(
-            recipientId = recipientId,
-            type = type,
-            title = title,
-            message = message,
-            channel = channel,
-            createdAt = LocalDateTime.now()
+        notificationService.sendEventNotification(
+            recipientId = ticket.userId,
+            type = NotificationType.SYSTEM,
+            eventKey = NotificationEventKey.SUPPORT_MESSAGE_ADDED,
+            entityType = NotificationEntityType.SUPPORT_TICKET,
+            entityId = ticket.id,
+            preferenceKey = NotificationPreferenceKey.SUPPORT_UPDATES,
+            title = "New support message",
+            message = "There is a new message on ticket '${ticket.subject}'.",
+            deepLink = "/support"
         )
-        return notificationRepository.save(notification)
-    }
-
-    @Transactional
-    fun deleteNotification(id: String): Boolean {
-        return if (notificationRepository.existsById(id)) {
-            notificationRepository.deleteById(id)
-            true
-        } else {
-            false
-        }
-    }
-
-    @Transactional
-    fun deleteAllNotificationsForRecipient(recipientId: String): Int {
-        val notifications = notificationRepository.findByRecipientId(recipientId)
-        notificationRepository.deleteAll(notifications)
-        return notifications.size
+        return savedTicket.chats.last()
     }
 
     // ==================== DTO MAPPING ====================
@@ -220,13 +187,13 @@ class SupportService(
 
     fun closeTicketDTO(id: String): SupportTicketDTO? = closeTicket(id)?.toDTO()
 
-    fun getChatsDTOByTicketId(ticketId: String): List<SupportTicketChatDTO> = 
+    fun getChatsDTOByTicketId(ticketId: String): List<SupportTicketChatDTO> =
         getChatsByTicketId(ticketId).map { it.toDTO() }
 
-    fun addUserMessageDTO(ticketId: String, message: String): SupportTicketChatDTO? = 
+    fun addUserMessageDTO(ticketId: String, message: String): SupportTicketChatDTO? =
         addUserMessage(ticketId, message)?.toDTO()
 
-    fun addAdminMessageDTO(ticketId: String, adminId: String, message: String): SupportTicketChatDTO? = 
+    fun addAdminMessageDTO(ticketId: String, adminId: String, message: String): SupportTicketChatDTO? =
         addAdminMessage(ticketId, adminId, message)?.toDTO()
 
     fun addMessageDTO(ticketId: String, request: AddMessageRequest): SupportTicketChatDTO? {
@@ -237,15 +204,4 @@ class SupportService(
             addUserMessageDTO(ticketId, request.message)
         }
     }
-
-    fun getNotificationsDTOByRecipient(recipientId: String): List<NotificationDTO> = 
-        getNotificationsByRecipient(recipientId).map { notification ->
-            NotificationDTO(
-                id = (notification.id ?: ""),
-                type = NotificationType.valueOf(notification.type),
-                message = notification.message,
-                time = notification.createdAt.toString(),
-                read = false // Notifications don't have read status in the entity
-            )
-        }
 }
