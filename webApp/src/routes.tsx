@@ -27,6 +27,7 @@ import SettingsLayout from './pages/settings/SettingsLayout';
 import Support from './pages/Support';
 import Reports from './pages/Reports';
 import Landing from './pages/Landing';
+import ProductDetail from './pages/ProductDetail';
 import { UserRole } from './types';
 
 function withTransition(element: ReactElement): ReactElement {
@@ -102,6 +103,10 @@ export const router = createBrowserRouter([
       {
         path: 'marketplace',
         element: withTransition(<Marketplace />),
+      },
+      {
+        path: 'marketplace/product/:id',
+        element: withTransition(<ProductDetail />),
       },
     ],
   },
