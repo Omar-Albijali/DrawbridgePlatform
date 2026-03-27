@@ -68,18 +68,4 @@ class SupportController(
         }
     }
 
-    // ==================== NOTIFICATIONS ====================
-
-    @GetMapping("/notifications/recipient/{recipientId}")
-    fun getNotifications(@PathVariable recipientId: String): ResponseEntity<List<NotificationDTO>> =
-        ResponseEntity.ok(supportService.getNotificationsDTOByRecipient(recipientId))
-
-    @DeleteMapping("/notifications/{id}")
-    fun deleteNotification(@PathVariable id: String): ResponseEntity<Void> {
-        return if (supportService.deleteNotification(id)) {
-            ResponseEntity.ok().build()
-        } else {
-            ResponseEntity.notFound().build()
-        }
-    }
 }

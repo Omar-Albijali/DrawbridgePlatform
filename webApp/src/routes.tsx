@@ -14,6 +14,7 @@ import ManageProducts from './pages/ManageProducts';
 import Marketplace from './pages/Marketplace';
 import OrderDetails from './pages/OrderDetails';
 import Orders from './pages/Orders';
+import NotificationsInbox from './pages/NotificationsInbox';
 import ProductForm from './pages/ProductForm';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
@@ -124,6 +125,7 @@ export const router = createBrowserRouter([
         ),
       },
       { path: 'orders', element: withTransition(<Orders />) },
+      { path: 'notifications', element: withTransition(<NotificationsInbox />) },
       { path: 'orders/:id', element: withTransition(<OrderDetails />) },
       {
         path: 'cart',

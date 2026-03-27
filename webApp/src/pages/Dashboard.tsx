@@ -22,10 +22,13 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { Link, useNavigate } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { inventoryCompositionData, monthlyExpensesData, monthlySalesData, orderStatusData } from '../data/constants';
+import { notificationService } from '../services/notificationService';
 import { orderService } from '../services/orderService';
+import { getNotificationTitle, notificationDestination, shortenOrderIds } from '../utils/notificationHelpers';
 import { NotificationType, UserRole, type Notification, type Order, type OrderStatus } from '../types';
 
 interface KpiCardProps {
@@ -59,25 +62,11 @@ function KpiCard({ title, value, change, icon, iconBg, valueColor }: KpiCardProp
 
 export default function Dashboard(): JSX.Element {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isRetailer = user?.role === UserRole.RETAILER;
   const [orders, setOrders] = useState<Order[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [notifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: NotificationType.SYSTEM,
-      message: 'Welcome to your new dashboard',
-      time: 'Just now',
-      read: false,
-    } as unknown as Notification,
-    {
-      id: '2',
-      type: NotificationType.SYSTEM,
-      message: 'System maintenance scheduled for Sunday',
-      time: '1 day ago',
-      read: true,
-    } as unknown as Notification,
-  ]);
 
   useEffect(() => {
     const fetchData = async (): Promise<void> => {
@@ -90,7 +79,9 @@ export default function Dashboard(): JSX.Element {
         const data = user.role === UserRole.WHOLESALER
           ? await orderService.getByWholesaler(user.id)
           : await orderService.getByRetailer(user.id);
+        const notificationData = await notificationService.getNotifications(user.id);
         setOrders(Array.isArray(data) ? data : []);
+        setNotifications(Array.isArray(notificationData) ? notificationData : []);
       } catch (error) {
         console.error('Failed to fetch dashboard data', error);
       } finally {
@@ -290,13 +281,28 @@ export default function Dashboard(): JSX.Element {
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-navy-800">Recent Activity</h3>
-            <button type="button" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+            <Link to="/notifications" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
               View all
-            </button>
+            </Link>
           </div>
           <div className="space-y-4">
             {notifications.slice(0, 5).map((notification) => (
-              <div key={notification.id} className="flex items-start gap-3">
+              <button
+                key={notification.id}
+                type="button"
+                className="flex w-full items-start gap-3 text-left"
+                onClick={() => {
+                  if (!notification.read) {
+                    void notificationService.markAsRead(notification.id);
+                    setNotifications((prev) =>
+                      prev.map((item) =>
+                        item.id === notification.id ? ({ ...(item as object), read: true } as Notification) : item,
+                      ),
+                    );
+                  }
+                  navigate(notificationDestination(notification));
+                }}
+              >
                 <div
                   className={`w-2 h-2 rounded-full mt-2 ${
                     notification.type === NotificationType.ORDER
@@ -309,11 +315,15 @@ export default function Dashboard(): JSX.Element {
                   }`}
                 />
                 <div className="flex-1">
-                  <p className="text-sm text-navy-700">{notification.message}</p>
+                  <p className={`text-sm ${notification.read ? 'text-navy-500' : 'text-navy-700 font-medium'}`}>
+                    {shortenOrderIds(getNotificationTitle(notification))}
+                  </p>
+                  <p className="text-sm text-navy-700">{shortenOrderIds(notification.message)}</p>
                   <p className="text-xs text-navy-400 mt-1">{notification.time}</p>
                 </div>
-              </div>
+              </button>
             ))}
+            {notifications.length === 0 ? <p className="text-center text-navy-500 py-4">No recent activity</p> : null}
           </div>
         </div>
       </div>

@@ -15,7 +15,8 @@ import java.util.*
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val invoiceRepository: InvoiceRepository,
-    private val paymentMethodRepository: PaymentMethodRepository
+    private val paymentMethodRepository: PaymentMethodRepository,
+    private val notificationService: NotificationService
 ) {
 
     // ==================== PAYMENT OPERATIONS ====================
@@ -57,7 +58,21 @@ class PaymentService(
         if (status == PaymentStatus.COMPLETED) {
             payment.completedAt = LocalDateTime.now()
         }
-        return paymentRepository.save(payment)
+        val savedPayment = paymentRepository.save(payment)
+
+        notificationService.sendEventNotification(
+            recipientId = savedPayment.ownerId,
+            type = NotificationType.PAYMENT,
+            eventKey = NotificationEventKey.PAYMENT_STATUS_UPDATED,
+            entityType = NotificationEntityType.PAYMENT,
+            entityId = savedPayment.id,
+            preferenceKey = NotificationPreferenceKey.PAYMENT_STATUS,
+            title = "Payment status updated",
+            message = "Payment ${savedPayment.id ?: ""} is now ${savedPayment.status.name}.",
+            deepLink = "/settings/payments"
+        )
+
+        return savedPayment
     }
 
     @Transactional
