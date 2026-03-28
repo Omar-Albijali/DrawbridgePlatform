@@ -32,7 +32,8 @@ data class InventoryItemDTO(
     val status: InventoryStatus,
     val supplier: String,
     val lastRestocked: String?, // LocalDateTime -> String (ISO 8601)
-    val reorderQuantity: Int?
+    val reorderQuantity: Int?,
+    val imageUrl: String?
 )
 
 @OptIn(ExperimentalJsExport::class)

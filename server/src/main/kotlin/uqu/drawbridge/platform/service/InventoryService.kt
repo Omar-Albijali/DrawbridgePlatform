@@ -187,7 +187,8 @@ class InventoryService(
             status = status,
             supplier = supplierName,
             lastRestocked = this.lastUpdated.toString(),
-            reorderQuantity = this.autoOrderConfig.reorderQuantity
+            reorderQuantity = this.autoOrderConfig.reorderQuantity,
+            imageUrl = product?.images?.sortedBy { it.sortIndex }?.firstOrNull()?.url
         )
     }
 
@@ -400,7 +401,8 @@ class InventoryService(
                 status = status,
                 supplier = supplierName,
                 lastRestocked = item.lastUpdated.toString(),
-                reorderQuantity = item.autoOrderConfig.reorderQuantity
+                reorderQuantity = item.autoOrderConfig.reorderQuantity,
+                imageUrl = product?.images?.sortedBy { it.sortIndex }?.firstOrNull()?.url
             )
         }
     }
