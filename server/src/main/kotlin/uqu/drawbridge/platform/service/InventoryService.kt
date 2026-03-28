@@ -2,17 +2,28 @@ package uqu.drawbridge.platform.service
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import uqu.drawbridge.platform.InventoryItemDTO
+import uqu.drawbridge.platform.InventoryStatus
+import uqu.drawbridge.platform.NotificationEntityType
+import uqu.drawbridge.platform.NotificationEventKey
+import uqu.drawbridge.platform.NotificationPreferenceKey
+import uqu.drawbridge.platform.NotificationType
+import uqu.drawbridge.platform.CreateInventoryItemRequest
+import uqu.drawbridge.platform.UpdateAutoOrderConfigRequest
+import uqu.drawbridge.platform.AutoOrderConfigDTO
+import uqu.drawbridge.platform.ScheduleType
 import uqu.drawbridge.platform.model.AutoOrderConfig
 import uqu.drawbridge.platform.model.InventoryItem
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.ProductRepository
-import uqu.drawbridge.platform.*
+import java.time.DayOfWeek
 import java.time.LocalDateTime
 
 @Service
 class InventoryService(
     private val inventoryItemRepository: InventoryItemRepository,
-    private val productRepository: uqu.drawbridge.platform.repository.ProductRepository,
+    private val productRepository: ProductRepository,
+    private val orderService: OrderService,
     private val notificationService: NotificationService
 ) {
 
@@ -68,20 +79,24 @@ class InventoryService(
     @Transactional
     fun updateQuantity(id: String, newQuantity: Int): InventoryItem? {
         val item = inventoryItemRepository.findById(id).orElse(null) ?: return null
+        val previousQuantity = item.currentQuantity
         item.currentQuantity = newQuantity
         item.lastUpdated = LocalDateTime.now()
         val savedItem = inventoryItemRepository.save(item)
         maybeNotifyLowStock(savedItem)
+        maybeTriggerThresholdAutoRestock(savedItem, previousQuantity)
         return savedItem
     }
 
     @Transactional
     fun adjustQuantity(id: String, adjustment: Int): InventoryItem? {
         val item = inventoryItemRepository.findById(id).orElse(null) ?: return null
+        val previousQuantity = item.currentQuantity
         item.currentQuantity += adjustment
         item.lastUpdated = LocalDateTime.now()
         val savedItem = inventoryItemRepository.save(item)
         maybeNotifyLowStock(savedItem)
+        maybeTriggerThresholdAutoRestock(savedItem, previousQuantity)
         return savedItem
     }
 
@@ -163,6 +178,20 @@ class InventoryService(
             deepLink = "/inventory"
         )
         return savedItem
+    }
+
+    @Transactional
+    fun processDueAutoOrders(): Int {
+        val dueItems = getAutoOrderConfigsDueForProcessing()
+            .filter { it.autoOrderConfig.scheduleType != ScheduleType.THRESHOLD_BASED }
+
+        var processed = 0
+        dueItems.forEach { item ->
+            if (triggerAutoRestock(item)) {
+                processed += 1
+            }
+        }
+        return processed
     }
 
 
@@ -354,7 +383,7 @@ class InventoryService(
             ScheduleType.THRESHOLD_BASED -> null // No scheduled time, triggers on threshold
             ScheduleType.DAILY -> now.plusDays(1).withHour(9).withMinute(0).withSecond(0)
             ScheduleType.WEEKLY -> {
-                val targetDay = config.dayOfWeek?.split(",")?.firstOrNull()?.trim()?.toIntOrNull() ?: 1
+                val targetDay = parseDayOfWeek(config.dayOfWeek) ?: DayOfWeek.MONDAY.value
                 var next = now.plusDays(1)
                 while (next.dayOfWeek.value != targetDay) {
                     next = next.plusDays(1)
@@ -372,6 +401,28 @@ class InventoryService(
                 now.plusDays(interval.toLong()).withHour(9).withMinute(0).withSecond(0)
             }
         }
+    }
+
+    private fun parseDayOfWeek(dayOfWeek: String?): Int? {
+        val token = dayOfWeek
+            ?.split(",")
+            ?.firstOrNull()
+            ?.trim()
+            ?.uppercase()
+            ?: return null
+
+        return token.toIntOrNull()
+            ?.takeIf { it in 1..7 }
+            ?: when (token) {
+                "MONDAY" -> DayOfWeek.MONDAY.value
+                "TUESDAY" -> DayOfWeek.TUESDAY.value
+                "WEDNESDAY" -> DayOfWeek.WEDNESDAY.value
+                "THURSDAY" -> DayOfWeek.THURSDAY.value
+                "FRIDAY" -> DayOfWeek.FRIDAY.value
+                "SATURDAY" -> DayOfWeek.SATURDAY.value
+                "SUNDAY" -> DayOfWeek.SUNDAY.value
+                else -> null
+            }
     }
 
 
@@ -423,5 +474,40 @@ class InventoryService(
             )
         }
     }
-}
 
+    private fun maybeTriggerThresholdAutoRestock(item: InventoryItem, previousQuantity: Int) {
+        val config = item.autoOrderConfig
+        if (!config.enabled || config.scheduleType != ScheduleType.THRESHOLD_BASED) return
+
+        val threshold = config.minThreshold
+        val crossedThreshold = previousQuantity > threshold && item.currentQuantity <= threshold
+        if (crossedThreshold) {
+            triggerAutoRestock(item)
+        }
+    }
+
+    private fun triggerAutoRestock(item: InventoryItem): Boolean {
+        val itemId = item.id ?: return false
+        val config = item.autoOrderConfig
+        val reorderQuantity = config.reorderQuantity
+        if (!config.enabled || reorderQuantity <= 0) return false
+
+        val product = productRepository.findById(item.productId).orElse(null) ?: return false
+        val wholesalerId = product.wholesaler.id ?: return false
+        val createdOrder = orderService.createAutoRestockOrder(
+            retailerId = item.retailerId,
+            wholesalerId = wholesalerId,
+            productId = item.productId,
+            quantity = reorderQuantity,
+            unitPrice = product.price
+        ) ?: return false
+
+        if (createdOrder.id == null && createdOrder.orderGroupId == null) {
+            // Guard for unexpected persistence behavior; avoid marking as triggered if order wasn't persisted.
+            return false
+        }
+
+        markAutoOrderTriggered(itemId)
+        return true
+    }
+}

@@ -31,33 +31,33 @@ import { NotificationType, UserRole, type Notification } from '../types';
 function itemStyles(type: NotificationType): { icon: JSX.Element; wrap: string; label: string; labelClass: string } {
   if (type === NotificationType.ORDER) {
     return {
-      icon: <Package className="h-3.5 w-3.5 text-primary-700" />,
-      wrap: 'bg-primary-100 ring-1 ring-primary-200',
+      icon: <Package className="h-3.5 w-3.5 text-primary-700 dark:text-primary-300" />,
+      wrap: 'bg-primary-100 ring-1 ring-primary-200 dark:bg-primary-900/35 dark:ring-primary-800/70',
       label: 'Order',
-      labelClass: 'bg-primary-100 text-primary-700',
+      labelClass: 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
     };
   }
   if (type === NotificationType.STOCK) {
     return {
-      icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />,
-      wrap: 'bg-amber-100 ring-1 ring-amber-200',
+      icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" />,
+      wrap: 'bg-amber-100 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:ring-amber-800/70',
       label: 'Inventory',
-      labelClass: 'bg-amber-100 text-amber-700',
+      labelClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
     };
   }
   if (type === NotificationType.PAYMENT) {
     return {
-      icon: <CreditCard className="h-3.5 w-3.5 text-emerald-700" />,
-      wrap: 'bg-emerald-100 ring-1 ring-emerald-200',
+      icon: <CreditCard className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />,
+      wrap: 'bg-emerald-100 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:ring-emerald-800/70',
       label: 'Payment',
-      labelClass: 'bg-emerald-100 text-emerald-700',
+      labelClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
     };
   }
   return {
-    icon: <Shield className="h-3.5 w-3.5 text-slate-700" />,
-    wrap: 'bg-slate-100 ring-1 ring-slate-200',
+    icon: <Shield className="h-3.5 w-3.5 text-slate-700 dark:text-slate-300" />,
+    wrap: 'bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700',
     label: 'System',
-    labelClass: 'bg-slate-200 text-slate-700',
+    labelClass: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
   };
 }
 
@@ -241,13 +241,13 @@ export default function AppNavbar(): JSX.Element {
                 </button>
 
                 {isNotificationsOpen ? (
-                  <div className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-white/10 dark:bg-slate-900">
+                  <div className="absolute right-0 z-50 mt-2 w-96 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-white/10 dark:bg-slate-900">
                     <div className="mb-2 flex items-center justify-between px-2 py-1">
                       <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Notifications</p>
                       <button
                         type="button"
                         onClick={() => void handleMarkAllRead()}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-700"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-300 dark:hover:text-primary-200"
                       >
                         <CheckCheck className="h-3.5 w-3.5" />
                         Mark all read
@@ -256,7 +256,7 @@ export default function AppNavbar(): JSX.Element {
 
                     <div className="max-h-96 space-y-1 overflow-y-auto">
                       {notifications.length === 0 ? (
-                        <p className="rounded-lg px-3 py-6 text-center text-sm text-slate-500">No notifications yet.</p>
+                        <p className="rounded-lg px-3 py-6 text-center text-sm text-slate-500 dark:text-slate-400">No notifications yet.</p>
                       ) : (
                         notifications.map((notification) => (
                           (() => {
@@ -280,8 +280,8 @@ export default function AppNavbar(): JSX.Element {
                             }}
                             className={`w-full rounded-lg px-3 py-2 text-left transition ${
                               notification.read
-                                ? 'hover:bg-slate-100 dark:hover:bg-slate-800'
-                                : 'bg-primary-50 hover:bg-primary-100 dark:bg-primary-500/10'
+                                ? 'hover:bg-slate-100 dark:hover:bg-slate-800/70'
+                                : 'bg-primary-50 hover:bg-primary-100 dark:bg-primary-500/10 dark:hover:bg-primary-500/20'
                             }`}
                           >
                             <div className="flex items-start gap-2">
@@ -290,15 +290,15 @@ export default function AppNavbar(): JSX.Element {
                               </div>
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                  <p className={`text-sm ${notification.read ? 'text-slate-700' : 'font-semibold text-slate-900'}`}>
+                                  <p className={`text-sm ${notification.read ? 'text-slate-700 dark:text-slate-300' : 'font-semibold text-slate-900 dark:text-slate-100'}`}>
                                     {shortenOrderIds(getNotificationTitle(notification))}
                                   </p>
                                   <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${styles.labelClass}`}>
                                     {styles.label}
                                   </span>
                                 </div>
-                                <p className="mt-0.5 text-xs text-slate-500">{shortenOrderIds(notification.message)}</p>
-                                <p className="mt-1 text-[11px] text-slate-400">{notification.time}</p>
+                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{shortenOrderIds(notification.message)}</p>
+                                <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{notification.time}</p>
                               </div>
                             </div>
                           </button>
@@ -311,7 +311,7 @@ export default function AppNavbar(): JSX.Element {
                     <Link
                       to="/notifications"
                       onClick={() => setIsNotificationsOpen(false)}
-                      className="mt-2 block rounded-lg px-3 py-2 text-center text-sm font-semibold text-primary-600 hover:bg-primary-50 hover:text-primary-700"
+                      className="mt-2 block rounded-lg px-3 py-2 text-center text-sm font-semibold text-primary-600 hover:bg-primary-50 hover:text-primary-700 dark:text-primary-300 dark:hover:bg-primary-500/10 dark:hover:text-primary-200"
                     >
                       Open full inbox
                     </Link>

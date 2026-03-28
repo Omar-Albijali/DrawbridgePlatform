@@ -57,8 +57,8 @@ export default function AutoRestockModal({
   const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[40vw] overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700/70 w-full max-w-[40vw] overflow-hidden flex flex-col max-h-[90vh]">
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 p-6 text-white shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -80,17 +80,16 @@ export default function AutoRestockModal({
           </div>
         </div>
 
-        <div className="p-6 space-y-6 overflow-y-auto">
+        <div className="p-6 space-y-6 overflow-y-auto text-slate-800 dark:text-slate-100">
           <div>
             <label className="label">Restock Strategy</label>
             <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
-                className={`p-3 rounded-lg border text-left transition-all ${
-                  scheduleType == ScheduleType.THRESHOLD_BASED
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+                className={`p-3 rounded-lg border text-left transition-all ${scheduleType == ScheduleType.THRESHOLD_BASED
+                    ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/15 dark:text-primary-200'
+                    : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+                  }`}
                 onClick={() => setScheduleType(ScheduleType.THRESHOLD_BASED)}
               >
                 <div className="font-medium flex items-center gap-2">
@@ -102,11 +101,10 @@ export default function AutoRestockModal({
 
               <button
                 type="button"
-                className={`p-3 rounded-lg border text-left transition-all ${
-                  scheduleType == ScheduleType.WEEKLY
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+                className={`p-3 rounded-lg border text-left transition-all ${scheduleType == ScheduleType.WEEKLY
+                    ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/15 dark:text-primary-200'
+                    : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+                  }`}
                 onClick={() => setScheduleType(ScheduleType.WEEKLY)}
               >
                 <div className="font-medium flex items-center gap-2">
@@ -118,11 +116,10 @@ export default function AutoRestockModal({
 
               <button
                 type="button"
-                className={`p-3 rounded-lg border text-left transition-all ${
-                  scheduleType == ScheduleType.MONTHLY
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+                className={`p-3 rounded-lg border text-left transition-all ${scheduleType == ScheduleType.MONTHLY
+                    ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/15 dark:text-primary-200'
+                    : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+                  }`}
                 onClick={() => setScheduleType(ScheduleType.MONTHLY)}
               >
                 <div className="font-medium flex items-center gap-2">
@@ -134,11 +131,10 @@ export default function AutoRestockModal({
 
               <button
                 type="button"
-                className={`p-3 rounded-lg border text-left transition-all ${
-                  scheduleType == ScheduleType.INTERVAL_DAYS
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+                className={`p-3 rounded-lg border text-left transition-all ${scheduleType == ScheduleType.INTERVAL_DAYS
+                    ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/15 dark:text-primary-200'
+                    : 'border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+                  }`}
                 onClick={() => setScheduleType(ScheduleType.INTERVAL_DAYS)}
               >
                 <div className="font-medium flex items-center gap-2">
@@ -150,8 +146,8 @@ export default function AutoRestockModal({
             </div>
           </div>
 
-          <div className="space-y-4 pt-4 border-t border-gray-100">
-            <h3 className="font-medium text-navy-800">Configuration Details</h3>
+          <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700/70">
+            <h3 className="font-medium text-slate-900 dark:text-slate-100">Configuration Details</h3>
 
             {scheduleType == ScheduleType.THRESHOLD_BASED && (
               <div>
@@ -164,9 +160,9 @@ export default function AutoRestockModal({
                     className="input pr-16"
                     min="1"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-navy-500 text-sm">units</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-sm">units</span>
                 </div>
-                <p className="text-xs text-navy-500 mt-1">Trigger reorder when stock is less than this</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Trigger reorder when stock is less than this</p>
               </div>
             )}
 
@@ -208,7 +204,7 @@ export default function AutoRestockModal({
                     className="input pr-16"
                     min="1"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-navy-500 text-sm">days</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-sm">days</span>
                 </div>
               </div>
             )}
@@ -223,14 +219,14 @@ export default function AutoRestockModal({
                   className="input pr-16"
                   min="1"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-navy-500 text-sm">units</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-sm">units</span>
               </div>
-              <p className="text-xs text-navy-500 mt-1">Amount to order when triggered</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Amount to order when triggered</p>
             </div>
           </div>
         </div>
 
-        <div className="px-6 py-4 bg-gray-50 flex gap-3 shrink-0">
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 dark:bg-slate-900/60 dark:border-slate-700/70 flex gap-3 shrink-0">
           <button type="button" onClick={onClose} className="flex-1 btn-secondary">
             Cancel
           </button>

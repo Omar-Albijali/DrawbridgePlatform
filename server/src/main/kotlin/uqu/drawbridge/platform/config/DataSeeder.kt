@@ -170,7 +170,7 @@ class DataSeeder(
                 autoOrderConfig = AutoOrderConfig(
                     enabled = true,
                     minThreshold = 10,
-                    reorderQuantity = 20,
+                    reorderQuantity = 20
             )))
 
             inventoryItemRepository.save(InventoryItem(
