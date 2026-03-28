@@ -26,7 +26,7 @@ export default function ProductDetail(): JSX.Element {
             try {
                 const data = await productService.getById(id);
                 setProduct(data);
-                setSelectedImage(data.image);
+                setSelectedImage(data.images?.[0] || data.image);
             } catch {
                 navigate('/marketplace', { replace: true });
             } finally {
@@ -52,7 +52,7 @@ export default function ProductDetail(): JSX.Element {
             ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
             : 0;
 
-    const allImages = product ? [product.image, ...(product.images ?? [])].filter(Boolean) : [];
+    const allImages = product?.images ?? [];
 
     if (loading) {
         return (
