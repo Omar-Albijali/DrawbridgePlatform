@@ -205,6 +205,23 @@ export default function Inventory(): JSX.Element {
     return "Not Scheduled";
   };
 
+  const formatNextRestockDate = (value?: string | null): string | null => {
+    if (!value) {
+      return null;
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+
+    return parsed.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
   const lowStockCount = inventory.filter((item) => getStatusName(item.status) === InventoryStatus.LOW_STOCK.name).length;
   const outOfStockCount = inventory.filter((item) => getStatusName(item.status) === InventoryStatus.OUT_OF_STOCK.name).length;
   const autoRestockEnabled = inventory.filter((item) => item.autoRestock).length;
@@ -229,7 +246,7 @@ export default function Inventory(): JSX.Element {
       }
     >
 
-      
+
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card !p-4">
@@ -293,9 +310,11 @@ export default function Inventory(): JSX.Element {
 
       <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#0f1219] shadow-2xl mt-6">
         <div className="grid grid-cols-12 gap-4 px-4 py-2.5 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em]">
-          <div className="col-span-5">Product Descriptor</div>
+          <div className="col-span-4">Product Descriptor</div>
           <div className="col-span-2 text-center">Stock Qty</div>
-          <div className="col-span-5 text-right pr-6">Restock Automation</div>
+          <div className="col-span-1 text-center">Stock Status</div>
+          <div className="col-span-2 text-center">Next Restock</div>
+          <div className="col-span-3 text-right pr-6">Restock Automation</div>
         </div>
 
         <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -303,10 +322,11 @@ export default function Inventory(): JSX.Element {
             const isEditingStock = editingStockItemId === item.id;
             const isLow = item.currentStock <= (item.autoOrderConfig?.minThreshold ?? 0);
             const hasChanged = isEditingStock && String(item.currentStock) !== stockDraft;
+            const nextRestockDate = formatNextRestockDate(item.autoOrderConfig?.nextScheduledAt);
 
             return (
               <div key={item.id} className="grid grid-cols-12 gap-4 items-center px-4 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-all group">
-                <div className="col-span-5 flex items-center gap-3">
+                <div className="col-span-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded bg-slate-900 flex items-center justify-center border border-slate-800 group-hover:border-slate-600 transition-colors overflow-hidden">
                     {item.imageUrl ? (
                       <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
@@ -315,12 +335,12 @@ export default function Inventory(): JSX.Element {
                     )}
                   </div>
                   <div className="truncate flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       <div className="text-sm font-semibold text-slate-900 dark:text-slate-200 truncate">{item.name}</div>
                       <button
                         type="button"
                         onClick={() => void handleDelete(item)}
-                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                        className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                         title="Delete from inventory"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -351,13 +371,12 @@ export default function Inventory(): JSX.Element {
                         if (!isEditingStock) beginStockEdit(item);
                         setStockDraft(val);
                       }}
-                      className={`w-12 text-center bg-transparent border-b transition-all outline-none py-1 text-base font-bold ${
-                        isEditingStock || hasChanged
-                          ? 'border-blue-500 text-white'
+                      className={`w-14 text-center bg-transparent border-b transition-all outline-none py-0.5 text-base font-semibold tabular-nums ${isEditingStock || hasChanged
+                          ? 'border-blue-500 text-slate-900 dark:text-white'
                           : isLow
-                            ? 'border-transparent text-amber-500'
+                            ? 'border-transparent text-amber-600 dark:text-amber-400'
                             : 'border-transparent text-slate-900 dark:text-slate-200'
-                      } hover:border-slate-700 focus:border-blue-500 focus:ring-0`}
+                        } hover:border-slate-400 focus:border-blue-500 focus:ring-0`}
                     />
 
                     {hasChanged && (
@@ -366,7 +385,7 @@ export default function Inventory(): JSX.Element {
                           type="button"
                           onClick={() => void saveStockEdit(item)}
                           disabled={isSavingStock}
-                          className="p-0.5 text-emerald-500 hover:bg-emerald-500/10 rounded transition-colors disabled:opacity-50"
+                          className="p-0.5 text-emerald-600 hover:bg-emerald-500/10 rounded transition-colors disabled:opacity-50"
                           title="Confirm change"
                         >
                           <Check className="w-3.5 h-3.5" />
@@ -375,7 +394,7 @@ export default function Inventory(): JSX.Element {
                           type="button"
                           onClick={cancelStockEdit}
                           disabled={isSavingStock}
-                          className="p-0.5 text-slate-500 hover:bg-slate-800 rounded transition-colors disabled:opacity-50"
+                          className="p-0.5 text-slate-500 hover:bg-slate-800/20 rounded transition-colors disabled:opacity-50"
                           title="Cancel"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -383,23 +402,41 @@ export default function Inventory(): JSX.Element {
                       </div>
                     )}
                   </div>
-                  <div className={`text-[9px] font-bold uppercase tracking-tighter mt-1 ${isLow ? 'text-amber-500/60' : 'text-slate-600'}`}>
-                    {isLow ? 'Critical Low' : 'Stable'}
-                  </div>
                 </div>
 
-                <div className="col-span-5 flex justify-end pr-2">
+                <div className="col-span-1 flex justify-center">
+                  <span
+                    className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${isLow
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800'
+                      : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700'
+                      }`}
+                  >
+                    {isLow ? 'Critical Low' : 'Stable'}
+                  </span>
+                </div>
+
+                <div className="col-span-2 flex justify-center">
+                  {nextRestockDate ? (
+                    <span className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 whitespace-nowrap dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                      <Calendar className="w-3 h-3" />
+                      {nextRestockDate}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-medium text-slate-400 dark:text-slate-600">-</span>
+                  )}
+                </div>
+
+                <div className="col-span-3 flex justify-end pr-2">
                   <div
-                    className={`flex items-center p-1 rounded-lg border transition-all duration-300 min-w-[280px] h-[46px] ${item.autoRestock ? 'bg-blue-500/5 border-blue-500/20' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-60'}`}
+                    className={`flex items-center p-1 rounded-lg border transition-all duration-300 min-w-[280px] min-h-[46px] ${item.autoRestock ? 'bg-blue-500/5 border-blue-500/20' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-60'}`}
                   >
                     <button
                       type="button"
                       onClick={() => void toggleAutoRestock(item.id)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all min-w-[100px] justify-center ${
-                        item.autoRestock
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all min-w-[100px] justify-center ${item.autoRestock
                           ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
                           : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
+                        }`}
                     >
                       {item.autoRestock ? (
                         <>
@@ -427,7 +464,7 @@ export default function Inventory(): JSX.Element {
                         </div>
                         <div className="flex flex-col">
                           <span className="text-[11px] font-bold text-slate-900 dark:text-slate-200 whitespace-nowrap">{ScheduleSummary(item)}</span>
-                          <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest whitespace-nowrap">
+                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest whitespace-nowrap">
                             {item.autoOrderConfig?.scheduleType == ScheduleType.THRESHOLD_BASED ? 'Threshold' : 'Recurrence'}
                           </span>
                         </div>

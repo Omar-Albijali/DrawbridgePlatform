@@ -148,6 +148,42 @@ class OrderService(
     }
 
     @Transactional
+    fun createAutoRestockOrder(
+        retailerId: String,
+        wholesalerId: String,
+        productId: String,
+        quantity: Int,
+        unitPrice: BigDecimal
+    ): Order? {
+        if (quantity <= 0) return null
+
+        val subtotal = unitPrice.multiply(BigDecimal(quantity))
+        val order = Order(
+            retailerId = retailerId,
+            wholesalerId = wholesalerId,
+            status = OrderStatus.PENDING,
+            subtotal = subtotal,
+            autoOrder = true,
+            orderItems = mutableListOf(
+                OrderItem(
+                    productId = productId,
+                    quantity = quantity,
+                    unitPrice = unitPrice
+                )
+            )
+        )
+
+        val orderGroup = OrderGroup(
+            retailerId = retailerId,
+            groupTotal = subtotal,
+            paymentStatus = PaymentStatus.PENDING,
+            orders = mutableListOf(order)
+        )
+
+        return orderGroupRepository.save(orderGroup).orders.firstOrNull()
+    }
+
+    @Transactional
     fun updateOrderStatus(id: String, status: OrderStatus): Order? {
         val order = orderRepository.findById(id).orElse(null) ?: return null
         val isFirstDelivery = status == OrderStatus.DELIVERED && order.deliveredAt == null
