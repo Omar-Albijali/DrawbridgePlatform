@@ -1,5 +1,6 @@
 import { fetchApi } from './api';
 import { InventoryItem, AutoOrderConfig, CreateInventoryItemRequest, UpdateAutoOrderConfigRequest } from '../types';
+import {ScheduleType} from "shared";
 
 
 export const inventoryService = {
@@ -47,7 +48,7 @@ export const inventoryService = {
             enabled: hasConfig,
             minThreshold: config.minThreshold ?? 0,
             reorderQuantity: config.reorderQuantity ?? 0,
-            scheduleType: config.scheduleType,
+            scheduleType: config.scheduleType?.name || ScheduleType.THRESHOLD_BASED.name,
             intervalDays: config.intervalDays ?? null,
             dayOfWeek: config.dayOfWeek ?? null,
             dayOfMonth: config.dayOfMonth ?? null

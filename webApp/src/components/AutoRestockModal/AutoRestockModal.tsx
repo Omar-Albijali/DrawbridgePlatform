@@ -45,9 +45,9 @@ export default function AutoRestockModal({
       minThreshold: threshold,
       reorderQuantity,
       scheduleType,
-      intervalDays: scheduleType === ScheduleType.INTERVAL_DAYS ? intervalDays : null,
-      dayOfWeek: scheduleType === ScheduleType.WEEKLY ? dayOfWeek : null,
-      dayOfMonth: scheduleType === ScheduleType.MONTHLY ? dayOfMonth : null,
+      intervalDays: scheduleType == ScheduleType.INTERVAL_DAYS ? intervalDays : null,
+      dayOfWeek: scheduleType == ScheduleType.WEEKLY ? dayOfWeek : null,
+      dayOfMonth: scheduleType == ScheduleType.MONTHLY ? dayOfMonth : null,
       enabled: true,
     };
     onSave(config);
@@ -58,7 +58,7 @@ export default function AutoRestockModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[40vw] overflow-hidden flex flex-col max-h-[90vh]">
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 p-6 text-white shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -87,7 +87,7 @@ export default function AutoRestockModal({
               <button
                 type="button"
                 className={`p-3 rounded-lg border text-left transition-all ${
-                  scheduleType === ScheduleType.THRESHOLD_BASED
+                  scheduleType == ScheduleType.THRESHOLD_BASED
                     ? 'border-primary-500 bg-primary-50 text-primary-700'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -103,7 +103,7 @@ export default function AutoRestockModal({
               <button
                 type="button"
                 className={`p-3 rounded-lg border text-left transition-all ${
-                  scheduleType === ScheduleType.WEEKLY
+                  scheduleType == ScheduleType.WEEKLY
                     ? 'border-primary-500 bg-primary-50 text-primary-700'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -119,7 +119,7 @@ export default function AutoRestockModal({
               <button
                 type="button"
                 className={`p-3 rounded-lg border text-left transition-all ${
-                  scheduleType === ScheduleType.MONTHLY
+                  scheduleType == ScheduleType.MONTHLY
                     ? 'border-primary-500 bg-primary-50 text-primary-700'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -135,7 +135,7 @@ export default function AutoRestockModal({
               <button
                 type="button"
                 className={`p-3 rounded-lg border text-left transition-all ${
-                  scheduleType === ScheduleType.INTERVAL_DAYS
+                  scheduleType == ScheduleType.INTERVAL_DAYS
                     ? 'border-primary-500 bg-primary-50 text-primary-700'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -153,7 +153,7 @@ export default function AutoRestockModal({
           <div className="space-y-4 pt-4 border-t border-gray-100">
             <h3 className="font-medium text-navy-800">Configuration Details</h3>
 
-            {scheduleType === ScheduleType.THRESHOLD_BASED && (
+            {scheduleType == ScheduleType.THRESHOLD_BASED && (
               <div>
                 <label className="label">Minimum Threshold</label>
                 <div className="relative">
@@ -170,7 +170,7 @@ export default function AutoRestockModal({
               </div>
             )}
 
-            {scheduleType === ScheduleType.WEEKLY && (
+            {scheduleType == ScheduleType.WEEKLY && (
               <div>
                 <label className="label">Day of Week</label>
                 <select className="input" value={dayOfWeek} onChange={(event) => setDayOfWeek(event.target.value)}>
@@ -183,7 +183,7 @@ export default function AutoRestockModal({
               </div>
             )}
 
-            {scheduleType === ScheduleType.MONTHLY && (
+            {scheduleType == ScheduleType.MONTHLY && (
               <div>
                 <label className="label">Day of Month</label>
                 <select className="input" value={dayOfMonth} onChange={(event) => setDayOfMonth(event.target.value)}>
@@ -197,7 +197,7 @@ export default function AutoRestockModal({
               </div>
             )}
 
-            {scheduleType === ScheduleType.INTERVAL_DAYS && (
+            {scheduleType == ScheduleType.INTERVAL_DAYS && (
               <div>
                 <label className="label">Interval (Days)</label>
                 <div className="relative">

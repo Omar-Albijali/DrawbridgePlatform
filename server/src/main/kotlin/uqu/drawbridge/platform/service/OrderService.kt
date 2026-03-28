@@ -19,6 +19,7 @@ class OrderService(
     private val orderRepository: OrderRepository,
     private val orderItemRepository: OrderItemRepository,
     private val orderGroupRepository: OrderGroupRepository,
+    private val inventoryItemRepository: InventoryItemRepository,
     private val userRepository: UserRepository,
     private val productRepository: ProductRepository,
     private val categoryRepository: CategoryRepository,
@@ -149,12 +150,18 @@ class OrderService(
     @Transactional
     fun updateOrderStatus(id: String, status: OrderStatus): Order? {
         val order = orderRepository.findById(id).orElse(null) ?: return null
+        val isFirstDelivery = status == OrderStatus.DELIVERED && order.deliveredAt == null
         order.status = status
         
         // Update timestamps based on status
         when (status) {
             OrderStatus.SHIPPED -> order.shippedAt = LocalDateTime.now()
-            OrderStatus.DELIVERED -> order.deliveredAt = LocalDateTime.now()
+            OrderStatus.DELIVERED -> {
+                order.deliveredAt = LocalDateTime.now()
+                if (isFirstDelivery) {
+                    addDeliveredItemsToRetailInventory(order)
+                }
+            }
             else -> {}
         }
         
@@ -437,5 +444,32 @@ class OrderService(
         }
         orderGroup.groupTotal = total
         orderGroupRepository.save(orderGroup)
+    }
+
+    private fun addDeliveredItemsToRetailInventory(order: Order) {
+        val orderId = order.id ?: return
+        val now = LocalDateTime.now()
+        val quantitiesByProductId = orderItemRepository.findByOrderId(orderId)
+            .groupingBy { it.productId }
+            .fold(0) { total, item -> total + item.quantity }
+
+        quantitiesByProductId.forEach { (productId, quantity) ->
+            val inventoryItem = inventoryItemRepository.findByRetailerIdAndProductId(order.retailerId, productId)
+            if (inventoryItem != null) {
+                inventoryItem.currentQuantity += quantity
+                inventoryItem.lastUpdated = now
+                inventoryItemRepository.save(inventoryItem)
+            } else {
+                inventoryItemRepository.save(
+                    InventoryItem(
+                        retailerId = order.retailerId,
+                        productId = productId,
+                        currentQuantity = quantity,
+                        lastUpdated = now,
+                        autoOrderConfig = AutoOrderConfig()
+                    )
+                )
+            }
+        }
     }
 }
