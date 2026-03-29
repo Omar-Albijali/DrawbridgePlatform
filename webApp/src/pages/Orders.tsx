@@ -3,6 +3,7 @@ import { useEffect, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowUpDown,
+  Copy,
   CheckCircle2,
   ChevronDown,
   Clock,
@@ -21,6 +22,7 @@ import {
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { orderService } from '../services/orderService';
+import { reorderOrderToCart } from '../utils/reorderOrder';
 import { Order, OrderStatus, UserRole } from '../types';
 
 type SortField = 'id' | 'placedAt' | 'subtotal' | 'status' | 'retailerName';
@@ -44,6 +46,7 @@ export default function Orders(): JSX.Element {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [reorderingOrderId, setReorderingOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     const handleScroll = () => setOpenMenuId(null);
@@ -116,6 +119,47 @@ export default function Orders(): JSX.Element {
     } catch (error) {
       console.error(`Failed to ${String(action)} order`, error);
       alert(`Failed to ${String(action)} order`);
+    }
+  };
+
+  const handleReorder = async (order: Order, e: MouseEvent): Promise<void> => {
+    e.stopPropagation();
+    if (isWholesaler || !user?.id) return;
+
+    if (reorderingOrderId === order.id) {
+      return;
+    }
+
+    setReorderingOrderId(order.id);
+    try {
+      const { addedItems, failedItems, failedProductNames } = await reorderOrderToCart(user.id, order);
+
+      if (addedItems === 0 && failedItems === 0) {
+        alert('This order has no items to re-order.');
+        return;
+      }
+
+      if (addedItems === 0) {
+        alert('Unable to re-order items from this order right now.');
+        return;
+      }
+
+      if (failedItems > 0) {
+        const preview = failedProductNames.slice(0, 2).join(', ');
+        const suffix = failedItems > 2 ? ', and more' : '';
+        const details = preview ? ` Unavailable: ${preview}${suffix}.` : '';
+        alert(`Added ${addedItems} item(s) to your cart. ${failedItems} item(s) could not be added.${details}`);
+      } else {
+        alert('Order items were added to your cart.');
+      }
+
+      navigate('/cart');
+    } catch (error) {
+      console.error('Failed to reorder order', error);
+      alert('Failed to re-order this order');
+    } finally {
+      setReorderingOrderId(null);
+      setOpenMenuId(null);
     }
   };
 
@@ -427,6 +471,22 @@ export default function Orders(): JSX.Element {
                                   <Eye className="w-4 h-4 text-navy-400 dark:text-slate-400" />
                                   View Details
                                 </button>
+                                {!isWholesaler && (
+                                  <button
+                                    disabled={reorderingOrderId === order.id}
+                                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors dark:hover:bg-slate-800 ${
+                                      reorderingOrderId === order.id
+                                        ? 'text-navy-400 cursor-not-allowed dark:text-slate-500'
+                                        : 'text-navy-700 hover:bg-gray-50 dark:text-slate-200'
+                                    }`}
+                                    onClick={(e) => {
+                                      void handleReorder(order, e);
+                                    }}
+                                  >
+                                    <Copy className="w-4 h-4 text-navy-400 dark:text-slate-400" />
+                                    {reorderingOrderId === order.id ? 'Re-ordering...' : 'Re-order'}
+                                  </button>
+                                )}
                                 <button
                                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors dark:text-slate-200 dark:hover:bg-slate-800"
                                   onClick={() => {

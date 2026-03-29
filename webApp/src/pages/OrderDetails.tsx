@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, Download, MapPin, Package, Truck } from 'lucide-react';
+import { ArrowLeft, Calendar, Copy, Download, MapPin, Package, Truck } from 'lucide-react';
 import PageShell from '../components/PageShell';
+import { useAuth } from '../contexts/AuthContext';
 import { orderService } from '../services/orderService';
-import { Order } from '../types';
+import { reorderOrderToCart } from '../utils/reorderOrder';
+import { Order, UserRole } from '../types';
 
 function statusName(status: unknown): string {
   if (!status) return '';
@@ -13,9 +15,12 @@ function statusName(status: unknown): string {
 export default function OrderDetails(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isWholesaler = user?.role === UserRole.WHOLESALER;
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isReordering, setIsReordering] = useState(false);
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -53,6 +58,43 @@ export default function OrderDetails(): JSX.Element {
     );
   }
 
+  const handleReorder = async (): Promise<void> => {
+    if (!user?.id || isWholesaler || isReordering) {
+      return;
+    }
+
+    setIsReordering(true);
+    try {
+      const { addedItems, failedItems, failedProductNames } = await reorderOrderToCart(user.id, order);
+
+      if (addedItems === 0 && failedItems === 0) {
+        alert('This order has no items to re-order.');
+        return;
+      }
+
+      if (addedItems === 0) {
+        alert('Unable to re-order items from this order right now.');
+        return;
+      }
+
+      if (failedItems > 0) {
+        const preview = failedProductNames.slice(0, 2).join(', ');
+        const suffix = failedItems > 2 ? ', and more' : '';
+        const details = preview ? ` Unavailable: ${preview}${suffix}.` : '';
+        alert(`Added ${addedItems} item(s) to your cart. ${failedItems} item(s) could not be added.${details}`);
+      } else {
+        alert('Order items were added to your cart.');
+      }
+
+      navigate('/cart');
+    } catch (error) {
+      console.error('Failed to reorder order', error);
+      alert('Failed to re-order this order');
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
   return (
     <PageShell
       title={`Order #${order.id}`}
@@ -65,6 +107,18 @@ export default function OrderDetails(): JSX.Element {
           >
             <ArrowLeft className="w-4 h-4" />
             Back
+          </button>
+          <button
+            onClick={() => void handleReorder()}
+            disabled={isWholesaler || isReordering}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+              isWholesaler || isReordering
+                ? 'border-gray-100 text-gray-400 cursor-not-allowed'
+                : 'border-gray-200 text-navy-600 hover:bg-gray-50'
+            }`}
+          >
+            <Copy className="w-4 h-4" />
+            {isReordering ? 'Re-ordering...' : 'Re-order'}
           </button>
           <button
   onClick={() => {
