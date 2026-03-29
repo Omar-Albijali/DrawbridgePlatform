@@ -198,3 +198,15 @@ html.has-custom-cursor label {
 .dark .theme-surface-scope .hover\:text-navy-800:hover {
   @apply text-slate-100;
 }
+
+.dark .theme-surface-scope.buyer-checkout .bg-gray-200 {
+  @apply bg-slate-700;
+}
+
+.dark .theme-surface-scope.buyer-checkout .text-gray-500 {
+  @apply text-slate-300;
+}
+
+.dark .theme-surface-scope.buyer-checkout .bg-primary-50 {
+  @apply bg-primary-500/15;
+}
