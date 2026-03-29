@@ -11,3 +11,4 @@ class DrawbridgeApplication
 fun main(args: Array<String>) {
     runApplication<DrawbridgeApplication>(*args)
 }
+

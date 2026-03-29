@@ -1,9 +1,10 @@
 import { ChevronDown, X } from 'lucide-react';
-import { brands, categories } from '../../data/constants';
 
 interface FilterSidebarProps {
+  categoryOptions: string[];
   selectedCategories: string[];
   setSelectedCategories: (categories: string[]) => void;
+  brandOptions: string[];
   selectedBrands: string[];
   setSelectedBrands: (brands: string[]) => void;
   priceRange: [number, number];
@@ -12,8 +13,10 @@ interface FilterSidebarProps {
 }
 
 export default function FilterSidebar({
+  categoryOptions,
   selectedCategories,
   setSelectedCategories,
+  brandOptions,
   selectedBrands,
   setSelectedBrands,
   priceRange,
@@ -64,7 +67,7 @@ export default function FilterSidebar({
           <ChevronDown className="w-4 h-4 text-navy-400" />
         </button>
         <div className="space-y-2">
-          {categories.map((category) => (
+          {categoryOptions.map((category) => (
             <label key={category} className="flex items-center gap-3 cursor-pointer group">
               <input
                 type="checkbox"
@@ -134,7 +137,7 @@ export default function FilterSidebar({
           <ChevronDown className="w-4 h-4 text-navy-400" />
         </button>
         <div className="space-y-2 max-h-48 overflow-y-auto">
-          {brands.map((brand) => (
+          {brandOptions.map((brand) => (
             <label key={brand} className="flex items-center gap-3 cursor-pointer group">
               <input
                 type="checkbox"
