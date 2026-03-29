@@ -6,7 +6,7 @@ import PageShell from '../components/PageShell';
 import ProductCard from '../components/ProductCard/ProductCard';
 import { useAuth } from '../contexts/AuthContext';
 import { productService } from '../services/productService';
-import { UserRole, type Product } from '../types';
+import { UserRole, type Category, type Product } from '../types';
 
 export default function Marketplace(): JSX.Element {
   const { isAuthenticated, user } = useAuth();
@@ -21,18 +21,29 @@ export default function Marketplace(): JSX.Element {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
-    const fetchProducts = async (): Promise<void> => {
-      try {
-        const data = await productService.getAll();
-        setProducts(data);
-      } catch (error) {
-        console.error('Failed to fetch products', error);
+    const fetchMarketplaceData = async (): Promise<void> => {
+      const [productsResult, categoriesResult] = await Promise.allSettled([
+        productService.getAll(),
+        productService.getCategories(),
+      ]);
+
+      if (productsResult.status === 'fulfilled') {
+        setProducts(productsResult.value);
+      } else {
+        console.error('Failed to fetch products', productsResult.reason);
+      }
+
+      if (categoriesResult.status === 'fulfilled') {
+        setCategories(categoriesResult.value);
+      } else {
+        console.error('Failed to fetch categories', categoriesResult.reason);
       }
     };
 
-    void fetchProducts();
+    void fetchMarketplaceData();
   }, []);
 
   const filteredProducts = useMemo(() => {
@@ -79,6 +90,21 @@ default:
         }
       });
   }, [priceRange, products, searchQuery, selectedBrands, selectedCategories, sortBy]);
+
+  const categoryOptions = useMemo(
+    () => {
+      const categoryNamesFromCatalog = categories.map((category) => category.name.trim()).filter((category) => category.length > 0);
+      const categoryNamesFromProducts = products.map((product) => product.category.trim()).filter((category) => category.length > 0);
+
+      return Array.from(new Set([...categoryNamesFromCatalog, ...categoryNamesFromProducts])).sort((a, b) => a.localeCompare(b));
+    },
+    [categories, products],
+  );
+
+  const brandOptions = useMemo(
+    () => Array.from(new Set(products.map((product) => product.brand.trim()).filter((brand) => brand.length > 0))).sort((a, b) => a.localeCompare(b)),
+    [products],
+  );
 
   const clearFilters = (): void => {
     setSelectedCategories([]);
@@ -188,8 +214,10 @@ default:
       <div className="flex gap-6">
         <div className="hidden w-72 shrink-0 lg:block">
           <FilterSidebar
+            categoryOptions={categoryOptions}
             selectedCategories={selectedCategories}
             setSelectedCategories={setSelectedCategories}
+            brandOptions={brandOptions}
             selectedBrands={selectedBrands}
             setSelectedBrands={setSelectedBrands}
             priceRange={priceRange}
@@ -243,8 +271,10 @@ default:
             </div>
             <div className="p-4">
               <FilterSidebar
+                categoryOptions={categoryOptions}
                 selectedCategories={selectedCategories}
                 setSelectedCategories={setSelectedCategories}
+                brandOptions={brandOptions}
                 selectedBrands={selectedBrands}
                 setSelectedBrands={setSelectedBrands}
                 priceRange={priceRange}

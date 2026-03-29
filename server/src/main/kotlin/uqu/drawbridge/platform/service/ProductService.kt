@@ -121,7 +121,7 @@ class ProductService(
             image = sortedImages.firstOrNull()?.url ?: "",
             images = sortedImages.map { it.url }.toTypedArray(),
             category = category?.name ?: "",
-            brand = "", // Brand is not in the entity
+            brand = this.wholesaler.businessName,
             stock = this.stockQuantity,
             rating = this.averageRating.toDouble(),
             reviews = this.ratingCount,
