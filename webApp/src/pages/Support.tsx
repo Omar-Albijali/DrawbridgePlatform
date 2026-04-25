@@ -226,9 +226,7 @@ export default function Support(): JSX.Element {
         attachmentInputRef.current.value = '';
       }
 
-      setSubmitMessage(
-        '\u062A\u0645 \u0627\u0633\u062A\u0644\u0627\u0645 \u062A\u0630\u0643\u0631\u062A\u0643\u060C \u0648\u0633\u064A\u062A\u0645 \u0627\u0644\u0631\u062F \u0639\u0644\u064A\u0643 \u062E\u0644\u0627\u0644 24 \u0625\u0644\u0649 48 \u0633\u0627\u0639\u0629 \u0639\u0645\u0644.'
-      );
+      setSubmitMessage('Your request has been received and will be processed as soon as possible.');
       setActiveTab('tickets');
       await loadTickets(createdTicket.id);
     } catch (error) {
