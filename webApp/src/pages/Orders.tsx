@@ -500,8 +500,8 @@ export default function Orders(): JSX.Element {
                                 <button
                                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors dark:text-slate-200 dark:hover:bg-slate-800"
                                   onClick={() => {
-                                    alert('Support feature coming soon!');
                                     setOpenMenuId(null);
+                                    navigate('/support');
                                   }}
                                 >
                                   <MessageSquare className="w-4 h-4 text-navy-400 dark:text-slate-400" />
