@@ -283,7 +283,7 @@ export default function Support(): JSX.Element {
 
             {activeTab === 'create' ? (
               <div className="space-y-6 p-6">
-                <div className="rounded-2xl border border-primary-200/70 bg-gradient-to-r from-primary-50 to-blue-50/70 p-4 dark:border-primary-800/40 dark:from-primary-900/20 dark:to-slate-900">
+                <div className="rounded-2xl border border-primary-200/70 bg-gradient-to-r from-primary-50 to-blue-50/70 p-4 dark:border-primary-700/35 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.22),rgba(15,23,42,0.96))]">
                   <div className="flex items-start gap-3">
                     <LifeBuoy className="mt-0.5 h-5 w-5 text-primary-700 dark:text-primary-300" />
                     <div>
@@ -440,7 +440,7 @@ export default function Support(): JSX.Element {
                         }}
                         className={`w-full rounded-2xl border p-4 text-left transition ${
                           selectedTicketId === ticket.id
-                            ? 'border-primary-300 bg-primary-50/60 shadow-card dark:border-primary-700/60 dark:bg-primary-900/15'
+                            ? 'border-primary-300 bg-primary-50/60 shadow-card dark:border-primary-700/45 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(6,78,59,0.18))]'
                             : 'border-slate-200 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-slate-900/70'
                         }`}
                       >
