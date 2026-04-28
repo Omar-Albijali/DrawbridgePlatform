@@ -1,5 +1,9 @@
 package uqu.drawbridge.platform.service
 
+import jakarta.persistence.criteria.JoinType
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uqu.drawbridge.platform.model.*
@@ -7,6 +11,7 @@ import uqu.drawbridge.platform.repository.CategoryRepository
 import uqu.drawbridge.platform.repository.ProductRepository
 import uqu.drawbridge.platform.repository.UserRepository
 import uqu.drawbridge.platform.*
+import uqu.drawbridge.platform.dto.PaginatedResponse
 import java.math.BigDecimal
 
 @Service
@@ -41,6 +46,68 @@ class ProductService(
 
     fun getPublishedProductsByCategory(categoryId: String): List<Product> =
         productRepository.findByCategoryId(categoryId).filter { it.published }
+
+    fun getPublishedBrands(): List<String> =
+        productRepository.findDistinctPublishedBrands()
+
+    fun getPublishedProductsPageDTO(
+        page: Int = 0,
+        size: Int = 12,
+        search: String? = null,
+        categories: List<String>? = null,
+        brands: List<String>? = null,
+        minPrice: Double? = null,
+        maxPrice: Double? = null,
+        sort: String? = null
+    ): PaginatedResponse<ProductDTO> {
+        val normalizedPage = page.coerceAtLeast(0)
+        val normalizedSize = size.coerceIn(1, 100)
+        val pageable = PageRequest.of(normalizedPage, normalizedSize, getMarketplaceSort(sort))
+        val normalizedCategories = normalizeValues(categories)
+        val normalizedBrands = normalizeValues(brands)
+        val normalizedSearch = search?.trim()?.takeIf { it.isNotEmpty() }
+        val minBound = minPrice?.coerceAtLeast(0.0)
+        val maxBound = maxPrice?.coerceAtLeast(0.0)
+        val effectiveMinPrice = when {
+            minBound != null && maxBound != null -> minOf(minBound, maxBound)
+            else -> minBound
+        }
+        val effectiveMaxPrice = when {
+            minBound != null && maxBound != null -> maxOf(minBound, maxBound)
+            else -> maxBound
+        }
+
+        var specification = Specification.where(publishedOnly())
+
+        if (normalizedSearch != null) {
+            specification = specification.and(matchesSearch(normalizedSearch))
+        }
+        if (normalizedCategories.isNotEmpty()) {
+            specification = specification.and(matchesCategories(normalizedCategories))
+        }
+        if (normalizedBrands.isNotEmpty()) {
+            specification = specification.and(matchesBrands(normalizedBrands))
+        }
+        if (effectiveMinPrice != null) {
+            specification = specification.and(minimumPrice(BigDecimal.valueOf(effectiveMinPrice)))
+        }
+        if (effectiveMaxPrice != null) {
+            specification = specification.and(maximumPrice(BigDecimal.valueOf(effectiveMaxPrice)))
+        }
+
+        val productPage = productRepository.findAll(specification, pageable)
+        val content = mapProductsToDTOs(productPage.content)
+
+        return PaginatedResponse(
+            content = content,
+            currentPage = productPage.number,
+            pageSize = productPage.size,
+            totalPages = productPage.totalPages,
+            totalElements = productPage.totalElements,
+            first = productPage.isFirst,
+            last = productPage.isLast
+        )
+    }
 
     @Transactional
     fun createProduct(product: Product): Product {
@@ -145,29 +212,134 @@ class ProductService(
         parentCategoryId = this.parentCategoryId
     )
 
+    private fun toDTO(
+        product: Product,
+        categoryName: String?,
+        discount: ProductDiscount?
+    ): ProductDTO {
+        val originalPrice = if (discount != null) {
+            product.price.toDouble()
+        } else {
+            null
+        }
+        val effectivePrice = if (discount != null) {
+            val discountFactor = BigDecimal.ONE - (discount.discountPercentage / BigDecimal(100))
+            (product.price * discountFactor).toDouble()
+        } else {
+            product.price.toDouble()
+        }
+        val sortedImages = product.images.sortedBy { it.sortIndex }
+
+        return ProductDTO(
+            id = (product.id ?: ""),
+            name = product.name,
+            description = product.description,
+            price = effectivePrice,
+            originalPrice = originalPrice,
+            image = sortedImages.firstOrNull()?.url ?: "",
+            images = sortedImages.map { it.url }.toTypedArray(),
+            category = categoryName ?: "",
+            brand = product.wholesaler.businessName,
+            stock = product.stockQuantity,
+            rating = product.averageRating.toDouble(),
+            reviews = product.ratingCount,
+            supplier = product.wholesaler.businessName,
+            published = product.published
+        )
+    }
+
+    private fun mapProductsToDTOs(products: List<Product>): List<ProductDTO> {
+        if (products.isEmpty()) {
+            return emptyList()
+        }
+
+        val categoriesById = categoryRepository.findAllById(products.map { it.categoryId }.distinct())
+            .associateBy { it.id ?: "" }
+        val discountsByProductId = productDiscountService.getBestActiveDiscounts(products.mapNotNull { it.id })
+
+        return products.map { product ->
+            toDTO(
+                product = product,
+                categoryName = categoriesById[product.categoryId]?.name,
+                discount = product.id?.let(discountsByProductId::get)
+            )
+        }
+    }
+
+    private fun normalizeValues(values: List<String>?): List<String> =
+        values.orEmpty()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+
+    private fun publishedOnly(): Specification<Product> =
+        Specification { root, _, criteriaBuilder ->
+            criteriaBuilder.isTrue(root.get("published"))
+        }
+
+    private fun matchesSearch(search: String): Specification<Product> =
+        Specification { root, _, criteriaBuilder ->
+            val searchPattern = "%${search.lowercase()}%"
+            criteriaBuilder.or(
+                criteriaBuilder.like(criteriaBuilder.lower(root.get("name")), searchPattern),
+                criteriaBuilder.like(criteriaBuilder.lower(root.get("description")), searchPattern)
+            )
+        }
+
+    private fun matchesCategories(categories: List<String>): Specification<Product> =
+        Specification { root, _, _ ->
+            root.get<String>("categoryId").`in`(categories)
+        }
+
+    private fun matchesBrands(brands: List<String>): Specification<Product> =
+        Specification { root, _, criteriaBuilder ->
+            val normalizedBrands = brands.map { it.lowercase() }
+            val wholesalerJoin = root.join<Product, User>("wholesaler", JoinType.INNER)
+            criteriaBuilder.lower(wholesalerJoin.get("businessName")).`in`(normalizedBrands)
+        }
+
+    private fun minimumPrice(minPrice: BigDecimal): Specification<Product> =
+        Specification { root, _, criteriaBuilder ->
+            criteriaBuilder.greaterThanOrEqualTo(root.get("price"), minPrice)
+        }
+
+    private fun maximumPrice(maxPrice: BigDecimal): Specification<Product> =
+        Specification { root, _, criteriaBuilder ->
+            criteriaBuilder.lessThanOrEqualTo(root.get("price"), maxPrice)
+        }
+
+    private fun getMarketplaceSort(sort: String?): Sort =
+        when (sort?.trim()?.lowercase()) {
+            "price-low" -> Sort.by(Sort.Order.asc("price"), Sort.Order.asc("name"))
+            "price-high" -> Sort.by(Sort.Order.desc("price"), Sort.Order.asc("name"))
+            "rating" -> Sort.by(Sort.Order.desc("averageRating"), Sort.Order.desc("ratingCount"), Sort.Order.asc("name"))
+            "newest" -> Sort.by(Sort.Order.desc("id"))
+            else -> Sort.by(Sort.Order.desc("averageRating"), Sort.Order.desc("ratingCount"), Sort.Order.asc("name"))
+        }
+
     // ==================== DTO-RETURNING METHODS ====================
 
-    fun getAllProductsDTO(): List<ProductDTO> = getAllProducts().map { it.toDTO() }
+    fun getAllProductsDTO(): List<ProductDTO> = mapProductsToDTOs(getAllProducts())
 
     fun getProductDTOById(id: String): ProductDTO? = getProductById(id)?.toDTO()
 
     fun getProductsDTOByWholesaler(wholesalerId: String): List<ProductDTO> = 
-        getProductsByWholesaler(wholesalerId).map { it.toDTO() }
+        mapProductsToDTOs(getProductsByWholesaler(wholesalerId))
 
     fun getProductsDTOByCategory(categoryId: String): List<ProductDTO> = 
-        getProductsByCategory(categoryId).map { it.toDTO() }
+        mapProductsToDTOs(getProductsByCategory(categoryId))
 
     fun searchProductsDTO(query: String): List<ProductDTO> = 
-        searchProducts(query).map { it.toDTO() }
+        mapProductsToDTOs(searchProducts(query))
 
     fun getPublishedProductsDTO(): List<ProductDTO> =
-        getPublishedProducts().map { it.toDTO() }
+        mapProductsToDTOs(getPublishedProducts())
 
     fun searchPublishedProductsDTO(query: String): List<ProductDTO> =
-        searchPublishedProducts(query).map { it.toDTO() }
+        mapProductsToDTOs(searchPublishedProducts(query))
 
     fun getPublishedProductsDTOByCategory(categoryId: String): List<ProductDTO> =
-        getPublishedProductsByCategory(categoryId).map { it.toDTO() }
+        mapProductsToDTOs(getPublishedProductsByCategory(categoryId))
 
     @Transactional
     fun createProductDTO(product: Product): ProductDTO = createProduct(product).toDTO()

@@ -1,9 +1,57 @@
 import { fetchApi } from './api';
 import { ImageUploadResponse, ProductImageResponse } from '../types';
-import { Product, Category, CreateProductRequest } from '../types';
+import { Product, Category, CreateProductRequest, PaginatedResponse } from '../types';
+
+interface MarketplaceProductQuery {
+    page?: number;
+    size?: number;
+    search?: string;
+    category?: string[];
+    brand?: string[];
+    minPrice?: number;
+    maxPrice?: number;
+    sort?: string;
+}
+
+function buildMarketplaceQuery(params: MarketplaceProductQuery = {}): string {
+    const searchParams = new URLSearchParams();
+
+    searchParams.set('page', String(params.page ?? 0));
+    searchParams.set('size', String(params.size ?? 12));
+
+    if (params.search?.trim()) {
+        searchParams.set('search', params.search.trim());
+    }
+
+    params.category?.filter((value) => value.trim().length > 0).forEach((value) => {
+        searchParams.append('category', value);
+    });
+
+    params.brand?.filter((value) => value.trim().length > 0).forEach((value) => {
+        searchParams.append('brand', value);
+    });
+
+    if (params.sort?.trim()) {
+        searchParams.set('sort', params.sort.trim());
+    }
+
+    if (typeof params.minPrice === 'number') {
+        searchParams.set('minPrice', String(params.minPrice));
+    }
+
+    if (typeof params.maxPrice === 'number') {
+        searchParams.set('maxPrice', String(params.maxPrice));
+    }
+
+    const queryString = searchParams.toString();
+    return queryString.length > 0 ? `?${queryString}` : '';
+}
 
 export const productService = {
-    getAll: () => fetchApi<Product[]>('/products'),
+    getAll: () => fetchApi<Product[]>('/products/all'),
+
+    getMarketplacePage: (params: MarketplaceProductQuery = {}, signal?: AbortSignal) =>
+        fetchApi<PaginatedResponse<Product>>(`/products${buildMarketplaceQuery(params)}`, signal ? { signal } : undefined),
 
     getById: (id: string) => fetchApi<Product>(`/products/${id}`),
 
@@ -64,5 +112,7 @@ export const productService = {
     // Categories
     getCategories: () => fetchApi<Category[]>('/products/categories'),
 
-    getCategoryById: (id: string) => fetchApi<Category>(`/products/categories/${id}`)
+    getCategoryById: (id: string) => fetchApi<Category>(`/products/categories/${id}`),
+
+    getBrands: () => fetchApi<string[]>('/products/brands')
 };

@@ -103,6 +103,19 @@ class ProductDiscountService(
     }
 
     /**
+     * Get the best active discount for each product in the provided collection.
+     */
+    fun getBestActiveDiscounts(productIds: Collection<String>): Map<String, ProductDiscount> {
+        if (productIds.isEmpty()) {
+            return emptyMap()
+        }
+
+        return productDiscountRepository.findActiveDiscountsByProductIds(productIds, LocalDateTime.now())
+            .groupBy { it.productId }
+            .mapValues { (_, discounts) -> discounts.maxByOrNull { it.discountPercentage }!! }
+    }
+
+    /**
      * Calculate the discounted price for a product.
      */
     fun calculateDiscountedPrice(originalPrice: BigDecimal, productId: String): BigDecimal {

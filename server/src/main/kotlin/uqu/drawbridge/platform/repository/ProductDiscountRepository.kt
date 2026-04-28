@@ -16,6 +16,15 @@ interface ProductDiscountRepository : JpaRepository<ProductDiscount, String> {
         AND d.endDate >= :now
     """)
     fun findActiveDiscountsByProductId(productId: String, now: LocalDateTime = LocalDateTime.now()): List<ProductDiscount>
+
+    @Query("""
+        SELECT d FROM ProductDiscount d 
+        WHERE d.productId IN :productIds 
+        AND d.isActive = true 
+        AND d.startDate <= :now 
+        AND d.endDate >= :now
+    """)
+    fun findActiveDiscountsByProductIds(productIds: Collection<String>, now: LocalDateTime = LocalDateTime.now()): List<ProductDiscount>
     
     fun deleteByProductId(productId: String)
 }

@@ -1,5 +1,6 @@
 package uqu.drawbridge.platform.service
 
+import io.mailtrap.client.MailtrapClient
 import io.mailtrap.config.MailtrapConfig
 import io.mailtrap.factory.MailtrapClientFactory
 import io.mailtrap.model.request.emails.Address
@@ -35,7 +36,7 @@ class EmailService(
         max(1L, 1000L / safeRate)
     }
 
-    private val client by lazy {
+    private val client: MailtrapClient by lazy {
         val configBuilder = MailtrapConfig.Builder().token(apiToken)
         if (sandbox && inboxId > 0) {
             configBuilder.sandbox(true).inboxId(inboxId)
@@ -106,16 +107,52 @@ class EmailService(
         sendMailWithRateLimitHandling(mail)
     }
 
+    fun sendSupportTicketEmail(
+        toEmail: String,
+        ticketNumber: String,
+        subject: String,
+        category: String,
+        description: String,
+        userEmail: String,
+        userId: String,
+        attachmentUrl: String?
+    ) {
+        val safeAttachmentUrl = attachmentUrl ?: "No attachment provided"
+        val htmlBody = """
+            <html>
+              <body style="font-family: Arial, sans-serif; color: #0f172a;">
+                <h2 style="margin-bottom: 12px;">New support ticket received</h2>
+                <table style="border-collapse: collapse; width: 100%;">
+                  <tr><td style="padding: 8px; font-weight: 700;">Ticket Number</td><td style="padding: 8px;">$ticketNumber</td></tr>
+                  <tr><td style="padding: 8px; font-weight: 700;">Subject</td><td style="padding: 8px;">$subject</td></tr>
+                  <tr><td style="padding: 8px; font-weight: 700;">Category</td><td style="padding: 8px;">$category</td></tr>
+                  <tr><td style="padding: 8px; font-weight: 700;">User Email</td><td style="padding: 8px;">$userEmail</td></tr>
+                  <tr><td style="padding: 8px; font-weight: 700;">User ID</td><td style="padding: 8px;">$userId</td></tr>
+                  <tr><td style="padding: 8px; font-weight: 700;">Attachment</td><td style="padding: 8px;">$safeAttachmentUrl</td></tr>
+                </table>
+                <div style="margin-top: 16px;">
+                  <p style="margin-bottom: 8px; font-weight: 700;">Description</p>
+                  <p style="white-space: pre-wrap; line-height: 1.6;">$description</p>
+                </div>
+              </body>
+            </html>
+        """.trimIndent()
+
+        val mail = MailtrapMail.builder()
+            .from(Address(fromEmail, fromName))
+            .to(listOf(Address(toEmail, "Drawbridge Support")))
+            .subject("New support ticket $ticketNumber")
+            .html(htmlBody)
+            .build()
+
+        sendMailWithRateLimitHandling(mail)
+    }
+
     private fun sendMailWithRateLimitHandling(mail: MailtrapMail) {
         repeat(maxRetries + 1) { attempt ->
             try {
                 waitForSendWindow()
-                // SDK throws on failure (InvalidRequestBodyException, HttpClientException, etc.)
-                if (sandbox && inboxId > 0) {
-                    client.testingApi().emails().send(mail, inboxId)
-                } else {
-                    client.sendingApi().emails().send(mail)
-                }
+                client.send(mail)
                 return
             } catch (ex: Exception) {
                 val canRetry = attempt < maxRetries && isMailtrapRateLimitError(ex)
