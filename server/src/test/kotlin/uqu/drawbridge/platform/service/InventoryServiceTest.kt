@@ -32,12 +32,14 @@ class InventoryServiceTest {
     private val productRepository = mock(ProductRepository::class.java)
     private val orderService = mock(OrderService::class.java)
     private val notificationService = mock(NotificationService::class.java)
+    private val inventoryAuditService = mock(InventoryAuditService::class.java)
 
     private val service = InventoryService(
         inventoryItemRepository = inventoryItemRepository,
         productRepository = productRepository,
         orderService = orderService,
-        notificationService = notificationService
+        notificationService = notificationService,
+        inventoryAuditService = inventoryAuditService
     )
 
     @Test

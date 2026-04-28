@@ -14,7 +14,8 @@ class ProductService(
     private val productRepository: ProductRepository,
     private val categoryRepository: CategoryRepository,
     private val productDiscountService: ProductDiscountService,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val inventoryAuditService: InventoryAuditService
 ) {
 
     // ==================== PRODUCT OPERATIONS ====================
@@ -42,13 +43,21 @@ class ProductService(
         productRepository.findByCategoryId(categoryId).filter { it.published }
 
     @Transactional
-    fun createProduct(product: Product): Product = productRepository.save(product)
+    fun createProduct(product: Product): Product {
+        val savedProduct = productRepository.save(product)
+        logProductStockChange(savedProduct, 0, savedProduct.stockQuantity, "Product created")
+        return savedProduct
+    }
 
     @Transactional
     fun updateProduct(id: String, product: Product): Product? {
-        return if (productRepository.existsById(id)) {
+        val existingProduct = productRepository.findById(id).orElse(null)
+        return if (existingProduct != null) {
+            val previousStockQuantity = existingProduct.stockQuantity
             product.id = id
-            productRepository.save(product)
+            val savedProduct = productRepository.save(product)
+            logProductStockChange(savedProduct, previousStockQuantity, savedProduct.stockQuantity, "Product stock updated")
+            savedProduct
         } else {
             null
         }
@@ -160,8 +169,10 @@ class ProductService(
     fun getPublishedProductsDTOByCategory(categoryId: String): List<ProductDTO> =
         getPublishedProductsByCategory(categoryId).map { it.toDTO() }
 
+    @Transactional
     fun createProductDTO(product: Product): ProductDTO = createProduct(product).toDTO()
 
+    @Transactional
     fun updateProductDTO(id: String, product: Product): ProductDTO? = updateProduct(id, product)?.toDTO()
 
     @Transactional
@@ -184,12 +195,15 @@ class ProductService(
     @Transactional
     fun updateProductFromRequest(id: String, request: CreateProductRequest): ProductDTO? {
         val existing = getProductById(id) ?: return null
+        val previousStockQuantity = existing.stockQuantity
         existing.name = request.name
         existing.description = request.description
         existing.categoryId = request.categoryId
         existing.price = BigDecimal.valueOf(request.price)
         existing.stockQuantity = request.stock
-        return productRepository.save(existing).toDTO()
+        val savedProduct = productRepository.save(existing)
+        logProductStockChange(savedProduct, previousStockQuantity, savedProduct.stockQuantity, "Product stock updated")
+        return savedProduct.toDTO()
     }
 
     fun getAllCategoriesDTO(): List<CategoryDTO> = getAllCategories().map { it.toDTO() }
@@ -200,4 +214,17 @@ class ProductService(
         getCategoriesByParent(parentId).map { it.toDTO() }
 
     fun createCategoryDTO(category: Category): CategoryDTO = createCategory(category).toDTO()
+
+    private fun logProductStockChange(product: Product, quantityBefore: Int, quantityAfter: Int, reason: String) {
+        val productId = product.id ?: return
+        inventoryAuditService.logStockChange(
+            productId = productId,
+            inventoryItemId = null,
+            stockTargetType = InventoryStockTargetType.PRODUCT_CATALOG,
+            sourceType = InventoryAuditSourceType.MANUAL,
+            quantityBefore = quantityBefore,
+            quantityAfter = quantityAfter,
+            reason = reason
+        )
+    }
 }

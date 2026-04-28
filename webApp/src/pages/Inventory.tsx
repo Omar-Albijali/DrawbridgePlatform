@@ -1,8 +1,9 @@
 import { KeyboardEvent, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { AlertTriangle, Package, Plus, RefreshCw, Search, Trash2, XCircle, Settings2, Calendar, Activity, X, Check, Slash } from 'lucide-react';
+import { AlertTriangle, Package, Plus, RefreshCw, Search, Trash2, XCircle, Settings2, Calendar, Activity, X, Check, Slash, History } from 'lucide-react';
 import AddInventoryModal from '../components/AddInventoryModal/AddInventoryModal';
 import AutoRestockModal from '../components/AutoRestockModal/AutoRestockModal';
+import InventoryHistoryPanel from '../components/InventoryHistoryPanel';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { inventoryService } from '../services/inventoryService';
@@ -23,6 +24,7 @@ export default function Inventory(): JSX.Element {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
   const [editingStockItemId, setEditingStockItemId] = useState<string | null>(null);
   const [stockDraft, setStockDraft] = useState('');
   const [isSavingStock, setIsSavingStock] = useState(false);
@@ -339,6 +341,14 @@ export default function Inventory(): JSX.Element {
                       <div className="text-sm font-semibold text-slate-900 dark:text-slate-200 truncate">{item.name}</div>
                       <button
                         type="button"
+                        onClick={() => setHistoryItem(item)}
+                        className="p-1 text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                        title="View stock history"
+                      >
+                        <History className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => void handleDelete(item)}
                         className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                         title="Delete from inventory"
@@ -497,6 +507,15 @@ export default function Inventory(): JSX.Element {
       <AutoRestockModal item={selectedItem} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveConfig} />
 
       <AddInventoryModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddInventory} />
+
+      <InventoryHistoryPanel
+        isOpen={historyItem !== null}
+        onClose={() => setHistoryItem(null)}
+        title={historyItem?.name ?? 'Stock history'}
+        subtitle={historyItem?.supplier ?? undefined}
+        inventoryItemId={historyItem?.id}
+        stockTargetType="RETAILER_INVENTORY"
+      />
     </PageShell>
   );
 }

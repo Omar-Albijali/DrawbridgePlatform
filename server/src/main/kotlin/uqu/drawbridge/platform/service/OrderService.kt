@@ -24,7 +24,8 @@ class OrderService(
     private val productRepository: ProductRepository,
     private val categoryRepository: CategoryRepository,
     private val productImageRepository: ProductImageRepository,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val inventoryAuditService: InventoryAuditService
 ) {
 
     // ==================== ORDER GROUP OPERATIONS ====================
@@ -485,6 +486,8 @@ class OrderService(
     private fun addDeliveredItemsToRetailInventory(order: Order) {
         val orderId = order.id ?: return
         val now = LocalDateTime.now()
+        val sourceType = if (order.autoOrder) InventoryAuditSourceType.RESTOCK else InventoryAuditSourceType.ORDER
+        val reason = if (order.autoOrder) "Auto-restock order delivered" else "Order delivered"
         val quantitiesByProductId = orderItemRepository.findByOrderId(orderId)
             .groupingBy { it.productId }
             .fold(0) { total, item -> total + item.quantity }
@@ -492,11 +495,22 @@ class OrderService(
         quantitiesByProductId.forEach { (productId, quantity) ->
             val inventoryItem = inventoryItemRepository.findByRetailerIdAndProductId(order.retailerId, productId)
             if (inventoryItem != null) {
-                inventoryItem.currentQuantity += quantity
+                val previousQuantity = inventoryItem.currentQuantity
+                inventoryItem.currentQuantity = previousQuantity + quantity
                 inventoryItem.lastUpdated = now
-                inventoryItemRepository.save(inventoryItem)
+                val savedItem = inventoryItemRepository.save(inventoryItem)
+                inventoryAuditService.logStockChange(
+                    productId = productId,
+                    inventoryItemId = savedItem.id,
+                    stockTargetType = InventoryStockTargetType.RETAILER_INVENTORY,
+                    sourceType = sourceType,
+                    sourceId = orderId,
+                    quantityBefore = previousQuantity,
+                    quantityAfter = savedItem.currentQuantity,
+                    reason = reason
+                )
             } else {
-                inventoryItemRepository.save(
+                val savedItem = inventoryItemRepository.save(
                     InventoryItem(
                         retailerId = order.retailerId,
                         productId = productId,
@@ -504,6 +518,16 @@ class OrderService(
                         lastUpdated = now,
                         autoOrderConfig = AutoOrderConfig()
                     )
+                )
+                inventoryAuditService.logStockChange(
+                    productId = productId,
+                    inventoryItemId = savedItem.id,
+                    stockTargetType = InventoryStockTargetType.RETAILER_INVENTORY,
+                    sourceType = sourceType,
+                    sourceId = orderId,
+                    quantityBefore = 0,
+                    quantityAfter = savedItem.currentQuantity,
+                    reason = reason
                 )
             }
         }

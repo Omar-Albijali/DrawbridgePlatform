@@ -11,7 +11,6 @@ import {
     NotificationType,
     NotificationEventKey,
     NotificationEntityType,
-    TicketStatus,
     NotificationChannel,
     PaymentMethodType,
 
@@ -54,9 +53,7 @@ import {
 
     // Support DTOs
     SupportTicketDTO,
-    SupportTicketChatDTO,
     CreateTicketRequest,
-    AddMessageRequest,
 
     // Product DTOs
     CreateProductRequest,
@@ -76,6 +73,20 @@ import {
     ChangePasswordRequest
 } from 'shared';
 
+export interface SupportTicketChatDTO {
+    id: string;
+    ticketId: string;
+    adminId: string | null;
+    message: string;
+    isAdmin: boolean;
+    createdAt: string;
+}
+
+export interface AddMessageRequest {
+    message: string;
+    adminId?: string | null;
+}
+
 // Re-export all shared enums and types for use throughout the webapp
 export {
     UserRole,
@@ -88,7 +99,6 @@ export {
     NotificationType,
     NotificationEventKey,
     NotificationEntityType,
-    TicketStatus,
     NotificationChannel,
     PaymentMethodType,
     OrderDTO,
@@ -125,9 +135,7 @@ export {
     CreatePaymentMethodRequest,
     CreateInvoiceRequest,
     SupportTicketDTO,
-    SupportTicketChatDTO,
     CreateTicketRequest,
-    AddMessageRequest,
     CreateProductRequest,
     CreateInventoryItemRequest,
     UpdateAutoOrderConfigRequest,
