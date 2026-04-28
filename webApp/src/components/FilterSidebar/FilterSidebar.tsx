@@ -1,10 +1,15 @@
 import { ChevronDown, X } from 'lucide-react';
 
+export interface FilterOption {
+  label: string;
+  value: string;
+}
+
 interface FilterSidebarProps {
-  categoryOptions: string[];
+  categoryOptions: FilterOption[];
   selectedCategories: string[];
   setSelectedCategories: (categories: string[]) => void;
-  brandOptions: string[];
+  brandOptions: FilterOption[];
   selectedBrands: string[];
   setSelectedBrands: (brands: string[]) => void;
   priceRange: [number, number];
@@ -67,17 +72,21 @@ export default function FilterSidebar({
           <ChevronDown className="w-4 h-4 text-navy-400" />
         </button>
         <div className="space-y-2">
-          {categoryOptions.map((category) => (
-            <label key={category} className="flex items-center gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={selectedCategories.includes(category)}
-                onChange={() => toggleCategory(category)}
-                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-              />
-              <span className="text-sm text-navy-600 group-hover:text-navy-800">{category}</span>
-            </label>
-          ))}
+          {categoryOptions.length > 0 ? (
+            categoryOptions.map((category) => (
+              <label key={category.value} className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={selectedCategories.includes(category.value)}
+                  onChange={() => toggleCategory(category.value)}
+                  className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-navy-600 group-hover:text-navy-800">{category.label}</span>
+              </label>
+            ))
+          ) : (
+            <p className="text-sm text-navy-400">No categories available.</p>
+          )}
         </div>
       </div>
 
@@ -96,7 +105,10 @@ export default function FilterSidebar({
                 id="price-min"
                 type="number"
                 value={priceRange[0]}
-                onChange={(event) => setPriceRange([Number(event.target.value), priceRange[1]])}
+                onChange={(event) => {
+                  const nextMin = Math.max(0, Number(event.target.value) || 0);
+                  setPriceRange([nextMin, Math.max(nextMin, priceRange[1])]);
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="0"
               />
@@ -110,7 +122,10 @@ export default function FilterSidebar({
                 id="price-max"
                 type="number"
                 value={priceRange[1]}
-                onChange={(event) => setPriceRange([priceRange[0], Number(event.target.value)])}
+                onChange={(event) => {
+                  const nextMax = Math.max(0, Number(event.target.value) || 0);
+                  setPriceRange([Math.min(priceRange[0], nextMax), nextMax]);
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="5000"
               />
@@ -137,17 +152,21 @@ export default function FilterSidebar({
           <ChevronDown className="w-4 h-4 text-navy-400" />
         </button>
         <div className="space-y-2 max-h-48 overflow-y-auto">
-          {brandOptions.map((brand) => (
-            <label key={brand} className="flex items-center gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={selectedBrands.includes(brand)}
-                onChange={() => toggleBrand(brand)}
-                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-              />
-              <span className="text-sm text-navy-600 group-hover:text-navy-800">{brand}</span>
-            </label>
-          ))}
+          {brandOptions.length > 0 ? (
+            brandOptions.map((brand) => (
+              <label key={brand.value} className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={selectedBrands.includes(brand.value)}
+                  onChange={() => toggleBrand(brand.value)}
+                  className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-navy-600 group-hover:text-navy-800">{brand.label}</span>
+              </label>
+            ))
+          ) : (
+            <p className="text-sm text-navy-400">No brands available.</p>
+          )}
         </div>
       </div>
     </div>

@@ -40,6 +40,8 @@ import {
     VerifyEmailRequest,
     ResendVerificationRequest,
     LogoutRequest,
+
+    // Payment DTOs
     PaymentDTO,
     InvoiceDTO,
     PaymentMethodDTO,
@@ -48,6 +50,8 @@ import {
     CreateInvoiceRequest,
     SupportTicketDTO,
     CreateTicketRequest,
+
+    // Product DTOs
     CreateProductRequest,
     CreateInventoryItemRequest,
     UpdateAutoOrderConfigRequest,
@@ -134,3 +138,27 @@ export type Payment = PaymentDTO;
 export type Invoice = InvoiceDTO;
 export type PaymentMethod = PaymentMethodDTO;
 export type SupportTicket = SupportTicketDTO;
+
+export interface SupportTicketChat {
+    id: string;
+    ticketId: string;
+    adminId?: string | null;
+    message: string;
+    isAdmin: boolean;
+    createdAt: string;
+}
+
+export interface AddMessageRequest {
+    message: string;
+    adminId?: string | null;
+}
+
+export interface PaginatedResponse<T> {
+    content: T[];
+    currentPage: number;
+    pageSize: number;
+    totalPages: number;
+    totalElements: number;
+    isFirst: boolean;
+    isLast: boolean;
+}
