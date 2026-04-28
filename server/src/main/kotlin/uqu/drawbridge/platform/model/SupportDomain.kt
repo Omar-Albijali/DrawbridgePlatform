@@ -1,61 +1,81 @@
 package uqu.drawbridge.platform.model
 
-import jakarta.persistence.*
+import jakarta.persistence.Column
+import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
+import jakarta.persistence.GeneratedValue
+import jakarta.persistence.GenerationType
+import jakarta.persistence.Id
+import jakarta.persistence.PrePersist
+import jakarta.persistence.PreUpdate
+import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 import java.time.LocalDateTime
-import uqu.drawbridge.platform.TicketStatus
 import uqu.drawbridge.platform.NotificationChannel
-import uqu.drawbridge.platform.NotificationPreferenceKey
 import uqu.drawbridge.platform.NotificationEntityType
 import uqu.drawbridge.platform.NotificationEventKey
+import uqu.drawbridge.platform.NotificationPreferenceKey
 import uqu.drawbridge.platform.NotificationType
-
-
+import uqu.drawbridge.platform.SupportTicketCategory
+import uqu.drawbridge.platform.SupportTicketStatus
 
 @Entity
-@Table(name = "support_tickets")
+@Table(
+    name = "support_ticket_requests",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uk_support_ticket_requests_ticket_number",
+            columnNames = ["ticket_number"]
+        )
+    ]
+)
 open class SupportTicket(
-    @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    open var id: Long? = null,
 
-    @Column(nullable = false)
+    @Column(name = "ticket_number", nullable = false, unique = true)
+    open var ticketNumber: String,
+
+    @Column(name = "user_id", nullable = false)
     open var userId: String,
 
     @Column(nullable = false)
     open var subject: String,
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    open var category: SupportTicketCategory,
+
     @Column(nullable = false, columnDefinition = "TEXT")
     open var description: String,
 
+    @Column(name = "attachment_url")
+    open var attachmentUrl: String? = null,
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    open var status: TicketStatus,
+    open var status: SupportTicketStatus = SupportTicketStatus.OPEN,
 
-    @Column(nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     open var createdAt: LocalDateTime = LocalDateTime.now(),
 
-    @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
-    @JoinColumn(name = "ticket_id", nullable = false)
-    open var chats: MutableList<SupportTicketChat> = mutableListOf()
-)
+    @Column(name = "updated_at", nullable = false)
+    open var updatedAt: LocalDateTime = LocalDateTime.now()
+) {
+    @PrePersist
+    fun onCreate() {
+        val now = LocalDateTime.now()
+        createdAt = now
+        updatedAt = now
+    }
 
-@Entity
-@Table(name = "support_ticket_chats")
-open class SupportTicketChat(
-    @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var chatId: String? = null,
-
-    @Column(name = "ticket_id", insertable = false, updatable = false, nullable = false)
-    open var ticketId: String? = null,
-
-    @Column(nullable = true)
-    open var adminId: String? = null, // Null if message is from ticket user, otherwise this admin id
-
-    @Column(nullable = false, columnDefinition = "TEXT")
-    open var message: String,
-
-    @Column(nullable = false)
-    open var createdAt: LocalDateTime = LocalDateTime.now()
-)
+    @PreUpdate
+    fun onUpdate() {
+        updatedAt = LocalDateTime.now()
+    }
+}
 
 @Entity
 @Table(name = "notifications")

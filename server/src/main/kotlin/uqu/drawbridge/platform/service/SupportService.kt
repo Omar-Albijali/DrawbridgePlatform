@@ -1,207 +1,142 @@
 package uqu.drawbridge.platform.service
 
-import java.time.LocalDateTime
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import uqu.drawbridge.platform.AddMessageRequest
-import uqu.drawbridge.platform.CreateTicketRequest
+import org.springframework.web.multipart.MultipartFile
 import uqu.drawbridge.platform.NotificationEntityType
 import uqu.drawbridge.platform.NotificationEventKey
 import uqu.drawbridge.platform.NotificationPreferenceKey
 import uqu.drawbridge.platform.NotificationType
-import uqu.drawbridge.platform.SupportTicketChatDTO
+import uqu.drawbridge.platform.SupportTicketCategory
 import uqu.drawbridge.platform.SupportTicketDTO
-import uqu.drawbridge.platform.TicketStatus
+import uqu.drawbridge.platform.SupportTicketStatus
 import uqu.drawbridge.platform.model.SupportTicket
-import uqu.drawbridge.platform.model.SupportTicketChat
-import uqu.drawbridge.platform.repository.AdminRepository
-import uqu.drawbridge.platform.repository.SupportTicketChatRepository
+import uqu.drawbridge.platform.model.User
 import uqu.drawbridge.platform.repository.SupportTicketRepository
 
 @Service
 class SupportService(
     private val supportTicketRepository: SupportTicketRepository,
-    private val supportTicketChatRepository: SupportTicketChatRepository,
-    private val adminRepository: AdminRepository,
-    private val notificationService: NotificationService
+    private val fileStorageService: FileStorageService,
+    private val notificationService: NotificationService,
+    private val emailService: EmailService
 ) {
-
-    // ==================== SUPPORT TICKET OPERATIONS ====================
-
-    fun getAllTickets(): List<SupportTicket> {
-        return supportTicketRepository.findAll()
-    }
-
-    fun getTicketById(id: String): SupportTicket? {
-        return supportTicketRepository.findById(id).orElse(null)
-    }
-
-    fun getTicketsByUserId(userId: String): List<SupportTicket> {
-        return supportTicketRepository.findByUserId(userId)
-    }
-
-    fun getTicketsByStatus(status: TicketStatus): List<SupportTicket> {
-        return supportTicketRepository.findByStatus(status)
-    }
-
-    fun getOpenTickets(): List<SupportTicket> {
-        return supportTicketRepository.findByStatus(TicketStatus.OPEN)
-    }
-
-    fun getTicketsByUserAndStatus(userId: String, status: TicketStatus): List<SupportTicket> {
-        return supportTicketRepository.findByUserIdAndStatus(userId, status)
-    }
+    private val log = LoggerFactory.getLogger(SupportService::class.java)
+    private val dateFormatter = DateTimeFormatter.BASIC_ISO_DATE
+    private val supportEmailRecipient = "thameralsh790@gmail.com"
 
     @Transactional
-    fun createTicket(ticket: SupportTicket): SupportTicket {
-        ticket.status = TicketStatus.OPEN
-        ticket.createdAt = LocalDateTime.now()
-        return supportTicketRepository.save(ticket)
-    }
+    fun createTicket(
+        user: User,
+        subject: String,
+        category: SupportTicketCategory,
+        description: String,
+        attachment: MultipartFile?
+    ): SupportTicketDTO {
+        val normalizedSubject = subject.trim()
+        val normalizedDescription = description.trim()
 
-    @Transactional
-    fun createTicket(userId: String, subject: String, description: String): SupportTicket {
+        require(normalizedSubject.isNotBlank()) { "Subject is required" }
+        require(normalizedDescription.isNotBlank()) { "Description is required" }
+
+        val attachmentUrl = attachment
+            ?.takeIf { !it.isEmpty }
+            ?.let { uploadedFile ->
+                val relativePath = fileStorageService.storeFile(uploadedFile, "support")
+                fileStorageService.getFileUrl(relativePath)
+            }
+
         val ticket = SupportTicket(
-            userId = userId,
-            subject = subject,
-            description = description,
-            status = TicketStatus.OPEN,
-            createdAt = LocalDateTime.now()
+            ticketNumber = generateTicketNumber(),
+            userId = requireNotNull(user.id) { "User ID is required" },
+            subject = normalizedSubject,
+            category = category,
+            description = normalizedDescription,
+            attachmentUrl = attachmentUrl,
+            status = SupportTicketStatus.OPEN
         )
+
         val saved = supportTicketRepository.save(ticket)
-        notificationService.sendEventNotification(
-            recipientId = userId,
-            type = NotificationType.SYSTEM,
-            eventKey = NotificationEventKey.SUPPORT_TICKET_OPENED,
-            entityType = NotificationEntityType.SUPPORT_TICKET,
-            entityId = saved.id,
-            preferenceKey = NotificationPreferenceKey.SUPPORT_UPDATES,
-            title = "Support ticket opened",
-            message = "Your support ticket '${saved.subject}' was created.",
-            deepLink = "/support"
-        )
-        return saved
-    }
 
-    @Transactional
-    fun closeTicket(id: String): SupportTicket? {
-        val ticket = supportTicketRepository.findById(id).orElse(null) ?: return null
-        ticket.status = TicketStatus.CLOSED
-        return supportTicketRepository.save(ticket)
-    }
-
-    @Transactional
-    fun reopenTicket(id: String): SupportTicket? {
-        val ticket = supportTicketRepository.findById(id).orElse(null) ?: return null
-        ticket.status = TicketStatus.OPEN
-        return supportTicketRepository.save(ticket)
-    }
-
-    @Transactional
-    fun deleteTicket(id: String): Boolean {
-        return if (supportTicketRepository.existsById(id)) {
-            supportTicketRepository.deleteById(id)
-            true
-        } else {
-            false
+        runCatching {
+            notificationService.sendEventNotification(
+                recipientId = user.id!!,
+                type = NotificationType.SYSTEM,
+                eventKey = NotificationEventKey.SUPPORT_TICKET_OPENED,
+                entityType = NotificationEntityType.SUPPORT_TICKET,
+                entityId = saved.id?.toString(),
+                preferenceKey = NotificationPreferenceKey.SUPPORT_UPDATES,
+                title = "Support ticket received",
+                message = "Ticket ${saved.ticketNumber} has been created successfully.",
+                deepLink = "/support"
+            )
+        }.onFailure { ex ->
+            log.warn("Failed to create in-app notification for support ticket {}", saved.ticketNumber, ex)
         }
+
+        runCatching {
+            emailService.sendSupportTicketEmail(
+                toEmail = supportEmailRecipient,
+                ticketNumber = saved.ticketNumber,
+                subject = saved.subject,
+                category = saved.category.name,
+                description = saved.description,
+                userEmail = user.email,
+                userId = user.id!!,
+                attachmentUrl = saved.attachmentUrl
+            )
+        }.onFailure { ex ->
+            log.warn("Support email delivery failed for ticket {}", saved.ticketNumber, ex)
+        }
+
+        return saved.toDTO()
     }
 
-    // ==================== SUPPORT TICKET CHAT OPERATIONS ====================
-
-    fun getChatsByTicketId(ticketId: String): List<SupportTicketChat> {
-        return supportTicketChatRepository.findByTicketIdOrderByCreatedAtAsc(ticketId)
+    @Transactional(readOnly = true)
+    fun getMyTickets(userId: String): List<SupportTicketDTO> {
+        return supportTicketRepository.findAllByUserIdOrderByUpdatedAtDesc(userId).map { it.toDTO() }
     }
 
-    @Transactional
-    fun addUserMessage(ticketId: String, message: String): SupportTicketChat? {
-        return createAndAddChat(ticketId, null, message)
+    @Transactional(readOnly = true)
+    fun getTicketById(id: Long, userId: String): SupportTicketDTO {
+        val ticket = supportTicketRepository.findByIdAndUserId(id, userId)
+            ?: throw NoSuchElementException("Support ticket not found")
+        return ticket.toDTO()
     }
 
-    @Transactional
-    fun addAdminMessage(ticketId: String, adminId: String, message: String): SupportTicketChat? {
-        // Verify admin exists
-        adminRepository.findById(adminId).orElse(null) ?: return null
-        return createAndAddChat(ticketId, adminId, message)
+    private fun generateTicketNumber(): String {
+        val prefix = "TCK-${LocalDate.now().format(dateFormatter)}-"
+        val lastSequence = supportTicketRepository
+            .findTopByTicketNumberStartingWithOrderByTicketNumberDesc(prefix)
+            ?.ticketNumber
+            ?.substringAfterLast("-")
+            ?.toIntOrNull()
+            ?: 0
+
+        var nextSequence = lastSequence + 1
+        var candidate = prefix + nextSequence.toString().padStart(4, '0')
+
+        while (supportTicketRepository.existsByTicketNumber(candidate)) {
+            nextSequence += 1
+            candidate = prefix + nextSequence.toString().padStart(4, '0')
+        }
+
+        return candidate
     }
 
-    private fun createAndAddChat(ticketId: String, adminId: String?, message: String): SupportTicketChat? {
-        val ticket = supportTicketRepository.findById(ticketId).orElse(null) ?: return null
-
-        val chat = SupportTicketChat(
-            adminId = adminId,
-            message = message,
-            createdAt = LocalDateTime.now()
-        )
-        ticket.chats.add(chat)
-        val savedTicket = supportTicketRepository.save(ticket)
-        notificationService.sendEventNotification(
-            recipientId = ticket.userId,
-            type = NotificationType.SYSTEM,
-            eventKey = NotificationEventKey.SUPPORT_MESSAGE_ADDED,
-            entityType = NotificationEntityType.SUPPORT_TICKET,
-            entityId = ticket.id,
-            preferenceKey = NotificationPreferenceKey.SUPPORT_UPDATES,
-            title = "New support message",
-            message = "There is a new message on ticket '${ticket.subject}'.",
-            deepLink = "/support"
-        )
-        return savedTicket.chats.last()
-    }
-
-    // ==================== DTO MAPPING ====================
-
-    fun SupportTicket.toDTO() = SupportTicketDTO(
-        id = (this.id ?: ""),
+    private fun SupportTicket.toDTO() = SupportTicketDTO(
+        id = this.id?.toString() ?: "",
+        ticketNumber = this.ticketNumber,
         userId = this.userId,
         subject = this.subject,
+        category = this.category,
         description = this.description,
+        attachmentUrl = this.attachmentUrl,
         status = this.status,
-        createdAt = this.createdAt.toString()
+        createdAt = this.createdAt.toString(),
+        updatedAt = this.updatedAt.toString()
     )
-
-    fun SupportTicketChat.toDTO() = SupportTicketChatDTO(
-        id = (this.chatId ?: ""),
-        ticketId = this.ticketId ?: "",
-        adminId = this.adminId,
-        message = this.message,
-        isAdmin = this.adminId != null,
-        createdAt = this.createdAt.toString()
-    )
-
-    // ==================== DTO-RETURNING METHODS ====================
-
-    fun getAllTicketsDTO(): List<SupportTicketDTO> = getAllTickets().map { it.toDTO() }
-
-    fun getTicketDTOById(id: String): SupportTicketDTO? = getTicketById(id)?.toDTO()
-
-    fun getTicketsDTOByUserId(userId: String): List<SupportTicketDTO> = getTicketsByUserId(userId).map { it.toDTO() }
-
-    fun createTicketDTO(request: CreateTicketRequest): SupportTicketDTO {
-        return createTicket(
-            request.userId,
-            request.subject,
-            request.description
-        ).toDTO()
-    }
-
-    fun closeTicketDTO(id: String): SupportTicketDTO? = closeTicket(id)?.toDTO()
-
-    fun getChatsDTOByTicketId(ticketId: String): List<SupportTicketChatDTO> =
-        getChatsByTicketId(ticketId).map { it.toDTO() }
-
-    fun addUserMessageDTO(ticketId: String, message: String): SupportTicketChatDTO? =
-        addUserMessage(ticketId, message)?.toDTO()
-
-    fun addAdminMessageDTO(ticketId: String, adminId: String, message: String): SupportTicketChatDTO? =
-        addAdminMessage(ticketId, adminId, message)?.toDTO()
-
-    fun addMessageDTO(ticketId: String, request: AddMessageRequest): SupportTicketChatDTO? {
-        val adminIdStr = request.adminId
-        return if (adminIdStr != null) {
-            addAdminMessageDTO(ticketId, adminIdStr, request.message)
-        } else {
-            addUserMessageDTO(ticketId, request.message)
-        }
-    }
 }
