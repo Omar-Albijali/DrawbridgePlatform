@@ -7,6 +7,7 @@ import {
   CreditCard,
   Heart,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Moon,
   Package,
@@ -66,6 +67,7 @@ const retailerLinks = [
   { to: '/marketplace', label: 'Marketplace', icon: Store },
   { to: '/inventory', label: 'Inventory', icon: Store },
   { to: '/orders', label: 'Orders', icon: ReceiptText },
+  { to: '/support', label: 'Support', icon: LifeBuoy },
 ] as const;
 
 const wholesalerLinks = [
@@ -73,6 +75,7 @@ const wholesalerLinks = [
   { to: '/marketplace', label: 'Marketplace', icon: Store },
   { to: '/products', label: 'Products', icon: Store },
   { to: '/orders', label: 'Orders', icon: ReceiptText },
+  { to: '/support', label: 'Support', icon: LifeBuoy },
 ] as const;
 
 export default function AppNavbar(): JSX.Element {

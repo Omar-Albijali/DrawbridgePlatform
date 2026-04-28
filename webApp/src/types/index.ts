@@ -1,6 +1,4 @@
-// Import all shared types from the shared module
 import {
-    // Enums
     UserRole,
     OrderStatus,
     ShippingMethod,
@@ -11,11 +9,10 @@ import {
     NotificationType,
     NotificationEventKey,
     NotificationEntityType,
-    SupportTicketStatus,
     NotificationChannel,
     PaymentMethodType,
-
-    // DTOs
+    SupportTicketCategory,
+    SupportTicketStatus,
     OrderDTO,
     OrderItemDTO,
     OrderGroupDTO,
@@ -51,30 +48,19 @@ import {
     CreatePaymentRequest,
     CreatePaymentMethodRequest,
     CreateInvoiceRequest,
-
-    // Support DTOs
     SupportTicketDTO,
     CreateTicketRequest,
 
     // Product DTOs
     CreateProductRequest,
-
-    // Inventory Request DTOs
     CreateInventoryItemRequest,
     UpdateAutoOrderConfigRequest,
-
-    // Order Request DTOs
     UpdateOrderTrackingRequest,
-
-    // Cart Request DTOs
     AddToCartRequest,
-
-    // User Request DTOs
     UpdateUserProfileRequest,
     ChangePasswordRequest
 } from 'shared';
 
-// Re-export all shared enums and types for use throughout the webapp
 export {
     UserRole,
     OrderStatus,
@@ -86,9 +72,10 @@ export {
     NotificationType,
     NotificationEventKey,
     NotificationEntityType,
-    SupportTicketStatus,
     NotificationChannel,
     PaymentMethodType,
+    SupportTicketCategory,
+    SupportTicketStatus,
     OrderDTO,
     OrderItemDTO,
     OrderGroupDTO,
@@ -133,8 +120,6 @@ export {
     ChangePasswordRequest
 };
 
-// Define type aliases to match the shared DTO structures
-// This allows the rest of the application to continue using generic names
 export type User = UserDTO;
 export type Product = ProductDTO;
 export type InventoryItem = InventoryItemDTO;
@@ -153,7 +138,6 @@ export type Payment = PaymentDTO;
 export type Invoice = InvoiceDTO;
 export type PaymentMethod = PaymentMethodDTO;
 export type SupportTicket = SupportTicketDTO;
-export type TicketStatus = SupportTicketStatus;
 
 export interface SupportTicketChat {
     id: string;

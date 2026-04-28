@@ -1,33 +1,31 @@
 import { fetchApi } from './api';
-import { SupportTicket, SupportTicketChat, CreateTicketRequest, AddMessageRequest } from '../types';
+import { SupportTicket } from '../types';
+
+export interface CreateSupportTicketInput {
+    subject: string;
+    category: string;
+    description: string;
+    attachment?: File | null;
+}
 
 export const supportService = {
-    getAllTickets: () => fetchApi<SupportTicket[]>('/support/tickets'),
+    createTicket: (input: CreateSupportTicketInput) => {
+        const formData = new FormData();
+        formData.append('subject', input.subject.trim());
+        formData.append('category', input.category);
+        formData.append('description', input.description.trim());
 
-    getTicket: (id: string) => fetchApi<SupportTicket>(`/support/tickets/${id}`),
+        if (input.attachment) {
+            formData.append('attachment', input.attachment);
+        }
 
-    getUserTickets: (userId: string) => fetchApi<SupportTicket[]>(`/support/tickets/user/${userId}`),
-
-    createTicket: (userId: string, subject: string, description: string) => {
-        const request = { userId, subject, description } as unknown as CreateTicketRequest;
-        return fetchApi<SupportTicket>('/support/tickets', {
+        return fetchApi<SupportTicket>('/support', {
             method: 'POST',
-            body: JSON.stringify(request)
+            body: formData
         });
     },
 
-    closeTicket: (id: string) => fetchApi<SupportTicket>(`/support/tickets/${id}/close`, {
-        method: 'POST'
-    }),
+    getMyTickets: () => fetchApi<SupportTicket[]>('/support/my'),
 
-    // Chat
-    getChatHistory: (ticketId: string) => fetchApi<SupportTicketChat[]>(`/support/tickets/${ticketId}/chat`),
-
-    sendMessage: (ticketId: string, message: string, adminId?: string) => {
-        const request = { message, adminId } as unknown as AddMessageRequest;
-        return fetchApi<SupportTicketChat>(`/support/tickets/${ticketId}/chat`, {
-            method: 'POST',
-            body: JSON.stringify(request)
-        });
-    }
+    getTicket: (id: string) => fetchApi<SupportTicket>(`/support/${id}`)
 };
