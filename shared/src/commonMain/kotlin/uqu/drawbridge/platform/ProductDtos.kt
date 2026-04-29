@@ -9,8 +9,8 @@ data class ProductDTO(
     val id: String, // Long -> String for JS safety
     val name: String,
     val description: String,
-    val price: Double, // BigDecimal -> Double
-    val originalPrice: Double?,
+    val price: String, // BigDecimal -> String to preserve precision
+    val originalPrice: String?,
     val image: String,
     val images: Array<String>,
     val category: String,
@@ -35,8 +35,8 @@ data class CategoryDTO(
 data class CreateProductRequest(
     val name: String,
     val description: String,
-    val price: Double,
-    val originalPrice: Double?,
+    val price: String,
+    val originalPrice: String?,
     val image: String,
     val category: String,
     val categoryId: String, // Long -> String

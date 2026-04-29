@@ -12,6 +12,7 @@ import uqu.drawbridge.platform.repository.ProductRepository
 import uqu.drawbridge.platform.repository.UserRepository
 import uqu.drawbridge.platform.*
 import uqu.drawbridge.platform.dto.PaginatedResponse
+import uqu.drawbridge.platform.validation.RequestValidation
 import java.math.BigDecimal
 
 @Service
@@ -175,15 +176,15 @@ class ProductService(
         val category = categoryRepository.findById(this.categoryId).orElse(null)
         val discount = productDiscountService.getBestActiveDiscount(this.id!!)
         val originalPrice = if (discount != null) {
-            this.price.toDouble()
+            this.price.toPlainString()
         } else {
             null
         }
         val effectivePrice = if (discount != null) {
             val discountFactor = java.math.BigDecimal.ONE - (discount.discountPercentage / java.math.BigDecimal(100))
-            (this.price * discountFactor).toDouble()
+            (this.price * discountFactor).toPlainString()
         } else {
-            this.price.toDouble()
+            this.price.toPlainString()
         }
         
         val sortedImages = this.images.sortedBy { it.sortIndex }
@@ -218,15 +219,15 @@ class ProductService(
         discount: ProductDiscount?
     ): ProductDTO {
         val originalPrice = if (discount != null) {
-            product.price.toDouble()
+            product.price.toPlainString()
         } else {
             null
         }
         val effectivePrice = if (discount != null) {
             val discountFactor = BigDecimal.ONE - (discount.discountPercentage / BigDecimal(100))
-            (product.price * discountFactor).toDouble()
+            (product.price * discountFactor).toPlainString()
         } else {
-            product.price.toDouble()
+            product.price.toPlainString()
         }
         val sortedImages = product.images.sortedBy { it.sortIndex }
 
@@ -349,6 +350,12 @@ class ProductService(
 
     @Transactional
     fun createProductFromRequest(request: CreateProductRequest): ProductDTO {
+        RequestValidation.requireNotBlank(request.wholesalerId, "wholesalerId")
+        RequestValidation.requireNotBlank(request.name, "name")
+        RequestValidation.requireNotBlank(request.description, "description")
+        RequestValidation.requireNotBlank(request.categoryId, "categoryId")
+        RequestValidation.requirePositive(request.stock, "stock")
+        val parsedPrice = RequestValidation.parsePositiveBigDecimal(request.price, "price")
         val wholesaler = userRepository.findById(request.wholesalerId).orElseThrow {
             NoSuchElementException("Wholesaler not found: ${request.wholesalerId}")
         }
@@ -357,7 +364,7 @@ class ProductService(
             name = request.name,
             description = request.description,
             categoryId = request.categoryId,
-            price = BigDecimal.valueOf(request.price),
+            price = parsedPrice,
             stockQuantity = request.stock,
             published = true
         )
@@ -366,12 +373,18 @@ class ProductService(
 
     @Transactional
     fun updateProductFromRequest(id: String, request: CreateProductRequest): ProductDTO? {
+        RequestValidation.requireNotBlank(id, "id")
+        RequestValidation.requireNotBlank(request.name, "name")
+        RequestValidation.requireNotBlank(request.description, "description")
+        RequestValidation.requireNotBlank(request.categoryId, "categoryId")
+        RequestValidation.requirePositive(request.stock, "stock")
+        val parsedPrice = RequestValidation.parsePositiveBigDecimal(request.price, "price")
         val existing = getProductById(id) ?: return null
         val previousStockQuantity = existing.stockQuantity
         existing.name = request.name
         existing.description = request.description
         existing.categoryId = request.categoryId
-        existing.price = BigDecimal.valueOf(request.price)
+        existing.price = parsedPrice
         existing.stockQuantity = request.stock
         val savedProduct = productRepository.save(existing)
         logProductStockChange(savedProduct, previousStockQuantity, savedProduct.stockQuantity, "Product stock updated")

@@ -31,7 +31,7 @@ data class PaymentDTO(
     val orderId: String, // Long -> String
     val ownerId: String, // Long -> String
     val paymentMethodId: String, // Long -> String
-    val amount: Double, // BigDecimal -> Double
+    val amount: String, // BigDecimal -> String to preserve precision
     val status: PaymentStatus,
     val transactionRef: String,
     val completedAt: String // LocalDateTime -> String (ISO 8601)
@@ -45,7 +45,7 @@ data class InvoiceDTO(
     val invoiceNumber: String,
     val issueDate: String, // LocalDateTime -> String (ISO 8601)
     val dueDate: String, // LocalDateTime -> String (ISO 8601)
-    val totalAmount: Double, // BigDecimal -> Double
+    val totalAmount: String, // BigDecimal -> String to preserve precision
     val currency: String
 )
 
@@ -65,7 +65,7 @@ data class CreatePaymentRequest(
     val orderId: String,
     val ownerId: String,
     val paymentMethodId: String,
-    val amount: Double,
+    val amount: String,
     val transactionRef: String
 )
 
@@ -85,6 +85,6 @@ data class CreateInvoiceRequest(
     val invoiceNumber: String,
     val issueDate: String,
     val dueDate: String,
-    val totalAmount: Double,
+    val totalAmount: String,
     val currency: String
 )

@@ -7,6 +7,7 @@ import uqu.drawbridge.platform.repository.InvoiceRepository
 import uqu.drawbridge.platform.repository.PaymentMethodRepository
 import uqu.drawbridge.platform.repository.PaymentRepository
 import uqu.drawbridge.platform.*
+import uqu.drawbridge.platform.validation.RequestValidation
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.*
@@ -223,7 +224,7 @@ class PaymentService(
         orderId = this.orderId,
         ownerId = this.ownerId,
         paymentMethodId = this.paymentMethodId,
-        amount = this.amount.toDouble(),
+        amount = this.amount.toPlainString(),
         status = this.status,
         transactionRef = this.transactionRef,
         completedAt = this.completedAt.toString()
@@ -235,7 +236,7 @@ class PaymentService(
         invoiceNumber = this.invoiceNumber,
         issueDate = this.issueDate.toString(),
         dueDate = this.dueDate.toString(),
-        totalAmount = this.totalAmount.toDouble(),
+        totalAmount = this.totalAmount.toPlainString(),
         currency = this.currency
     )
 
@@ -256,11 +257,15 @@ class PaymentService(
     fun getPaymentsDTOByOrderId(orderId: String): List<PaymentDTO> = getPaymentsByOrderId(orderId).map { it.toDTO() }
 
     fun createPaymentDTO(request: CreatePaymentRequest): PaymentDTO {
+        RequestValidation.requireNotBlank(request.orderId, "orderId")
+        RequestValidation.requireNotBlank(request.ownerId, "ownerId")
+        RequestValidation.requireNotBlank(request.paymentMethodId, "paymentMethodId")
+        val amount = RequestValidation.parsePositiveBigDecimal(request.amount, "amount")
         val payment = Payment(
             orderId = request.orderId,
             ownerId = request.ownerId,
             paymentMethodId = request.paymentMethodId,
-            amount = BigDecimal(request.amount),
+            amount = amount,
             status = PaymentStatus.PENDING,
             transactionRef = request.transactionRef,
             completedAt = LocalDateTime.now()
@@ -279,12 +284,16 @@ class PaymentService(
     fun getInvoiceDTOByOrderId(orderId: String): InvoiceDTO? = getInvoiceByOrderId(orderId)?.toDTO()
 
     fun createInvoiceDTO(request: CreateInvoiceRequest): InvoiceDTO {
+        RequestValidation.requireNotBlank(request.orderId, "orderId")
+        RequestValidation.requireNotBlank(request.invoiceNumber, "invoiceNumber")
+        RequestValidation.requireNotBlank(request.currency, "currency")
+        val totalAmount = RequestValidation.parsePositiveBigDecimal(request.totalAmount, "totalAmount")
         val invoice = Invoice(
             orderId = request.orderId,
             invoiceNumber = request.invoiceNumber,
             issueDate = LocalDateTime.parse(request.issueDate),
             dueDate = LocalDateTime.parse(request.dueDate),
-            totalAmount = BigDecimal(request.totalAmount),
+            totalAmount = totalAmount,
             currency = request.currency
         )
         return createInvoice(invoice).toDTO()
@@ -294,6 +303,9 @@ class PaymentService(
         getPaymentMethodsByOwner(ownerId).map { it.toDTO() }
 
     fun addPaymentMethodDTO(request: CreatePaymentMethodRequest): PaymentMethodDTO {
+        RequestValidation.requireNotBlank(request.ownerId, "ownerId")
+        RequestValidation.requireNotBlank(request.type, "type")
+        RequestValidation.requireNotBlank(request.maskedDetails, "maskedDetails")
         val paymentMethod = PaymentMethod(
             ownerId = request.ownerId,
             type = PaymentMethodType.valueOf(request.type),
