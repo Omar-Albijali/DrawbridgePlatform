@@ -1,9 +1,10 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class ProductDTO(
     val id: String, // Long -> String for JS safety
@@ -21,7 +22,6 @@ data class ProductDTO(
     val published: Boolean
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CategoryDTO(
     val id: String, // Long -> String for JS safety
@@ -29,7 +29,6 @@ data class CategoryDTO(
     val parentCategoryId: String?
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CreateProductRequest(
     val name: String,
@@ -43,7 +42,6 @@ data class CreateProductRequest(
     val stock: Int
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class ImageUploadResponse(
     val id: String?, // Long -> String
@@ -51,7 +49,6 @@ data class ImageUploadResponse(
     val message: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class ProductImageResponse(
     val id: String?, // Long -> String

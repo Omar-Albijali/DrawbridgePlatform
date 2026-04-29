@@ -1,9 +1,10 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class OrderStatus {
     PENDING,
@@ -18,7 +19,6 @@ enum class OrderStatus {
     RETURNED
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class ShippingMethod {
     STANDARD,
@@ -28,14 +28,12 @@ enum class ShippingMethod {
     CUSTOM
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class TrackingInfoDTO(
     val trackingNumber: String,
     val trackingUrl: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class OrderItemDTO(
     val id: String, // Long -> String for JS safety
@@ -47,7 +45,6 @@ data class OrderItemDTO(
     val unitPrice: Double // BigDecimal -> Double
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class OrderDTO(
     val id: String, // Long -> String
@@ -68,7 +65,6 @@ data class OrderDTO(
     val items: Array<OrderItemDTO> // List -> Array for JS interop
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class OrderGroupDTO(
     val id: String, // Long -> String
@@ -79,7 +75,6 @@ data class OrderGroupDTO(
     val orders: Array<OrderDTO> // List -> Array
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class UpdateOrderTrackingRequest(
     val shippingMethod: ShippingMethod? = null,
