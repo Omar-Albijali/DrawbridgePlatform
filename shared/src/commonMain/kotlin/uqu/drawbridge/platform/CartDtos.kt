@@ -1,9 +1,10 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CartItemDTO(
     val id: String?, // Long -> String for JS safety
@@ -13,7 +14,6 @@ data class CartItemDTO(
     val addedAt: String? // LocalDateTime -> String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class ShoppingCartDTO(
     val id: String, // Long -> String for JS safety
@@ -22,7 +22,6 @@ data class ShoppingCartDTO(
     val items: Array<CartItemDTO>?
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class AddToCartRequest(
     val productId: String, // Long -> String

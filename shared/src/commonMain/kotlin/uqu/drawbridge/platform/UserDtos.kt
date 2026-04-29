@@ -1,16 +1,16 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class UserRole {
     RETAILER,
     WHOLESALER
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class AddressDto(
     val id: String? = null,
@@ -21,7 +21,6 @@ data class AddressDto(
     val country: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class RepresentativeDto(
     val name: String,
@@ -30,7 +29,6 @@ data class RepresentativeDto(
     val email: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class VerificationStatus {
     VERIFIED,
@@ -38,7 +36,6 @@ enum class VerificationStatus {
     UNVERIFIED
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class UserDTO(
     val id: String,
@@ -54,7 +51,6 @@ data class UserDTO(
     val avatar: String?
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class LoginRequest(
     val email: String,
@@ -62,7 +58,6 @@ data class LoginRequest(
     val rememberMe: Boolean = false
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class RegisterRequest(
     val email: String,
@@ -78,7 +73,6 @@ data class RegisterRequest(
     val addresses: Array<AddressDto> // List -> Array
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class AuthResponse(
     val token: String,
@@ -88,38 +82,32 @@ data class AuthResponse(
     val role: UserRole
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class ForgotPasswordRequest(
     val email: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class ResetPasswordRequest(
     val token: String,
     val newPassword: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class VerifyEmailRequest(
     val token: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class ResendVerificationRequest(
     val email: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class LogoutRequest(
     val token: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class AddressResponseDto(
     val id: String,
@@ -130,7 +118,6 @@ data class AddressResponseDto(
     val country: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CreateAddressRequest(
     val street: String,
@@ -140,7 +127,6 @@ data class CreateAddressRequest(
     val country: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class UpdateUserProfileRequest(
     val company: String,
@@ -149,7 +135,6 @@ data class UpdateUserProfileRequest(
     val representative: RepresentativeDto
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class ChangePasswordRequest(
     val currentPassword: String,

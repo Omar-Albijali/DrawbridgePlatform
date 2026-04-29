@@ -1,9 +1,10 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class PaymentStatus {
     PENDING,
@@ -14,7 +15,6 @@ enum class PaymentStatus {
     CANCELLED
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class PaymentMethodType {
     CREDIT_CARD,
@@ -24,7 +24,6 @@ enum class PaymentMethodType {
     CASH_ON_DELIVERY
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class PaymentDTO(
     val id: String, // Long -> String for JS safety
@@ -37,7 +36,6 @@ data class PaymentDTO(
     val completedAt: String // LocalDateTime -> String (ISO 8601)
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class InvoiceDTO(
     val id: String, // Long -> String for JS safety
@@ -49,7 +47,6 @@ data class InvoiceDTO(
     val currency: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class PaymentMethodDTO(
     val id: String, // Long -> String for JS safety
@@ -59,7 +56,6 @@ data class PaymentMethodDTO(
     val isDefault: Boolean
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CreatePaymentRequest(
     val orderId: String,
@@ -69,7 +65,6 @@ data class CreatePaymentRequest(
     val transactionRef: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CreatePaymentMethodRequest(
     val ownerId: String,
@@ -78,7 +73,6 @@ data class CreatePaymentMethodRequest(
     val isDefault: Boolean
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CreateInvoiceRequest(
     val orderId: String,

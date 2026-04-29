@@ -1,9 +1,10 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class NotificationChannel {
     SYSTEM,
@@ -12,7 +13,6 @@ enum class NotificationChannel {
     PUSH
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class NotificationType {
     ORDER,
@@ -21,7 +21,6 @@ enum class NotificationType {
     SYSTEM
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class NotificationEventKey {
     ORDER_CREATED,
@@ -33,7 +32,6 @@ enum class NotificationEventKey {
     SUPPORT_MESSAGE_ADDED
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class NotificationEntityType {
     ORDER,
@@ -43,7 +41,6 @@ enum class NotificationEntityType {
     SYSTEM
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class NotificationPreferenceKey {
     ORDER_CONFIRMATION,
@@ -55,7 +52,6 @@ enum class NotificationPreferenceKey {
     SUPPORT_UPDATES
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class NotificationDTO(
     val id: String, // Long -> String for JS safety
@@ -70,7 +66,6 @@ data class NotificationDTO(
     val read: Boolean
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class NotificationPreferenceDTO(
     val userId: String,
@@ -79,7 +74,6 @@ data class NotificationPreferenceDTO(
     val enabled: Boolean
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class UpsertNotificationPreferenceRequest(
     val preferenceKey: NotificationPreferenceKey,
@@ -87,14 +81,12 @@ data class UpsertNotificationPreferenceRequest(
     val enabled: Boolean
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class UnreadCountDTO(
     val recipientId: String,
     val count: Int
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class WebPushSubscriptionDTO(
     val id: String,
@@ -106,7 +98,6 @@ data class WebPushSubscriptionDTO(
     val createdAt: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class RegisterWebPushSubscriptionRequest(
     val userId: String,
