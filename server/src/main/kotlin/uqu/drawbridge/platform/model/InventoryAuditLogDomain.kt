@@ -39,46 +39,46 @@ enum class InventoryAuditSourceType {
         Index(name = "idx_inventory_audit_source_created", columnList = "source_type, created_at")
     ]
 )
-open class InventoryAuditLog(
+class InventoryAuditLog(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(name = "product_id", nullable = false)
-    open var productId: String,
+    var productId: String,
 
     @Column(name = "inventory_item_id", nullable = true)
-    open var inventoryItemId: String? = null,
+    var inventoryItemId: String? = null,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "stock_target_type", nullable = false)
-    open var stockTargetType: InventoryStockTargetType,
+    var stockTargetType: InventoryStockTargetType,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "change_type", nullable = false)
-    open var changeType: InventoryAuditChangeType,
+    var changeType: InventoryAuditChangeType,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "source_type", nullable = false)
-    open var sourceType: InventoryAuditSourceType,
+    var sourceType: InventoryAuditSourceType,
 
     @Column(name = "source_id", nullable = true)
-    open var sourceId: String? = null,
+    var sourceId: String? = null,
 
     @Column(name = "quantity_before", nullable = false)
-    open var quantityBefore: Int,
+    var quantityBefore: Int,
 
     @Column(name = "quantity_after", nullable = false)
-    open var quantityAfter: Int,
+    var quantityAfter: Int,
 
     @Column(name = "change_amount", nullable = false)
-    open var changeAmount: Int,
+    var changeAmount: Int,
 
     @Column(name = "changed_by", nullable = false)
-    open var changedBy: String,
+    var changedBy: String,
 
     @Column(nullable = true, columnDefinition = "TEXT")
-    open var reason: String? = null,
+    var reason: String? = null,
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    open var createdAt: LocalDateTime = LocalDateTime.now()
+    var createdAt: LocalDateTime = LocalDateTime.now()
 )

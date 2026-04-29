@@ -9,19 +9,19 @@ import java.time.LocalDateTime
 
 @Entity
 @Table(name = "shopping_carts")
-open class ShoppingCart(
+class ShoppingCart(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(nullable = false, unique = true)
-    open var retailerId: String,
+    var retailerId: String,
 
     @Column(nullable = false)
-    open var updatedAt: LocalDateTime = LocalDateTime.now(),
+    var updatedAt: LocalDateTime = LocalDateTime.now(),
 
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
     @JoinColumn(name = "cart_id", nullable = false)
-    open var items: MutableList<CartItem> = mutableListOf()
+    var items: MutableList<CartItem> = mutableListOf()
 )
 
 
@@ -32,23 +32,23 @@ open class ShoppingCart(
     name = "cart_items",
     uniqueConstraints = [UniqueConstraint(columnNames = ["cart_id", "productId"])]
 )
-open class CartItem(
+class CartItem(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(name = "cart_id", insertable = false, updatable = false, nullable = false)
-    open var cartId: String? = null,
+    var cartId: String? = null,
 
     @Column(nullable = false)
-    open var productId: String,
+    var productId: String,
 
     // Denormalized for easier grouping during checkout
     @Column(nullable = false)
-    open var wholesalerId: String,
+    var wholesalerId: String,
 
     @Column(nullable = false)
-    open var quantity: Int,
+    var quantity: Int,
 
     @Column(nullable = false)
-    open var addedAt: LocalDateTime = LocalDateTime.now()
+    var addedAt: LocalDateTime = LocalDateTime.now()
 )
