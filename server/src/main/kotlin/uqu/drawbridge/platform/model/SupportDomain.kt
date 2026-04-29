@@ -30,39 +30,39 @@ import uqu.drawbridge.platform.SupportTicketStatus
         )
     ]
 )
-open class SupportTicket(
+class SupportTicket(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    open var id: Long? = null,
+    var id: Long? = null,
 
     @Column(name = "ticket_number", nullable = false, unique = true)
-    open var ticketNumber: String,
+    var ticketNumber: String,
 
     @Column(name = "user_id", nullable = false)
-    open var userId: String,
+    var userId: String,
 
     @Column(nullable = false)
-    open var subject: String,
+    var subject: String,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    open var category: SupportTicketCategory,
+    var category: SupportTicketCategory,
 
     @Column(nullable = false, columnDefinition = "TEXT")
-    open var description: String,
+    var description: String,
 
     @Column(name = "attachment_url")
-    open var attachmentUrl: String? = null,
+    var attachmentUrl: String? = null,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    open var status: SupportTicketStatus = SupportTicketStatus.OPEN,
+    var status: SupportTicketStatus = SupportTicketStatus.OPEN,
 
     @Column(name = "created_at", nullable = false, updatable = false)
-    open var createdAt: LocalDateTime = LocalDateTime.now(),
+    var createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(name = "updated_at", nullable = false)
-    open var updatedAt: LocalDateTime = LocalDateTime.now()
+    var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
     @PrePersist
     fun onCreate() {
@@ -79,46 +79,46 @@ open class SupportTicket(
 
 @Entity
 @Table(name = "notifications")
-open class Notification(
+class Notification(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(nullable = false)
-    open var recipientId: String,
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    open var type: NotificationType,
+    var recipientId: String,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    open var eventKey: NotificationEventKey,
+    var type: NotificationType,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    open var entityType: NotificationEntityType,
+    var eventKey: NotificationEventKey,
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    var entityType: NotificationEntityType,
 
     @Column(nullable = true)
-    open var entityId: String? = null,
+    var entityId: String? = null,
 
     @Column(nullable = false)
-    open var deepLink: String,
+    var deepLink: String,
 
     @Column(nullable = false)
-    open var title: String,
+    var title: String,
 
     @Column(nullable = false, columnDefinition = "TEXT")
-    open var message: String,
+    var message: String,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    open var channel: NotificationChannel,
+    var channel: NotificationChannel,
 
     @Column(name = "is_read", nullable = false, columnDefinition = "bit(1) not null default b'0'")
-    open var read: Boolean = false,
+    var read: Boolean = false,
 
     @Column(nullable = false)
-    open var createdAt: LocalDateTime = LocalDateTime.now()
+    var createdAt: LocalDateTime = LocalDateTime.now()
 )
 
 @Entity
@@ -131,49 +131,49 @@ open class Notification(
         )
     ]
 )
-open class NotificationPreference(
+class NotificationPreference(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(name = "user_id", nullable = false)
-    open var userId: String,
+    var userId: String,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "preference_key", nullable = false)
-    open var preferenceKey: NotificationPreferenceKey,
+    var preferenceKey: NotificationPreferenceKey,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    open var channel: NotificationChannel,
+    var channel: NotificationChannel,
 
     @Column(nullable = false)
-    open var enabled: Boolean = true,
+    var enabled: Boolean = true,
 
     @Column(nullable = false)
-    open var updatedAt: LocalDateTime = LocalDateTime.now()
+    var updatedAt: LocalDateTime = LocalDateTime.now()
 )
 
 @Entity
 @Table(name = "web_push_subscriptions")
-open class WebPushSubscription(
+class WebPushSubscription(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(name = "user_id", nullable = false)
-    open var userId: String,
+    var userId: String,
 
     @Column(nullable = false, unique = true, columnDefinition = "TEXT")
-    open var endpoint: String,
+    var endpoint: String,
 
     @Column(nullable = false, columnDefinition = "TEXT")
-    open var p256dh: String,
+    var p256dh: String,
 
     @Column(nullable = false, columnDefinition = "TEXT")
-    open var auth: String,
+    var auth: String,
 
     @Column(nullable = true)
-    open var userAgent: String? = null,
+    var userAgent: String? = null,
 
     @Column(nullable = false)
-    open var createdAt: LocalDateTime = LocalDateTime.now()
+    var createdAt: LocalDateTime = LocalDateTime.now()
 )

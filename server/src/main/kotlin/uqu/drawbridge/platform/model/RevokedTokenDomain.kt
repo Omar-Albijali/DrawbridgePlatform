@@ -8,15 +8,15 @@ import java.time.LocalDateTime
 
 @Entity
 @Table(name = "revoked_tokens")
-open class RevokedToken(
+class RevokedToken(
     @Id
     @Column(nullable = false, length = 64)
-    open var tokenId: String,
+    var tokenId: String,
 
     @Column(nullable = false)
-    open var expiresAt: LocalDateTime,
+    var expiresAt: LocalDateTime,
 
     @Column(nullable = false)
-    open var revokedAt: LocalDateTime = LocalDateTime.now()
+    var revokedAt: LocalDateTime = LocalDateTime.now()
 )
 
