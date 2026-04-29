@@ -1,9 +1,10 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class ScheduleType {
     THRESHOLD_BASED,
@@ -13,7 +14,6 @@ enum class ScheduleType {
     INTERVAL_DAYS
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class InventoryStatus {
     LOW_STOCK,
@@ -21,7 +21,6 @@ enum class InventoryStatus {
     OUT_OF_STOCK
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class InventoryItemDTO(
     val id: String, // Long -> String for JS safety
@@ -36,7 +35,6 @@ data class InventoryItemDTO(
     val imageUrl: String?
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class AutoOrderConfigDTO(
     val enabled: Boolean,
@@ -50,7 +48,6 @@ data class AutoOrderConfigDTO(
     val nextScheduledAt: String?  // LocalDateTime -> String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CreateInventoryItemRequest(
     val productId: String, // Long -> String
@@ -60,7 +57,6 @@ data class CreateInventoryItemRequest(
     val autoRestock: Boolean
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class UpdateAutoOrderConfigRequest(
     val enabled: Boolean,

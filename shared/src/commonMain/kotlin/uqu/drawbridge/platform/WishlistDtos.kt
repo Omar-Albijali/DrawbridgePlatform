@@ -1,9 +1,10 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class WishlistDTO(
     val id: String,
@@ -15,7 +16,6 @@ data class WishlistDTO(
     val createdAt: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class AddToWishlistRequest(
     val productId: String
