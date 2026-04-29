@@ -14,6 +14,7 @@ import uqu.drawbridge.platform.ResendVerificationRequest
 import uqu.drawbridge.platform.LogoutRequest
 import uqu.drawbridge.platform.security.JwtService
 import uqu.drawbridge.platform.service.UserService
+import uqu.drawbridge.platform.validation.RequestValidation
 
 @RestController
 @RequestMapping("/api/auth")
@@ -36,12 +37,13 @@ class AuthController(
 
     @PostMapping("/logout")
     fun logout(@RequestBody request: LogoutRequest, authentication: Authentication): ResponseEntity<Void> {
-        val tokenUser = jwtService.extractUsername(request.token) ?: return ResponseEntity.badRequest().build()
+        val token = RequestValidation.requireNotBlank(request.token, "token")
+        val tokenUser = jwtService.extractUsername(token) ?: return ResponseEntity.badRequest().build()
         if (tokenUser != authentication.name) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build()
         }
         return try {
-            jwtService.revokeToken(request.token)
+            jwtService.revokeToken(token)
             ResponseEntity.ok().build()
         } catch (_: IllegalArgumentException) {
             ResponseEntity.badRequest().build()

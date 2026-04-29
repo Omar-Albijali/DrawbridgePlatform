@@ -15,6 +15,7 @@ import uqu.drawbridge.platform.repository.EmailVerificationTokenRepository
 import uqu.drawbridge.platform.repository.PasswordResetTokenRepository
 import uqu.drawbridge.platform.repository.UserRepository
 import uqu.drawbridge.platform.security.JwtService
+import uqu.drawbridge.platform.validation.RequestValidation
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -31,7 +32,15 @@ class UserService(
     private fun normalizeEmail(email: String): String = email.trim().lowercase()
 
     fun register(request: RegisterRequest): AuthResponse {
-        val normalizedEmail = normalizeEmail(request.email)
+        val normalizedEmail = RequestValidation.requireEmail(request.email)
+        RequestValidation.requireMinLength(request.password, "password", 8)
+        RequestValidation.requireNotBlank(request.phoneNumber, "phoneNumber")
+        RequestValidation.requireNotBlank(request.commercialRegistrationNumber, "commercialRegistrationNumber")
+        RequestValidation.requireNotBlank(request.repName, "repName")
+        RequestValidation.requireNotBlank(request.repJobTitle, "repJobTitle")
+        RequestValidation.requireNotBlank(request.repPhoneNumber, "repPhoneNumber")
+        RequestValidation.requireEmail(request.repEmail, "repEmail")
+        require(request.addresses.isNotEmpty()) { "addresses must contain at least one address" }
 
         // Check if email already exists (case-insensitive)
         if (userRepository.existsByEmail(normalizedEmail)) {
@@ -87,7 +96,9 @@ class UserService(
     }
 
     fun login(request: LoginRequest): AuthResponse {
-        val user = userRepository.findByEmail(normalizeEmail(request.email))
+        val normalizedEmail = RequestValidation.requireEmail(request.email)
+        RequestValidation.requireNotBlank(request.password, "password")
+        val user = userRepository.findByEmail(normalizedEmail)
             ?: throw uqu.drawbridge.platform.exception.InvalidCredentialsException("Invalid email or password")
 
         if (!passwordEncoder.matches(request.password, user.passwordHash)) {
@@ -140,6 +151,9 @@ class UserService(
     }
 
     fun changePassword(id: String, request: uqu.drawbridge.platform.ChangePasswordRequest): Boolean {
+        RequestValidation.requireNotBlank(id, "id")
+        RequestValidation.requireNotBlank(request.currentPassword, "currentPassword")
+        RequestValidation.requireMinLength(request.newPassword, "newPassword", 8)
         val user = getUserById(id) ?: return false
 
         if (!passwordEncoder.matches(request.currentPassword, user.passwordHash)) {
@@ -155,7 +169,7 @@ class UserService(
 
     @Transactional
     fun initiateForgotPassword(email: String) {
-        val user = userRepository.findByEmail(normalizeEmail(email)) ?: return
+        val user = userRepository.findByEmail(RequestValidation.requireEmail(email)) ?: return
 
         // Invalidate any existing tokens for this user
         passwordResetTokenRepository.deleteAllByUserId(user.id!!)
@@ -177,6 +191,8 @@ class UserService(
 
     @Transactional
     fun resetPassword(token: String, newPassword: String) {
+        RequestValidation.requireNotBlank(token, "token")
+        RequestValidation.requireMinLength(newPassword, "newPassword", 8)
         val resetToken = passwordResetTokenRepository.findByToken(token)
             ?: throw IllegalArgumentException("Invalid or expired password reset token")
 
@@ -201,7 +217,7 @@ class UserService(
 
     @Transactional
     fun resendEmailVerification(email: String) {
-        val user = userRepository.findByEmail(normalizeEmail(email)) ?: return
+        val user = userRepository.findByEmail(RequestValidation.requireEmail(email)) ?: return
         if (user.verificationStatus) return
 
         initiateEmailVerification(user)
@@ -209,6 +225,7 @@ class UserService(
 
     @Transactional
     fun verifyEmail(token: String) {
+        RequestValidation.requireNotBlank(token, "token")
         val verificationToken = emailVerificationTokenRepository.findByToken(token)
             ?: throw IllegalArgumentException("Invalid or expired verification token")
 
