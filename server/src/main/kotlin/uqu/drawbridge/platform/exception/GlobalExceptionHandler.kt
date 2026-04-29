@@ -2,6 +2,7 @@ package uqu.drawbridge.platform.exception
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.slf4j.LoggerFactory
 import org.springframework.web.bind.annotation.ControllerAdvice
 import org.springframework.web.bind.annotation.ExceptionHandler
 import uqu.drawbridge.platform.ErrorResponse
@@ -9,6 +10,7 @@ import java.io.FileNotFoundException
 
 @ControllerAdvice
 class GlobalExceptionHandler {
+    private val logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
 
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleIllegalArgumentException(e: IllegalArgumentException): ResponseEntity<ErrorResponse> {
@@ -36,8 +38,8 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception::class)
     fun handleGenericException(e: Exception): ResponseEntity<ErrorResponse> {
-        e.printStackTrace() // Log the stack trace
+        logger.error("Unhandled exception", e)
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ErrorResponse(e.message ?: "An unexpected error occurred", 500))
+            .body(ErrorResponse("An unexpected error occurred", 500))
     }
 }
