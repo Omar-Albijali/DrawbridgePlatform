@@ -341,60 +341,11 @@ class OrderService(
     // ==================== DTO CONVERSION & ENRICHED GETTERS ====================
 
     fun Order.toDTO(): uqu.drawbridge.platform.OrderDTO {
-        val retailer = userRepository.findById(this.retailerId).orElseThrow { RuntimeException("Retailer not found") }
-        val orderGroup = this.orderGroupId?.let { orderGroupRepository.findById(it).orElse(null) }
-        
-        val itemDTOs = this.orderItems.map { item ->
-            val product = productRepository.findById(item.productId).orElse(null)
-            val categoryName = product?.let { 
-                categoryRepository.findById(it.categoryId).map { c -> c.name }.orElse("Unknown")
-            } ?: "Unknown"
-            
-            val imageUrl = product?.images?.firstOrNull()?.url
-
-            uqu.drawbridge.platform.OrderItemDTO(
-                id = (item.id ?: ""),
-                productId = item.productId,
-                productName = product?.name ?: "Unknown Product",
-                productCategory = categoryName,
-                productImageUrl = imageUrl,
-                quantity = item.quantity,
-                unitPrice = item.unitPrice.toDouble()
-            )
-        }
-
-        return uqu.drawbridge.platform.OrderDTO(
-            id = (this.id ?: ""),
-            orderGroupId = (this.orderGroupId ?: ""),
-            wholesalerId = this.wholesalerId,
-            retailerId = this.retailerId,
-            retailerName = retailer.businessName ?: retailer.representative?.name ?: "Unknown",
-            status = this.status,
-            subtotal = this.subtotal.toDouble(),
-            autoOrder = this.autoOrder,
-            shippingMethod = this.shippingMethod,
-            trackingNumber = this.trackingNumber,
-            trackingUrl = this.trackingUrl,
-            estimatedDelivery = this.estimatedDelivery?.toString(),
-            shippedAt = this.shippedAt?.toString(),
-            deliveredAt = this.deliveredAt?.toString(),
-            placedAt = orderGroup?.createdAt?.toString() ?: "Unknown",
-            items = itemDTOs.toTypedArray()
-        )
+        return mapOrdersToDTOs(listOf(this)).first()
     }
 
     fun OrderGroup.toDTO(): uqu.drawbridge.platform.OrderGroupDTO {
-        // Fetch orders explicitly to ensure we have them, especially if the orderGroup object is fresh and not refreshed
-        val orders = if (this.id != null) orderRepository.findByOrderGroupId(this.id!!) else emptyList()
-        
-        return uqu.drawbridge.platform.OrderGroupDTO(
-            id = (this.id ?: ""),
-            retailerId = this.retailerId,
-            groupTotal = this.groupTotal.toDouble(),
-            paymentStatus = this.paymentStatus,
-            createdAt = this.createdAt.toString(),
-            orders = orders.map { it.toDTO() }.toTypedArray()
-        )
+        return mapOrderGroupsToDTOs(listOf(this)).first()
     }
 
     fun mapToDTO(orderGroup: OrderGroup): uqu.drawbridge.platform.OrderGroupDTO {
@@ -403,38 +354,39 @@ class OrderService(
 
     @Transactional(readOnly = true)
     fun getAllOrdersDTO(): List<uqu.drawbridge.platform.OrderDTO> {
-        return getAllOrders().map { it.toDTO() }
+        return mapOrdersToDTOs(getAllOrders())
     }
 
     @Transactional(readOnly = true)
     fun getOrderDTOById(id: String): uqu.drawbridge.platform.OrderDTO? {
         val order = getOrderById(id) ?: return null
-        return order.toDTO()
+        return mapOrdersToDTOs(listOf(order)).firstOrNull()
     }
 
     @Transactional(readOnly = true)
     fun getOrdersDTOByWholesaler(wholesalerId: String): List<uqu.drawbridge.platform.OrderDTO> {
-        return getOrdersByWholesaler(wholesalerId).map { it.toDTO() }
+        return mapOrdersToDTOs(getOrdersByWholesaler(wholesalerId))
     }
     
     @Transactional(readOnly = true)
     fun getOrdersDTOByRetailer(retailerId: String): List<uqu.drawbridge.platform.OrderDTO> {
-        return getOrdersByRetailer(retailerId).map { it.toDTO() }
+        return mapOrdersToDTOs(getOrdersByRetailer(retailerId))
     }
     
     @Transactional(readOnly = true)
     fun getOrdersDTOByOrderGroup(orderGroupId: String): List<uqu.drawbridge.platform.OrderDTO> {
-        return getOrdersByOrderGroup(orderGroupId).map { it.toDTO() }
+        return mapOrdersToDTOs(getOrdersByOrderGroup(orderGroupId))
     }
 
     @Transactional(readOnly = true)
     fun getOrderGroupsDTOByRetailer(retailerId: String): List<uqu.drawbridge.platform.OrderGroupDTO> {
-        return getOrderGroupsByRetailer(retailerId).map { it.toDTO() }
+        return mapOrderGroupsToDTOs(getOrderGroupsByRetailer(retailerId))
     }
 
     @Transactional(readOnly = true)
     fun getOrderGroupDTOById(id: String): uqu.drawbridge.platform.OrderGroupDTO? {
-        return getOrderGroupById(id)?.toDTO()
+        val group = getOrderGroupById(id) ?: return null
+        return mapOrderGroupsToDTOs(listOf(group)).firstOrNull()
     }
 
     @Transactional
@@ -481,6 +433,90 @@ class OrderService(
         }
         orderGroup.groupTotal = total
         orderGroupRepository.save(orderGroup)
+    }
+
+    private fun mapOrderGroupsToDTOs(orderGroups: List<OrderGroup>): List<uqu.drawbridge.platform.OrderGroupDTO> {
+        if (orderGroups.isEmpty()) {
+            return emptyList()
+        }
+
+        val groupIds = orderGroups.mapNotNull { it.id }.distinct()
+        val ordersByGroupId = if (groupIds.isEmpty()) {
+            emptyMap()
+        } else {
+            orderRepository.findByOrderGroupIdIn(groupIds).groupBy { it.orderGroupId.orEmpty() }
+        }
+        val allOrders = ordersByGroupId.values.flatten()
+        val orderDTOsById = mapOrdersToDTOs(allOrders).associateBy { it.id }
+
+        return orderGroups.map { group ->
+            val orders = group.id?.let { groupId ->
+                ordersByGroupId[groupId].orEmpty().mapNotNull { order -> order.id?.let(orderDTOsById::get) }
+            }.orEmpty()
+
+            uqu.drawbridge.platform.OrderGroupDTO(
+                id = group.id.orEmpty(),
+                retailerId = group.retailerId,
+                groupTotal = group.groupTotal.toPlainString(),
+                paymentStatus = group.paymentStatus,
+                createdAt = group.createdAt.toString(),
+                orders = orders.toTypedArray()
+            )
+        }
+    }
+
+    private fun mapOrdersToDTOs(orders: List<Order>): List<uqu.drawbridge.platform.OrderDTO> {
+        if (orders.isEmpty()) {
+            return emptyList()
+        }
+
+        val retailersById = userRepository.findAllById(orders.map { it.retailerId }.distinct())
+            .associateBy { it.id.orEmpty() }
+        val orderGroupsById = orderGroupRepository.findAllById(orders.mapNotNull { it.orderGroupId }.distinct())
+            .associateBy { it.id.orEmpty() }
+        val productIds = orders.flatMap { order -> order.orderItems.map { item -> item.productId } }.distinct()
+        val productsById = productRepository.findAllById(productIds).associateBy { it.id.orEmpty() }
+        val categoriesById = categoryRepository.findAllById(productsById.values.map { it.categoryId }.distinct())
+            .associateBy { it.id.orEmpty() }
+
+        return orders.map { order ->
+            val retailer = retailersById[order.retailerId]
+            val orderGroup = order.orderGroupId?.let(orderGroupsById::get)
+            val itemDTOs = order.orderItems.map { item ->
+                val product = productsById[item.productId]
+                val categoryName = product?.categoryId?.let { categoriesById[it]?.name } ?: "Unknown"
+                val imageUrl = product?.images?.firstOrNull()?.url
+
+                uqu.drawbridge.platform.OrderItemDTO(
+                    id = item.id.orEmpty(),
+                    productId = item.productId,
+                    productName = product?.name ?: "Unknown Product",
+                    productCategory = categoryName,
+                    productImageUrl = imageUrl,
+                    quantity = item.quantity,
+                    unitPrice = item.unitPrice.toPlainString()
+                )
+            }
+
+            uqu.drawbridge.platform.OrderDTO(
+                id = order.id.orEmpty(),
+                orderGroupId = order.orderGroupId.orEmpty(),
+                wholesalerId = order.wholesalerId,
+                retailerId = order.retailerId,
+                retailerName = retailer?.businessName ?: retailer?.representative?.name ?: "Unknown",
+                status = order.status,
+                subtotal = order.subtotal.toPlainString(),
+                autoOrder = order.autoOrder,
+                shippingMethod = order.shippingMethod,
+                trackingNumber = order.trackingNumber,
+                trackingUrl = order.trackingUrl,
+                estimatedDelivery = order.estimatedDelivery?.toString(),
+                shippedAt = order.shippedAt?.toString(),
+                deliveredAt = order.deliveredAt?.toString(),
+                placedAt = orderGroup?.createdAt?.toString() ?: "Unknown",
+                items = itemDTOs.toTypedArray()
+            )
+        }
     }
 
     private fun addDeliveredItemsToRetailInventory(order: Order) {

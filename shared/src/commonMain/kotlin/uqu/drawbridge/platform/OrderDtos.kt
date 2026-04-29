@@ -44,7 +44,7 @@ data class OrderItemDTO(
     val productCategory: String,
     val productImageUrl: String?,
     val quantity: Int,
-    val unitPrice: Double // BigDecimal -> Double
+    val unitPrice: String // BigDecimal -> String to preserve precision
 )
 
 @OptIn(ExperimentalJsExport::class)
@@ -56,7 +56,7 @@ data class OrderDTO(
     val retailerId: String, // Long -> String
     val retailerName: String,
     val status: OrderStatus,
-    val subtotal: Double, // BigDecimal -> Double
+    val subtotal: String, // BigDecimal -> String to preserve precision
     val autoOrder: Boolean,
     val shippingMethod: ShippingMethod?,
     val trackingNumber: String?,
@@ -73,7 +73,7 @@ data class OrderDTO(
 data class OrderGroupDTO(
     val id: String, // Long -> String
     val retailerId: String, // Long -> String
-    val groupTotal: Double, // BigDecimal -> Double
+    val groupTotal: String, // BigDecimal -> String to preserve precision
     val paymentStatus: PaymentStatus,
     val createdAt: String, // LocalDateTime -> String
     val orders: Array<OrderDTO> // List -> Array
