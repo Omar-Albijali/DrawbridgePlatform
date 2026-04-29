@@ -174,36 +174,11 @@ class ProductService(
 
     fun Product.toDTO(): ProductDTO {
         val category = categoryRepository.findById(this.categoryId).orElse(null)
-        val discount = productDiscountService.getBestActiveDiscount(this.id!!)
-        val originalPrice = if (discount != null) {
-            this.price.toPlainString()
-        } else {
-            null
-        }
-        val effectivePrice = if (discount != null) {
-            val discountFactor = java.math.BigDecimal.ONE - (discount.discountPercentage / java.math.BigDecimal(100))
-            (this.price * discountFactor).toPlainString()
-        } else {
-            this.price.toPlainString()
-        }
-        
-        val sortedImages = this.images.sortedBy { it.sortIndex }
-        
-        return ProductDTO(
-            id = (this.id ?: ""),
-            name = this.name,
-            description = this.description,
-            price = effectivePrice,
-            originalPrice = originalPrice,
-            image = sortedImages.firstOrNull()?.url ?: "",
-            images = sortedImages.map { it.url }.toTypedArray(),
-            category = category?.name ?: "",
-            brand = this.wholesaler.businessName,
-            stock = this.stockQuantity,
-            rating = this.averageRating.toDouble(),
-            reviews = this.ratingCount,
-            supplier = this.wholesaler.businessName,
-            published = this.published
+        val discount = this.id?.let(productDiscountService::getBestActiveDiscount)
+        return toDTO(
+            product = this,
+            categoryName = category?.name,
+            discount = discount
         )
     }
 
