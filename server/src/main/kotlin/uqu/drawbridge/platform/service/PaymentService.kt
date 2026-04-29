@@ -124,8 +124,6 @@ class PaymentService(
 
     @Transactional
     fun createInvoice(invoice: Invoice): Invoice {
-        invoice.invoiceNumber = generateInvoiceNumber()
-        invoice.issueDate = LocalDateTime.now()
         return invoiceRepository.save(invoice)
     }
 
