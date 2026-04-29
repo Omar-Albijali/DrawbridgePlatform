@@ -3,6 +3,7 @@ package uqu.drawbridge.platform.security
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import io.jsonwebtoken.JwtException
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
@@ -48,8 +49,7 @@ class JwtAuthenticationFilter(
             }
         } catch (_: UsernameNotFoundException) {
             SecurityContextHolder.clearContext()
-        } catch (_: Exception) {
-            // Invalid, malformed, or revoked token should not break request processing.
+        } catch (_: JwtException) {
             SecurityContextHolder.clearContext()
         }
 
