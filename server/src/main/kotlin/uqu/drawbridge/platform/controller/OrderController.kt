@@ -10,6 +10,7 @@ import uqu.drawbridge.platform.model.OrderGroup
 import uqu.drawbridge.platform.OrderStatus
 import uqu.drawbridge.platform.service.OrderService
 import java.time.LocalDateTime
+import java.time.format.DateTimeParseException
 
 @RestController
 @RequestMapping("/api/orders")
@@ -67,12 +68,11 @@ class OrderController(
         @PathVariable id: String,
         @RequestBody request: uqu.drawbridge.platform.UpdateOrderTrackingRequest
     ): ResponseEntity<OrderDTO> {
-        // Parsing estimatedDelivery from String to LocalDateTime if provided
-        val estimatedDelivery = request.estimatedDelivery?.let { 
+        val estimatedDelivery = request.estimatedDelivery?.let {
             try {
-                LocalDateTime.parse(it) 
-            } catch (e: Exception) {
-                null 
+                LocalDateTime.parse(it)
+            } catch (_: DateTimeParseException) {
+                throw IllegalArgumentException("estimatedDelivery must be an ISO-8601 datetime")
             }
         }
         
