@@ -13,7 +13,9 @@ import uqu.drawbridge.platform.UpdateAutoOrderConfigRequest
 import uqu.drawbridge.platform.AutoOrderConfigDTO
 import uqu.drawbridge.platform.ScheduleType
 import uqu.drawbridge.platform.model.AutoOrderConfig
+import uqu.drawbridge.platform.model.InventoryAuditSourceType
 import uqu.drawbridge.platform.model.InventoryItem
+import uqu.drawbridge.platform.model.InventoryStockTargetType
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.ProductRepository
 import java.time.DayOfWeek
@@ -24,7 +26,8 @@ class InventoryService(
     private val inventoryItemRepository: InventoryItemRepository,
     private val productRepository: ProductRepository,
     private val orderService: OrderService,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val inventoryAuditService: InventoryAuditService
 ) {
 
     // ==================== INVENTORY ITEM OPERATIONS ====================
@@ -57,12 +60,15 @@ class InventoryService(
     fun createInventoryItem(inventoryItem: InventoryItem): InventoryItem {
         inventoryItem.lastUpdated = LocalDateTime.now()
         calculateNextScheduledAt(inventoryItem.autoOrderConfig)
-        return inventoryItemRepository.save(inventoryItem)
+        val savedItem = inventoryItemRepository.save(inventoryItem)
+        logInventoryStockChange(savedItem, 0, savedItem.currentQuantity, InventoryAuditSourceType.MANUAL, reason = "Inventory item created")
+        return savedItem
     }
 
     @Transactional
     fun updateInventoryItem(id: String, updatedItem: InventoryItem): InventoryItem? {
         val existingItem = inventoryItemRepository.findById(id).orElse(null) ?: return null
+        val previousQuantity = existingItem.currentQuantity
 
         existingItem.currentQuantity = updatedItem.currentQuantity
         existingItem.lastUpdated = LocalDateTime.now()
@@ -73,28 +79,44 @@ class InventoryService(
         calculateNextScheduledAt(config)
         existingItem.autoOrderConfig = config
 
-        return inventoryItemRepository.save(existingItem)
+        val savedItem = inventoryItemRepository.save(existingItem)
+        logInventoryStockChange(savedItem, previousQuantity, savedItem.currentQuantity, InventoryAuditSourceType.MANUAL, reason = "Inventory item updated")
+        return savedItem
     }
 
     @Transactional
-    fun updateQuantity(id: String, newQuantity: Int): InventoryItem? {
+    fun updateQuantity(
+        id: String,
+        newQuantity: Int,
+        sourceType: InventoryAuditSourceType = InventoryAuditSourceType.MANUAL,
+        sourceId: String? = null,
+        reason: String? = "Inventory quantity updated"
+    ): InventoryItem? {
         val item = inventoryItemRepository.findById(id).orElse(null) ?: return null
         val previousQuantity = item.currentQuantity
         item.currentQuantity = newQuantity
         item.lastUpdated = LocalDateTime.now()
         val savedItem = inventoryItemRepository.save(item)
+        logInventoryStockChange(savedItem, previousQuantity, savedItem.currentQuantity, sourceType, sourceId, reason)
         maybeNotifyLowStock(savedItem)
         maybeTriggerThresholdAutoRestock(savedItem, previousQuantity)
         return savedItem
     }
 
     @Transactional
-    fun adjustQuantity(id: String, adjustment: Int): InventoryItem? {
+    fun adjustQuantity(
+        id: String,
+        adjustment: Int,
+        sourceType: InventoryAuditSourceType = InventoryAuditSourceType.MANUAL,
+        sourceId: String? = null,
+        reason: String? = "Inventory quantity adjusted"
+    ): InventoryItem? {
         val item = inventoryItemRepository.findById(id).orElse(null) ?: return null
         val previousQuantity = item.currentQuantity
         item.currentQuantity += adjustment
         item.lastUpdated = LocalDateTime.now()
         val savedItem = inventoryItemRepository.save(item)
+        logInventoryStockChange(savedItem, previousQuantity, savedItem.currentQuantity, sourceType, sourceId, reason)
         maybeNotifyLowStock(savedItem)
         maybeTriggerThresholdAutoRestock(savedItem, previousQuantity)
         return savedItem
@@ -324,11 +346,14 @@ class InventoryService(
     @Transactional
     fun updateInventoryItemFromRequest(id: String, request: CreateInventoryItemRequest): InventoryItemDTO? {
         val existingItem = inventoryItemRepository.findById(id).orElse(null) ?: return null
+        val previousQuantity = existingItem.currentQuantity
         existingItem.currentQuantity = request.currentStock
         existingItem.lastUpdated = LocalDateTime.now()
         existingItem.autoOrderConfig.enabled = request.autoRestock
         existingItem.autoOrderConfig.minThreshold = request.minThreshold
-        return inventoryItemRepository.save(existingItem).toDTO()
+        val savedItem = inventoryItemRepository.save(existingItem)
+        logInventoryStockChange(savedItem, previousQuantity, savedItem.currentQuantity, InventoryAuditSourceType.MANUAL, reason = "Inventory item updated")
+        return savedItem.toDTO()
     }
 
     @Transactional
@@ -364,6 +389,26 @@ class InventoryService(
         existing.intervalDays = updated.intervalDays
         existing.dayOfWeek = updated.dayOfWeek
         existing.dayOfMonth = updated.dayOfMonth
+    }
+
+    private fun logInventoryStockChange(
+        item: InventoryItem,
+        quantityBefore: Int,
+        quantityAfter: Int,
+        sourceType: InventoryAuditSourceType,
+        sourceId: String? = null,
+        reason: String? = null
+    ) {
+        inventoryAuditService.logStockChange(
+            productId = item.productId,
+            inventoryItemId = item.id,
+            stockTargetType = InventoryStockTargetType.RETAILER_INVENTORY,
+            sourceType = sourceType,
+            sourceId = sourceId,
+            quantityBefore = quantityBefore,
+            quantityAfter = quantityAfter,
+            reason = reason
+        )
     }
     
     private fun updateConfigFromRequest(config: AutoOrderConfig, request: UpdateAutoOrderConfigRequest) {
