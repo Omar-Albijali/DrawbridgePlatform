@@ -18,6 +18,7 @@ import uqu.drawbridge.platform.model.InventoryItem
 import uqu.drawbridge.platform.model.InventoryStockTargetType
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.ProductRepository
+import uqu.drawbridge.platform.validation.RequestValidation
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 
@@ -329,6 +330,10 @@ class InventoryService(
 
     @Transactional
     fun createInventoryItemFromRequest(request: CreateInventoryItemRequest): InventoryItemDTO {
+        RequestValidation.requireNotBlank(request.productId, "productId")
+        RequestValidation.requireNotBlank(request.retailerId, "retailerId")
+        RequestValidation.requireNonNegative(request.currentStock, "currentStock")
+        RequestValidation.requireNonNegative(request.minThreshold, "minThreshold")
         val autoOrderConfig = AutoOrderConfig(
             enabled = request.autoRestock,
             minThreshold = request.minThreshold
@@ -345,6 +350,9 @@ class InventoryService(
 
     @Transactional
     fun updateInventoryItemFromRequest(id: String, request: CreateInventoryItemRequest): InventoryItemDTO? {
+        RequestValidation.requireNotBlank(id, "id")
+        RequestValidation.requireNonNegative(request.currentStock, "currentStock")
+        RequestValidation.requireNonNegative(request.minThreshold, "minThreshold")
         val existingItem = inventoryItemRepository.findById(id).orElse(null) ?: return null
         val previousQuantity = existingItem.currentQuantity
         existingItem.currentQuantity = request.currentStock
@@ -358,6 +366,9 @@ class InventoryService(
 
     @Transactional
     fun setAutoOrderConfigFromRequest(inventoryItemId: String, request: UpdateAutoOrderConfigRequest): InventoryItemDTO? {
+        RequestValidation.requireNotBlank(inventoryItemId, "inventoryItemId")
+        RequestValidation.requireNonNegative(request.minThreshold, "minThreshold")
+        RequestValidation.requirePositive(request.reorderQuantity, "reorderQuantity")
         val item = inventoryItemRepository.findById(inventoryItemId).orElse(null) ?: return null
         val config = item.autoOrderConfig
         
@@ -369,6 +380,9 @@ class InventoryService(
 
     @Transactional
     fun updateAutoOrderConfigFromRequest(inventoryItemId: String, request: UpdateAutoOrderConfigRequest): AutoOrderConfigDTO? {
+        RequestValidation.requireNotBlank(inventoryItemId, "inventoryItemId")
+        RequestValidation.requireNonNegative(request.minThreshold, "minThreshold")
+        RequestValidation.requirePositive(request.reorderQuantity, "reorderQuantity")
         val item = inventoryItemRepository.findById(inventoryItemId).orElse(null) ?: return null
         val config = item.autoOrderConfig
         

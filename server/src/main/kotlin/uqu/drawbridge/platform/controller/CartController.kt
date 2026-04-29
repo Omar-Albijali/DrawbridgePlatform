@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*
 import uqu.drawbridge.platform.*
 import uqu.drawbridge.platform.service.CartService
 import uqu.drawbridge.platform.service.OrderService
+import uqu.drawbridge.platform.validation.RequestValidation
 
 @RestController
 @RequestMapping("/api/cart")
@@ -35,6 +36,9 @@ class CartController(
         @PathVariable retailerId: String,
         @RequestBody request: AddToCartRequest
     ): ResponseEntity<CartItemDTO> {
+        RequestValidation.requireNotBlank(retailerId, "retailerId")
+        RequestValidation.requireNotBlank(request.productId, "productId")
+        RequestValidation.requirePositive(request.quantity, "quantity")
         val item = cartService.addToCartDTO(retailerId, request.productId, request.quantity)
             ?: throw IllegalArgumentException("Failed to add item to cart. Product not found?")
         return ResponseEntity.ok(item)
@@ -47,6 +51,9 @@ class CartController(
         @PathVariable productId: String,
         @RequestParam quantity: Int
     ): ResponseEntity<CartItemDTO> {
+        RequestValidation.requireNotBlank(retailerId, "retailerId")
+        RequestValidation.requireNotBlank(productId, "productId")
+        RequestValidation.requirePositive(quantity, "quantity")
         val item = cartService.updateCartItemQuantityDTO(retailerId, productId, quantity)
             ?: throw java.util.NoSuchElementException("Item not found in cart")
         return ResponseEntity.ok(item)
