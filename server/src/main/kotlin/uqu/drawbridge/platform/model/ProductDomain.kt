@@ -110,38 +110,3 @@ class ProductRating(
     @Column(nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 )
-
-
-// ===================== PRODUCT DISCOUNT =====================
-
-@Entity
-@Table(name = "product_discounts")
-class ProductDiscount(
-    @Id @GeneratedValue(strategy = GenerationType.UUID)
-    var id: String? = null,
-
-    @Column(nullable = false)
-    var productId: String,
-
-    @Column(nullable = false)
-    var name: String,
-
-    @Column(nullable = true, columnDefinition = "TEXT")
-    var description: String? = null,
-
-    // Percentage discount value (e.g., 20 for 20% off)
-    @Column(nullable = false)
-    var discountPercentage: BigDecimal,
-
-    @Column(nullable = false)
-    var startDate: LocalDateTime,
-
-    @Column(nullable = false)
-    var endDate: LocalDateTime,
-
-    @Column(nullable = false)
-    var isActive: Boolean = true,
-
-    @Column(nullable = false, updatable = false)
-    var createdAt: LocalDateTime = LocalDateTime.now()
-)

@@ -51,12 +51,6 @@ export default function ProductCard({
     void toggleWishlist(product.id);
   };
 
-  const originalPrice = product.originalPrice ?? undefined;
-  const discount =
-      originalPrice && originalPrice > product.price
-          ? Math.round(((originalPrice - product.price) / originalPrice) * 100)
-          : 0;
-
   return (
       <div
           onClick={handleCardClick}
@@ -68,11 +62,6 @@ export default function ProductCard({
               alt={product.name}
               className="buyer-product-card__image w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
-          {discount > 0 && (
-              <span className="buyer-product-card__badge absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-            -{discount}%
-          </span>
-          )}
           {(product.stock ?? 0) < 20 && (
               <span className="buyer-product-card__badge absolute top-3 right-3 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
             Low Stock
@@ -115,9 +104,6 @@ export default function ProductCard({
           <span className="buyer-product-card__price text-xl font-bold text-navy-800">
             SAR {product.price.toFixed(2)}
           </span>
-            {originalPrice && (
-                <span className="text-sm text-navy-400 line-through">SAR {originalPrice.toFixed(2)}</span>
-            )}
           </div>
 
           <p className="text-xs text-navy-500 mb-4">Supplied by: {product.supplier}</p>

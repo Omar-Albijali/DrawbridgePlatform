@@ -47,11 +47,6 @@ export default function ProductDetail(): JSX.Element {
         setTimeout(() => setAdded(false), 1500);
     };
 
-    const discount =
-        product?.originalPrice && product.originalPrice > product.price
-            ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-            : 0;
-
     const allImages = product?.images ?? [];
 
     if (loading) {
@@ -143,16 +138,6 @@ export default function ProductDetail(): JSX.Element {
             <span className="text-3xl font-extrabold text-navy-900">
               SAR {product.price.toFixed(2)}
             </span>
-                        {product.originalPrice && (
-                            <span className="text-lg text-navy-400 line-through">
-                SAR {product.originalPrice.toFixed(2)}
-              </span>
-                        )}
-                        {discount > 0 && (
-                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-sm font-bold text-red-600">
-                -{discount}%
-              </span>
-                        )}
                     </div>
 
                     {/* Supplier */}

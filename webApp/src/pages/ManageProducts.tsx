@@ -203,9 +203,6 @@ export default function ManageProducts(): JSX.Element {
                   <td className="px-6 py-4 text-right">
                     <div>
                       <span className="font-semibold text-navy-800">{product.price.toFixed(2)} SAR</span>
-                      {product.originalPrice && product.originalPrice > product.price && (
-                        <span className="block text-xs text-navy-400 line-through">{product.originalPrice.toFixed(2)} SAR</span>
-                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">

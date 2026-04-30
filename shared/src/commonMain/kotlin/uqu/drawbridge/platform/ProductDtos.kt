@@ -10,7 +10,6 @@ data class ProductDTO(
     val name: String,
     val description: String,
     val price: Double, // BigDecimal -> Double
-    val originalPrice: Double?,
     val image: String,
     val images: Array<String>,
     val category: String,
@@ -36,7 +35,6 @@ data class CreateProductRequest(
     val name: String,
     val description: String,
     val price: Double,
-    val originalPrice: Double?,
     val image: String,
     val category: String,
     val categoryId: String, // Long -> String
