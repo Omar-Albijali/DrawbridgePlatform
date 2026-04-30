@@ -95,65 +95,7 @@
   }
 }
 
-html.has-custom-cursor,
-html.has-custom-cursor a,
-html.has-custom-cursor button,
-html.has-custom-cursor [role='button'],
-html.has-custom-cursor input,
-html.has-custom-cursor textarea,
-html.has-custom-cursor select,
-html.has-custom-cursor label {
-  cursor: none !important;
-}
 
-.cursor-dot,
-.cursor-outline {
-  position: fixed;
-  top: 0;
-  left: 0;
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-  opacity: 0;
-  z-index: 1000;
-  transition: opacity 120ms ease;
-}
-
-.cursor-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #10b981;
-  transition: opacity 120ms ease, transform 200ms ease;
-}
-
-.cursor-outline {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  border: 2px solid rgba(16, 185, 129, 0.5);
-  transition:
-    width 300ms ease,
-    height 300ms ease,
-    border-color 300ms ease,
-    background-color 300ms ease,
-    opacity 120ms ease;
-}
-
-.cursor-dot.is-visible,
-.cursor-outline.is-visible {
-  opacity: 1;
-}
-
-.cursor-dot.hovering {
-  transform: translate(-50%, -50%) scale(0.6);
-}
-
-.cursor-outline.hovering {
-  width: 66px;
-  height: 66px;
-  border-color: #10b981;
-  background-color: rgba(16, 185, 129, 0.14);
-}
 
 .dark .theme-surface-scope .bg-white {
   @apply bg-slate-900;
