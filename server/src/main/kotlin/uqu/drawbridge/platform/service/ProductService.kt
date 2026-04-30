@@ -19,7 +19,6 @@ import java.math.BigDecimal
 class ProductService(
     private val productRepository: ProductRepository,
     private val categoryRepository: CategoryRepository,
-    private val productDiscountService: ProductDiscountService,
     private val userRepository: UserRepository,
     private val inventoryAuditService: InventoryAuditService
 ) {
@@ -174,11 +173,9 @@ class ProductService(
 
     fun Product.toDTO(): ProductDTO {
         val category = categoryRepository.findById(this.categoryId).orElse(null)
-        val discount = this.id?.let(productDiscountService::getBestActiveDiscount)
         return toDTO(
             product = this,
-            categoryName = category?.name,
-            discount = discount
+            categoryName = category?.name
         )
     }
 
@@ -190,28 +187,15 @@ class ProductService(
 
     private fun toDTO(
         product: Product,
-        categoryName: String?,
-        discount: ProductDiscount?
+        categoryName: String?
     ): ProductDTO {
-        val originalPrice = if (discount != null) {
-            product.price.toDouble()
-        } else {
-            null
-        }
-        val effectivePrice = if (discount != null) {
-            val discountFactor = BigDecimal.ONE - (discount.discountPercentage / BigDecimal(100))
-            (product.price * discountFactor).toDouble()
-        } else {
-            product.price.toDouble()
-        }
         val sortedImages = product.images.sortedBy { it.sortIndex }
 
         return ProductDTO(
             id = (product.id ?: ""),
             name = product.name,
             description = product.description,
-            price = effectivePrice,
-            originalPrice = originalPrice,
+            price = product.price.toDouble(),
             image = sortedImages.firstOrNull()?.url ?: "",
             images = sortedImages.map { it.url }.toTypedArray(),
             category = categoryName ?: "",
@@ -231,13 +215,11 @@ class ProductService(
 
         val categoriesById = categoryRepository.findAllById(products.map { it.categoryId }.distinct())
             .associateBy { it.id ?: "" }
-        val discountsByProductId = productDiscountService.getBestActiveDiscounts(products.mapNotNull { it.id })
 
         return products.map { product ->
             toDTO(
                 product = product,
-                categoryName = categoriesById[product.categoryId]?.name,
-                discount = product.id?.let(discountsByProductId::get)
+                categoryName = categoriesById[product.categoryId]?.name
             )
         }
     }

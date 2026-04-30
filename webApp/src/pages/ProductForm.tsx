@@ -52,7 +52,7 @@ export default function ProductForm(): JSX.Element {
       .then(([product, serverImages]) => {
         setName(product.name);
         setDescription(product.description);
-        setPrice(String(product.originalPrice ?? product.price));
+        setPrice(String(product.price));
         setStock(String(product.stock));
         const category = categories.find((item) => item.name === product.category);
         setCategoryId(category?.id ?? '');
@@ -190,7 +190,6 @@ export default function ProductForm(): JSX.Element {
           name: name.trim(),
           description: description.trim(),
           price: Number(price),
-          originalPrice: null,
           image: '',
           category: categoryName,
           categoryId,
@@ -212,7 +211,6 @@ export default function ProductForm(): JSX.Element {
           name: name.trim(),
           description: description.trim(),
           price: Number(price),
-          originalPrice: null,
           image: '',
           category: categoryName,
           categoryId,
