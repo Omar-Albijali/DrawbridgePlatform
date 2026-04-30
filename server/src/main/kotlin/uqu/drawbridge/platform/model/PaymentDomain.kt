@@ -10,74 +10,74 @@ import uqu.drawbridge.platform.PaymentMethodType
 
 @Entity
 @Table(name = "payments")
-open class Payment(
+class Payment(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(nullable = false)
-    open var orderId: String,
+    var orderId: String,
 
     @Column(nullable = false)
-    open var ownerId: String,
+    var ownerId: String,
 
     @Column(nullable = false)
-    open var paymentMethodId: String,
+    var paymentMethodId: String,
 
     @Column(nullable = false)
-    open var amount: BigDecimal,
+    var amount: BigDecimal,
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    open var status: PaymentStatus,
+    var status: PaymentStatus,
 
     @Column(nullable = false)
-    open var transactionRef: String,
+    var transactionRef: String,
 
     @Column(nullable = false)
-    open var completedAt: LocalDateTime
+    var completedAt: LocalDateTime
 )
 
 @Entity
 @Table(name = "invoices")
-open class Invoice(
+class Invoice(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(nullable = false)
-    open var orderId: String,
+    var orderId: String,
 
     @Column(nullable = false, unique = true)
-    open var invoiceNumber: String,
+    var invoiceNumber: String,
 
     @Column(nullable = false)
-    open var issueDate: LocalDateTime,
+    var issueDate: LocalDateTime,
 
     @Column(nullable = false)
-    open var dueDate: LocalDateTime,
+    var dueDate: LocalDateTime,
 
     @Column(nullable = false)
-    open var totalAmount: BigDecimal,
+    var totalAmount: BigDecimal,
 
     @Column(nullable = false)
-    open var currency: String
+    var currency: String
 )
 
 @Entity
 @Table(name = "payment_methods")
-open class PaymentMethod(
+class PaymentMethod(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(nullable = false)
-    open var ownerId: String,
+    var ownerId: String,
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    open var type: PaymentMethodType,
+    var type: PaymentMethodType,
 
     @Column(nullable = false)
-    open var maskedDetails: String,
+    var maskedDetails: String,
 
     @Column(nullable = false)
-    open var isDefault: Boolean = false
+    var isDefault: Boolean = false
 )

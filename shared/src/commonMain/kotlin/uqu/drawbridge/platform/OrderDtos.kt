@@ -1,10 +1,11 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 import kotlinx.serialization.Serializable
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 enum class OrderStatus {
@@ -20,7 +21,6 @@ enum class OrderStatus {
     RETURNED
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 enum class ShippingMethod {
@@ -31,7 +31,6 @@ enum class ShippingMethod {
     CUSTOM
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class TrackingInfoDTO(
@@ -39,7 +38,6 @@ data class TrackingInfoDTO(
     val trackingUrl: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class OrderItemDTO(
@@ -52,7 +50,6 @@ data class OrderItemDTO(
     val unitPrice: Double // BigDecimal -> Double
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class OrderDTO(
@@ -74,7 +71,6 @@ data class OrderDTO(
     val items: Array<OrderItemDTO> // List -> Array for JS interop
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class OrderGroupDTO(
@@ -86,7 +82,6 @@ data class OrderGroupDTO(
     val orders: Array<OrderDTO> // List -> Array
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class UpdateOrderTrackingRequest(

@@ -2,14 +2,22 @@ package uqu.drawbridge.platform.controller
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import uqu.drawbridge.platform.*
+import uqu.drawbridge.platform.dto.InventoryAuditLogPageResponse
+import uqu.drawbridge.platform.model.InventoryAuditSourceType
+import uqu.drawbridge.platform.model.InventoryStockTargetType
+import uqu.drawbridge.platform.service.InventoryAuditService
 import uqu.drawbridge.platform.service.InventoryService
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
 
 @RestController
 @RequestMapping("/api/inventory")
 class InventoryController(
-    private val inventoryService: InventoryService
+    private val inventoryService: InventoryService,
+    private val inventoryAuditService: InventoryAuditService
 ) {
 
     // ==================== INVENTORY ITEMS ====================
@@ -17,6 +25,42 @@ class InventoryController(
     @GetMapping
     fun getAllInventoryItems(): ResponseEntity<List<InventoryItemDTO>> {
         return ResponseEntity.ok(inventoryService.getAllInventoryItemsDTO())
+    }
+
+    @GetMapping("/logs")
+    fun getInventoryAuditLogs(
+        authentication: Authentication,
+        @RequestParam(required = false) productId: String?,
+        @RequestParam(required = false) inventoryItemId: String?,
+        @RequestParam(required = false) stockTargetType: InventoryStockTargetType?,
+        @RequestParam(required = false) sourceType: InventoryAuditSourceType?,
+        @RequestParam(required = false) from: String?,
+        @RequestParam(required = false) to: String?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int
+    ): ResponseEntity<InventoryAuditLogPageResponse> {
+        val normalizedProductId = productId?.takeIf { it.isNotBlank() }
+        val normalizedInventoryItemId = inventoryItemId?.takeIf { it.isNotBlank() }
+        if (normalizedProductId == null && normalizedInventoryItemId == null) {
+            throw IllegalArgumentException("productId or inventoryItemId is required")
+        }
+
+        if (!inventoryAuditService.canAccessLogs(authentication.name, normalizedProductId, normalizedInventoryItemId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        }
+
+        return ResponseEntity.ok(
+            inventoryAuditService.getLogs(
+                productId = normalizedProductId,
+                inventoryItemId = normalizedInventoryItemId,
+                stockTargetType = stockTargetType,
+                sourceType = sourceType,
+                from = parseAuditDateTime(from),
+                to = parseAuditDateTime(to),
+                page = page,
+                size = size
+            )
+        )
     }
 
     @GetMapping("/{id}")
@@ -134,6 +178,13 @@ class InventoryController(
         } else {
             ResponseEntity.notFound().build()
         }
+    }
+
+    private fun parseAuditDateTime(value: String?): LocalDateTime? {
+        val normalized = value?.takeIf { it.isNotBlank() } ?: return null
+        return runCatching { LocalDateTime.parse(normalized) }
+            .recoverCatching { OffsetDateTime.parse(normalized).toLocalDateTime() }
+            .getOrElse { throw IllegalArgumentException("Invalid date filter: $normalized") }
     }
     // ==================== POS SCAN ====================
 

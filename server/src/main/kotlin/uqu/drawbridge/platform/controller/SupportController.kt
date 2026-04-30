@@ -1,85 +1,61 @@
 package uqu.drawbridge.platform.controller
 
-import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.*
-import uqu.drawbridge.platform.*
+import org.springframework.security.core.Authentication
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.multipart.MultipartFile
+import uqu.drawbridge.platform.SupportTicketCategory
+import uqu.drawbridge.platform.SupportTicketDTO
 import uqu.drawbridge.platform.service.SupportService
+import uqu.drawbridge.platform.service.UserService
 
 @RestController
 @RequestMapping("/api/support")
 class SupportController(
-    private val supportService: SupportService
+    private val supportService: SupportService,
+    private val userService: UserService
 ) {
+    private fun getCurrentUser(authentication: Authentication) =
+        userService.getUserByEmail(authentication.name)
+            ?: throw NoSuchElementException("User not found")
 
-    // ==================== TICKETS ====================
-
-    @GetMapping("/tickets")
-    fun getAllTickets(): ResponseEntity<List<SupportTicketDTO>> =
-        ResponseEntity.ok(supportService.getAllTicketsDTO())
-
-    @GetMapping("/tickets/{id}")
-    fun getTicketById(@PathVariable id: String): ResponseEntity<SupportTicketDTO> {
-        val ticket = supportService.getTicketDTOById(id)
-        return if (ticket != null) {
-            ResponseEntity.ok(ticket)
-        } else {
-            ResponseEntity.notFound().build()
-        }
+    @PostMapping(consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    fun createTicket(
+        authentication: Authentication,
+        @RequestParam subject: String,
+        @RequestParam category: SupportTicketCategory,
+        @RequestParam description: String,
+        @RequestParam(name = "attachment", required = false) attachment: MultipartFile?
+    ): ResponseEntity<SupportTicketDTO> {
+        val user = getCurrentUser(authentication)
+        val created = supportService.createTicket(
+            user = user,
+            subject = subject,
+            category = category,
+            description = description,
+            attachment = attachment
+        )
+        return ResponseEntity.status(201).body(created)
     }
 
-    @GetMapping("/tickets/user/{userId}")
-    fun getTicketsByUser(@PathVariable userId: String): ResponseEntity<List<SupportTicketDTO>> =
-        ResponseEntity.ok(supportService.getTicketsDTOByUserId(userId))
-
-    @PostMapping("/tickets")
-    fun createTicket(@RequestBody request: CreateTicketRequest): ResponseEntity<SupportTicketDTO> {
-        val ticket = supportService.createTicketDTO(request)
-        return ResponseEntity.status(HttpStatus.CREATED).body(ticket)
+    @GetMapping("/my")
+    fun getMyTickets(authentication: Authentication): ResponseEntity<List<SupportTicketDTO>> {
+        val user = getCurrentUser(authentication)
+        return ResponseEntity.ok(supportService.getMyTickets(user.id!!))
     }
 
-    @PostMapping("/tickets/{id}/close")
-    fun closeTicket(@PathVariable id: String): ResponseEntity<SupportTicketDTO> {
-        val ticket = supportService.closeTicketDTO(id)
-        return if (ticket != null) {
-            ResponseEntity.ok(ticket)
-        } else {
-            ResponseEntity.notFound().build()
-        }
-    }
-
-    // ==================== CHAT ====================
-
-    @GetMapping("/tickets/{id}/chat")
-    fun getTicketChats(@PathVariable id: String): ResponseEntity<List<SupportTicketChatDTO>> =
-        ResponseEntity.ok(supportService.getChatsDTOByTicketId(id))
-
-    @PostMapping("/tickets/{id}/chat")
-    fun addChatMessage(
-        @PathVariable id: String,
-        @RequestBody request: AddMessageRequest
-    ): ResponseEntity<SupportTicketChatDTO> {
-        val chat = supportService.addMessageDTO(id, request)
-        
-        return if (chat != null) {
-            ResponseEntity.status(HttpStatus.CREATED).body(chat)
-        } else {
-            ResponseEntity.notFound().build()
-        }
-    }
-
-    // ==================== NOTIFICATIONS ====================
-
-    @GetMapping("/notifications/recipient/{recipientId}")
-    fun getNotifications(@PathVariable recipientId: String): ResponseEntity<List<NotificationDTO>> =
-        ResponseEntity.ok(supportService.getNotificationsDTOByRecipient(recipientId))
-
-    @DeleteMapping("/notifications/{id}")
-    fun deleteNotification(@PathVariable id: String): ResponseEntity<Void> {
-        return if (supportService.deleteNotification(id)) {
-            ResponseEntity.ok().build()
-        } else {
-            ResponseEntity.notFound().build()
-        }
+    @GetMapping("/{id}")
+    fun getTicketById(
+        authentication: Authentication,
+        @PathVariable id: Long
+    ): ResponseEntity<SupportTicketDTO> {
+        val user = getCurrentUser(authentication)
+        return ResponseEntity.ok(supportService.getTicketById(id, user.id!!))
     }
 }

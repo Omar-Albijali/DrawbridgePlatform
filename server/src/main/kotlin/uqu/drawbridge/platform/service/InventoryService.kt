@@ -2,17 +2,34 @@ package uqu.drawbridge.platform.service
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import uqu.drawbridge.platform.InventoryItemDTO
+import uqu.drawbridge.platform.InventoryStatus
+import uqu.drawbridge.platform.NotificationEntityType
+import uqu.drawbridge.platform.NotificationEventKey
+import uqu.drawbridge.platform.NotificationPreferenceKey
+import uqu.drawbridge.platform.NotificationType
+import uqu.drawbridge.platform.CreateInventoryItemRequest
+import uqu.drawbridge.platform.UpdateAutoOrderConfigRequest
+import uqu.drawbridge.platform.AutoOrderConfigDTO
+import uqu.drawbridge.platform.PosScanResponse
+import uqu.drawbridge.platform.ScheduleType
 import uqu.drawbridge.platform.model.AutoOrderConfig
+import uqu.drawbridge.platform.model.InventoryAuditSourceType
 import uqu.drawbridge.platform.model.InventoryItem
+import uqu.drawbridge.platform.model.InventoryStockTargetType
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.ProductRepository
-import uqu.drawbridge.platform.*
+import uqu.drawbridge.platform.validation.RequestValidation
+import java.time.DayOfWeek
 import java.time.LocalDateTime
 
 @Service
 class InventoryService(
     private val inventoryItemRepository: InventoryItemRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val orderService: OrderService,
+    private val notificationService: NotificationService,
+    private val inventoryAuditService: InventoryAuditService
 ) {
 
     // ==================== INVENTORY ITEM OPERATIONS ====================
@@ -45,12 +62,15 @@ class InventoryService(
     fun createInventoryItem(inventoryItem: InventoryItem): InventoryItem {
         inventoryItem.lastUpdated = LocalDateTime.now()
         calculateNextScheduledAt(inventoryItem.autoOrderConfig)
-        return inventoryItemRepository.save(inventoryItem)
+        val savedItem = inventoryItemRepository.save(inventoryItem)
+        logInventoryStockChange(savedItem, 0, savedItem.currentQuantity, InventoryAuditSourceType.MANUAL, reason = "Inventory item created")
+        return savedItem
     }
 
     @Transactional
     fun updateInventoryItem(id: String, updatedItem: InventoryItem): InventoryItem? {
         val existingItem = inventoryItemRepository.findById(id).orElse(null) ?: return null
+        val previousQuantity = existingItem.currentQuantity
 
         existingItem.currentQuantity = updatedItem.currentQuantity
         existingItem.lastUpdated = LocalDateTime.now()
@@ -61,23 +81,47 @@ class InventoryService(
         calculateNextScheduledAt(config)
         existingItem.autoOrderConfig = config
 
-        return inventoryItemRepository.save(existingItem)
+        val savedItem = inventoryItemRepository.save(existingItem)
+        logInventoryStockChange(savedItem, previousQuantity, savedItem.currentQuantity, InventoryAuditSourceType.MANUAL, reason = "Inventory item updated")
+        return savedItem
     }
 
     @Transactional
-    fun updateQuantity(id: String, newQuantity: Int): InventoryItem? {
+    fun updateQuantity(
+        id: String,
+        newQuantity: Int,
+        sourceType: InventoryAuditSourceType = InventoryAuditSourceType.MANUAL,
+        sourceId: String? = null,
+        reason: String? = "Inventory quantity updated"
+    ): InventoryItem? {
         val item = inventoryItemRepository.findById(id).orElse(null) ?: return null
+        val previousQuantity = item.currentQuantity
         item.currentQuantity = newQuantity
         item.lastUpdated = LocalDateTime.now()
-        return inventoryItemRepository.save(item)
+        val savedItem = inventoryItemRepository.save(item)
+        logInventoryStockChange(savedItem, previousQuantity, savedItem.currentQuantity, sourceType, sourceId, reason)
+        maybeNotifyLowStock(savedItem)
+        maybeTriggerThresholdAutoRestock(savedItem, previousQuantity)
+        return savedItem
     }
 
     @Transactional
-    fun adjustQuantity(id: String, adjustment: Int): InventoryItem? {
+    fun adjustQuantity(
+        id: String,
+        adjustment: Int,
+        sourceType: InventoryAuditSourceType = InventoryAuditSourceType.MANUAL,
+        sourceId: String? = null,
+        reason: String? = "Inventory quantity adjusted"
+    ): InventoryItem? {
         val item = inventoryItemRepository.findById(id).orElse(null) ?: return null
+        val previousQuantity = item.currentQuantity
         item.currentQuantity += adjustment
         item.lastUpdated = LocalDateTime.now()
-        return inventoryItemRepository.save(item)
+        val savedItem = inventoryItemRepository.save(item)
+        logInventoryStockChange(savedItem, previousQuantity, savedItem.currentQuantity, sourceType, sourceId, reason)
+        maybeNotifyLowStock(savedItem)
+        maybeTriggerThresholdAutoRestock(savedItem, previousQuantity)
+        return savedItem
     }
 
     @Transactional
@@ -145,7 +189,33 @@ class InventoryService(
         val config = item.autoOrderConfig
         config.lastTriggeredAt = LocalDateTime.now()
         calculateNextScheduledAt(config)
-        return inventoryItemRepository.save(item)
+        val savedItem = inventoryItemRepository.save(item)
+        notificationService.sendEventNotification(
+            recipientId = savedItem.retailerId,
+            type = NotificationType.STOCK,
+            eventKey = NotificationEventKey.AUTO_RESTOCK_TRIGGERED,
+            entityType = NotificationEntityType.INVENTORY_ITEM,
+            entityId = savedItem.id,
+            preferenceKey = NotificationPreferenceKey.AUTO_RESTOCK_CONFIRMATION,
+            title = "Auto-restock triggered",
+            message = "Auto-restock was triggered for product ${savedItem.productId}.",
+            deepLink = "/inventory"
+        )
+        return savedItem
+    }
+
+    @Transactional
+    fun processDueAutoOrders(): Int {
+        val dueItems = getAutoOrderConfigsDueForProcessing()
+            .filter { it.autoOrderConfig.scheduleType != ScheduleType.THRESHOLD_BASED }
+
+        var processed = 0
+        dueItems.forEach { item ->
+            if (triggerAutoRestock(item)) {
+                processed += 1
+            }
+        }
+        return processed
     }
 
 
@@ -170,7 +240,8 @@ class InventoryService(
             status = status,
             supplier = supplierName,
             lastRestocked = this.lastUpdated.toString(),
-            reorderQuantity = this.autoOrderConfig.reorderQuantity
+            reorderQuantity = this.autoOrderConfig.reorderQuantity,
+            imageUrl = product?.images?.sortedBy { it.sortIndex }?.firstOrNull()?.url
         )
     }
 
@@ -260,6 +331,10 @@ class InventoryService(
 
     @Transactional
     fun createInventoryItemFromRequest(request: CreateInventoryItemRequest): InventoryItemDTO {
+        RequestValidation.requireNotBlank(request.productId, "productId")
+        RequestValidation.requireNotBlank(request.retailerId, "retailerId")
+        RequestValidation.requireNonNegative(request.currentStock, "currentStock")
+        RequestValidation.requireNonNegative(request.minThreshold, "minThreshold")
         val autoOrderConfig = AutoOrderConfig(
             enabled = request.autoRestock,
             minThreshold = request.minThreshold
@@ -276,16 +351,25 @@ class InventoryService(
 
     @Transactional
     fun updateInventoryItemFromRequest(id: String, request: CreateInventoryItemRequest): InventoryItemDTO? {
+        RequestValidation.requireNotBlank(id, "id")
+        RequestValidation.requireNonNegative(request.currentStock, "currentStock")
+        RequestValidation.requireNonNegative(request.minThreshold, "minThreshold")
         val existingItem = inventoryItemRepository.findById(id).orElse(null) ?: return null
+        val previousQuantity = existingItem.currentQuantity
         existingItem.currentQuantity = request.currentStock
         existingItem.lastUpdated = LocalDateTime.now()
         existingItem.autoOrderConfig.enabled = request.autoRestock
         existingItem.autoOrderConfig.minThreshold = request.minThreshold
-        return inventoryItemRepository.save(existingItem).toDTO()
+        val savedItem = inventoryItemRepository.save(existingItem)
+        logInventoryStockChange(savedItem, previousQuantity, savedItem.currentQuantity, InventoryAuditSourceType.MANUAL, reason = "Inventory item updated")
+        return savedItem.toDTO()
     }
 
     @Transactional
     fun setAutoOrderConfigFromRequest(inventoryItemId: String, request: UpdateAutoOrderConfigRequest): InventoryItemDTO? {
+        RequestValidation.requireNotBlank(inventoryItemId, "inventoryItemId")
+        RequestValidation.requireNonNegative(request.minThreshold, "minThreshold")
+        RequestValidation.requirePositive(request.reorderQuantity, "reorderQuantity")
         val item = inventoryItemRepository.findById(inventoryItemId).orElse(null) ?: return null
         val config = item.autoOrderConfig
         
@@ -297,6 +381,9 @@ class InventoryService(
 
     @Transactional
     fun updateAutoOrderConfigFromRequest(inventoryItemId: String, request: UpdateAutoOrderConfigRequest): AutoOrderConfigDTO? {
+        RequestValidation.requireNotBlank(inventoryItemId, "inventoryItemId")
+        RequestValidation.requireNonNegative(request.minThreshold, "minThreshold")
+        RequestValidation.requirePositive(request.reorderQuantity, "reorderQuantity")
         val item = inventoryItemRepository.findById(inventoryItemId).orElse(null) ?: return null
         val config = item.autoOrderConfig
         
@@ -318,7 +405,27 @@ class InventoryService(
         existing.dayOfWeek = updated.dayOfWeek
         existing.dayOfMonth = updated.dayOfMonth
     }
-    
+
+    private fun logInventoryStockChange(
+        item: InventoryItem,
+        quantityBefore: Int,
+        quantityAfter: Int,
+        sourceType: InventoryAuditSourceType,
+        sourceId: String? = null,
+        reason: String? = null
+    ) {
+        inventoryAuditService.logStockChange(
+            productId = item.productId,
+            inventoryItemId = item.id,
+            stockTargetType = InventoryStockTargetType.RETAILER_INVENTORY,
+            sourceType = sourceType,
+            sourceId = sourceId,
+            quantityBefore = quantityBefore,
+            quantityAfter = quantityAfter,
+            reason = reason
+        )
+    }
+
     private fun updateConfigFromRequest(config: AutoOrderConfig, request: UpdateAutoOrderConfigRequest) {
         config.enabled = request.enabled
         config.minThreshold = request.minThreshold
@@ -336,7 +443,7 @@ class InventoryService(
             ScheduleType.THRESHOLD_BASED -> null // No scheduled time, triggers on threshold
             ScheduleType.DAILY -> now.plusDays(1).withHour(9).withMinute(0).withSecond(0)
             ScheduleType.WEEKLY -> {
-                val targetDay = config.dayOfWeek?.split(",")?.firstOrNull()?.trim()?.toIntOrNull() ?: 1
+                val targetDay = parseDayOfWeek(config.dayOfWeek) ?: DayOfWeek.MONDAY.value
                 var next = now.plusDays(1)
                 while (next.dayOfWeek.value != targetDay) {
                     next = next.plusDays(1)
@@ -354,6 +461,28 @@ class InventoryService(
                 now.plusDays(interval.toLong()).withHour(9).withMinute(0).withSecond(0)
             }
         }
+    }
+
+    private fun parseDayOfWeek(dayOfWeek: String?): Int? {
+        val token = dayOfWeek
+            ?.split(",")
+            ?.firstOrNull()
+            ?.trim()
+            ?.uppercase()
+            ?: return null
+
+        return token.toIntOrNull()
+            ?.takeIf { it in 1..7 }
+            ?: when (token) {
+                "MONDAY" -> DayOfWeek.MONDAY.value
+                "TUESDAY" -> DayOfWeek.TUESDAY.value
+                "WEDNESDAY" -> DayOfWeek.WEDNESDAY.value
+                "THURSDAY" -> DayOfWeek.THURSDAY.value
+                "FRIDAY" -> DayOfWeek.FRIDAY.value
+                "SATURDAY" -> DayOfWeek.SATURDAY.value
+                "SUNDAY" -> DayOfWeek.SUNDAY.value
+                else -> null
+            }
     }
 
 
@@ -408,9 +537,62 @@ class InventoryService(
                 status = status,
                 supplier = supplierName,
                 lastRestocked = item.lastUpdated.toString(),
-                reorderQuantity = item.autoOrderConfig.reorderQuantity
+                reorderQuantity = item.autoOrderConfig.reorderQuantity,
+                imageUrl = product?.images?.sortedBy { it.sortIndex }?.firstOrNull()?.url
             )
         }
     }
-}
 
+    private fun maybeNotifyLowStock(item: InventoryItem) {
+        val minThreshold = item.autoOrderConfig.minThreshold
+        if (item.currentQuantity <= minThreshold) {
+            notificationService.sendEventNotification(
+                recipientId = item.retailerId,
+                type = NotificationType.STOCK,
+                eventKey = NotificationEventKey.LOW_STOCK_ALERT,
+                entityType = NotificationEntityType.INVENTORY_ITEM,
+                entityId = item.id,
+                preferenceKey = NotificationPreferenceKey.LOW_STOCK_WARNING,
+                title = "Low stock alert",
+                message = "Product ${item.productId} dropped to ${item.currentQuantity}, below threshold $minThreshold.",
+                deepLink = "/inventory"
+            )
+        }
+    }
+
+    private fun maybeTriggerThresholdAutoRestock(item: InventoryItem, previousQuantity: Int) {
+        val config = item.autoOrderConfig
+        if (!config.enabled || config.scheduleType != ScheduleType.THRESHOLD_BASED) return
+
+        val threshold = config.minThreshold
+        val crossedThreshold = previousQuantity > threshold && item.currentQuantity <= threshold
+        if (crossedThreshold) {
+            triggerAutoRestock(item)
+        }
+    }
+
+    private fun triggerAutoRestock(item: InventoryItem): Boolean {
+        val itemId = item.id ?: return false
+        val config = item.autoOrderConfig
+        val reorderQuantity = config.reorderQuantity
+        if (!config.enabled || reorderQuantity <= 0) return false
+
+        val product = productRepository.findById(item.productId).orElse(null) ?: return false
+        val wholesalerId = product.wholesaler.id ?: return false
+        val createdOrder = orderService.createAutoRestockOrder(
+            retailerId = item.retailerId,
+            wholesalerId = wholesalerId,
+            productId = item.productId,
+            quantity = reorderQuantity,
+            unitPrice = product.price
+        ) ?: return false
+
+        if (createdOrder.id == null && createdOrder.orderGroupId == null) {
+            // Guard for unexpected persistence behavior; avoid marking as triggered if order wasn't persisted.
+            return false
+        }
+
+        markAutoOrderTriggered(itemId)
+        return true
+    }
+}

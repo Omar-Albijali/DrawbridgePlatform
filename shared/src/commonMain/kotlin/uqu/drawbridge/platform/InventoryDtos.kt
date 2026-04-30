@@ -1,10 +1,11 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 import kotlinx.serialization.Serializable
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 enum class ScheduleType {
@@ -15,7 +16,6 @@ enum class ScheduleType {
     INTERVAL_DAYS
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 enum class InventoryStatus {
@@ -24,7 +24,6 @@ enum class InventoryStatus {
     OUT_OF_STOCK
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class InventoryItemDTO(
@@ -36,10 +35,10 @@ data class InventoryItemDTO(
     val status: InventoryStatus,
     val supplier: String,
     val lastRestocked: String?, // LocalDateTime -> String (ISO 8601)
-    val reorderQuantity: Int?
+    val reorderQuantity: Int?,
+    val imageUrl: String?
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class AutoOrderConfigDTO(
@@ -54,7 +53,6 @@ data class AutoOrderConfigDTO(
     val nextScheduledAt: String?  // LocalDateTime -> String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class CreateInventoryItemRequest(
@@ -65,7 +63,6 @@ data class CreateInventoryItemRequest(
     val autoRestock: Boolean
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class UpdateAutoOrderConfigRequest(
@@ -78,7 +75,6 @@ data class UpdateAutoOrderConfigRequest(
     val dayOfMonth: String?
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class PosScanRequest(
@@ -86,7 +82,6 @@ data class PosScanRequest(
     val gtin: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class PosScanResponse(

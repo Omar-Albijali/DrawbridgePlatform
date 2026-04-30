@@ -2,53 +2,43 @@ package uqu.drawbridge.platform
 
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
-import kotlinx.serialization.Serializable
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-@Serializable
-enum class TicketStatus {
+enum class SupportTicketCategory {
+    ORDER,
+    POS,
+    PAYMENT,
+    OTHER
+}
+
+@OptIn(ExperimentalJsExport::class)
+@JsExport
+enum class SupportTicketStatus {
     OPEN,
+    IN_PROGRESS,
     CLOSED
 }
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-@Serializable
 data class SupportTicketDTO(
-    val id: String, // Long -> String for JS safety
-    val userId: String, // Long -> String
+    val id: String,
+    val ticketNumber: String,
+    val userId: String,
     val subject: String,
+    val category: SupportTicketCategory,
     val description: String,
-    val status: TicketStatus,
-    val createdAt: String // LocalDateTime -> String (ISO 8601)
+    val attachmentUrl: String?,
+    val status: SupportTicketStatus,
+    val createdAt: String,
+    val updatedAt: String
 )
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-@Serializable
-data class SupportTicketChatDTO(
-    val id: String, // Long -> String for JS safety
-    val ticketId: String, // Long -> String
-    val adminId: String?, // Long? -> String?
-    val message: String,
-    val isAdmin: Boolean,
-    val createdAt: String // LocalDateTime -> String (ISO 8601)
-)
-
-@OptIn(ExperimentalJsExport::class)
-@JsExport
-@Serializable
 data class CreateTicketRequest(
-    val userId: String, // Long -> String
     val subject: String,
+    val category: SupportTicketCategory,
     val description: String
-)
-
-@OptIn(ExperimentalJsExport::class)
-@JsExport
-@Serializable
-data class AddMessageRequest(
-    val message: String,
-    val adminId: String? = null // Long? -> String?
 )

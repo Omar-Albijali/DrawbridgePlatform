@@ -1,10 +1,11 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 import kotlinx.serialization.Serializable
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class ProductDTO(
@@ -12,7 +13,6 @@ data class ProductDTO(
     val name: String,
     val description: String,
     val price: Double, // BigDecimal -> Double
-    val originalPrice: Double?,
     val image: String,
     val images: Array<String>,
     val category: String,
@@ -25,7 +25,6 @@ data class ProductDTO(
     val published: Boolean
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class CategoryDTO(
@@ -34,14 +33,12 @@ data class CategoryDTO(
     val parentCategoryId: String?
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class CreateProductRequest(
     val name: String,
     val description: String,
     val price: Double,
-    val originalPrice: Double?,
     val image: String,
     val category: String,
     val categoryId: String, // Long -> String
@@ -51,7 +48,6 @@ data class CreateProductRequest(
     val gtin: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class ImageUploadResponse(
@@ -60,7 +56,6 @@ data class ImageUploadResponse(
     val message: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class ProductImageResponse(

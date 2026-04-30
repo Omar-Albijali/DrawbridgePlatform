@@ -1,6 +1,4 @@
-// Import all shared types from the shared module
 import {
-    // Enums
     UserRole,
     OrderStatus,
     ShippingMethod,
@@ -9,11 +7,12 @@ import {
     VerificationStatus,
     InventoryStatus,
     NotificationType,
-    TicketStatus,
+    NotificationEventKey,
+    NotificationEntityType,
     NotificationChannel,
     PaymentMethodType,
-
-    // DTOs
+    SupportTicketCategory,
+    SupportTicketStatus,
     OrderDTO,
     OrderItemDTO,
     OrderGroupDTO,
@@ -49,32 +48,19 @@ import {
     CreatePaymentRequest,
     CreatePaymentMethodRequest,
     CreateInvoiceRequest,
-
-    // Support DTOs
     SupportTicketDTO,
-    SupportTicketChatDTO,
     CreateTicketRequest,
-    AddMessageRequest,
 
     // Product DTOs
     CreateProductRequest,
-
-    // Inventory Request DTOs
     CreateInventoryItemRequest,
     UpdateAutoOrderConfigRequest,
-
-    // Order Request DTOs
     UpdateOrderTrackingRequest,
-
-    // Cart Request DTOs
     AddToCartRequest,
-
-    // User Request DTOs
     UpdateUserProfileRequest,
     ChangePasswordRequest
 } from 'shared';
 
-// Re-export all shared enums and types for use throughout the webapp
 export {
     UserRole,
     OrderStatus,
@@ -84,9 +70,12 @@ export {
     VerificationStatus,
     InventoryStatus,
     NotificationType,
-    TicketStatus,
+    NotificationEventKey,
+    NotificationEntityType,
     NotificationChannel,
     PaymentMethodType,
+    SupportTicketCategory,
+    SupportTicketStatus,
     OrderDTO,
     OrderItemDTO,
     OrderGroupDTO,
@@ -121,9 +110,7 @@ export {
     CreatePaymentMethodRequest,
     CreateInvoiceRequest,
     SupportTicketDTO,
-    SupportTicketChatDTO,
     CreateTicketRequest,
-    AddMessageRequest,
     CreateProductRequest,
     CreateInventoryItemRequest,
     UpdateAutoOrderConfigRequest,
@@ -133,8 +120,6 @@ export {
     ChangePasswordRequest
 };
 
-// Define type aliases to match the shared DTO structures
-// This allows the rest of the application to continue using generic names
 export type User = UserDTO;
 export type Product = ProductDTO;
 export type InventoryItem = InventoryItemDTO;
@@ -153,4 +138,27 @@ export type Payment = PaymentDTO;
 export type Invoice = InvoiceDTO;
 export type PaymentMethod = PaymentMethodDTO;
 export type SupportTicket = SupportTicketDTO;
-export type SupportTicketChat = SupportTicketChatDTO;
+
+export interface SupportTicketChat {
+    id: string;
+    ticketId: string;
+    adminId?: string | null;
+    message: string;
+    isAdmin: boolean;
+    createdAt: string;
+}
+
+export interface AddMessageRequest {
+    message: string;
+    adminId?: string | null;
+}
+
+export interface PaginatedResponse<T> {
+    content: T[];
+    currentPage: number;
+    pageSize: number;
+    totalPages: number;
+    totalElements: number;
+    isFirst: boolean;
+    isLast: boolean;
+}

@@ -22,11 +22,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { Link, useNavigate } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
-import { inventoryCompositionData, monthlyExpensesData, monthlySalesData, orderStatusData } from '../data/constants';
+import { inventoryService } from '../services/inventoryService';
+import { notificationService } from '../services/notificationService';
 import { orderService } from '../services/orderService';
-import { NotificationType, UserRole, type Notification, type Order, type OrderStatus } from '../types';
+import { getNotificationTitle, notificationDestination, shortenOrderIds } from '../utils/notificationHelpers';
+import { InventoryStatus, NotificationType, UserRole, type InventoryItem, type Notification, type Order, type OrderStatus } from '../types';
 
 interface KpiCardProps {
   title: string;
@@ -35,6 +38,19 @@ interface KpiCardProps {
   icon: JSX.Element;
   iconBg: string;
   valueColor?: string;
+}
+
+interface MonthlyStat {
+  [key: string]: string | number;
+  month: string;
+  amount: number;
+}
+
+interface PieStat {
+  [key: string]: string | number;
+  name: string;
+  value: number;
+  color: string;
 }
 
 function KpiCard({ title, value, change, icon, iconBg, valueColor }: KpiCardProps): JSX.Element {
@@ -59,25 +75,12 @@ function KpiCard({ title, value, change, icon, iconBg, valueColor }: KpiCardProp
 
 export default function Dashboard(): JSX.Element {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isRetailer = user?.role === UserRole.RETAILER;
   const [orders, setOrders] = useState<Order[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [notifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: NotificationType.SYSTEM,
-      message: 'Welcome to your new dashboard',
-      time: 'Just now',
-      read: false,
-    } as unknown as Notification,
-    {
-      id: '2',
-      type: NotificationType.SYSTEM,
-      message: 'System maintenance scheduled for Sunday',
-      time: '1 day ago',
-      read: true,
-    } as unknown as Notification,
-  ]);
 
   useEffect(() => {
     const fetchData = async (): Promise<void> => {
@@ -87,10 +90,21 @@ export default function Dashboard(): JSX.Element {
       }
 
       try {
-        const data = user.role === UserRole.WHOLESALER
-          ? await orderService.getByWholesaler(user.id)
-          : await orderService.getByRetailer(user.id);
-        setOrders(Array.isArray(data) ? data : []);
+        const ordersPromise = user.role === UserRole.WHOLESALER
+          ? orderService.getByWholesaler(user.id)
+          : orderService.getByRetailer(user.id);
+        const notificationsPromise = notificationService.getNotifications(user.id);
+        const inventoryPromise = user.role === UserRole.RETAILER ? inventoryService.getByRetailer(user.id) : Promise.resolve([]);
+
+        const [ordersData, notificationData, inventoryData] = await Promise.all([
+          ordersPromise,
+          notificationsPromise,
+          inventoryPromise,
+        ]);
+
+        setOrders(Array.isArray(ordersData) ? ordersData : []);
+        setNotifications(Array.isArray(notificationData) ? notificationData : []);
+        setInventory(Array.isArray(inventoryData) ? inventoryData : []);
       } catch (error) {
         console.error('Failed to fetch dashboard data', error);
       } finally {
@@ -112,6 +126,12 @@ export default function Dashboard(): JSX.Element {
   const totalAmount = orders.reduce((sum, order) => sum + (order.subtotal ?? 0), 0);
   const pendingCount = orders.filter((order) => getStatusName(order.status) === 'PENDING').length;
   const processingCount = orders.filter((order) => getStatusName(order.status) === 'PROCESSING').length;
+  const inventoryStatusName = (status: InventoryItem['status']): string => {
+    if (!status) {
+      return '';
+    }
+    return (status as { name?: string }).name ?? String(status);
+  };
 
   const retailerKpis: KpiCardProps[] = [
     {
@@ -170,8 +190,63 @@ export default function Dashboard(): JSX.Element {
   ];
 
   const kpis = isRetailer ? retailerKpis : wholesalerKpis;
-  const chartData = isRetailer ? monthlyExpensesData : monthlySalesData;
-  const pieData = isRetailer ? inventoryCompositionData : orderStatusData;
+  const monthFormatter = new Intl.DateTimeFormat('en', { month: 'short' });
+
+  const chartData: MonthlyStat[] = (() => {
+    const now = new Date();
+    const keyFor = (date: Date): string => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const months = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - (6 - index), 1);
+      return { key: keyFor(date), month: monthFormatter.format(date), amount: 0 };
+    });
+    const monthIndexMap = new Map(months.map((entry, index) => [entry.key, index]));
+
+    orders.forEach((order) => {
+      const placedAt = new Date(order.placedAt);
+      if (Number.isNaN(placedAt.getTime())) {
+        return;
+      }
+      const key = keyFor(placedAt);
+      const index = monthIndexMap.get(key);
+      if (index !== undefined) {
+        months[index].amount += order.subtotal ?? 0;
+      }
+    });
+
+    return months.map((entry) => ({ ...entry, amount: Number(entry.amount.toFixed(2)) }));
+  })();
+
+  const pieData: PieStat[] = isRetailer
+    ? (() => {
+        const totalItems = inventory.length;
+        const lowStock = inventory.filter((item) => inventoryStatusName(item.status) === InventoryStatus.LOW_STOCK.name).length;
+        const outOfStock = inventory.filter((item) => inventoryStatusName(item.status) === InventoryStatus.OUT_OF_STOCK.name).length;
+        const optimal = Math.max(totalItems - lowStock - outOfStock, 0);
+
+        const asPercentage = (count: number): number =>
+          totalItems > 0 ? Number(((count / totalItems) * 100).toFixed(1)) : 0;
+
+        return [
+          { name: 'Optimal', value: asPercentage(optimal), color: '#10b981' },
+          { name: 'Low Stock', value: asPercentage(lowStock), color: '#f59e0b' },
+          { name: 'Out of Stock', value: asPercentage(outOfStock), color: '#ef4444' },
+        ];
+      })()
+    : (() => {
+        const statusBuckets = [
+          { name: 'Delivered', key: 'DELIVERED', color: '#10b981' },
+          { name: 'Shipped', key: 'SHIPPED', color: '#3b82f6' },
+          { name: 'Processing', key: 'PROCESSING', color: '#f59e0b' },
+          { name: 'Pending', key: 'PENDING', color: '#6b7280' },
+          { name: 'Cancelled', key: 'CANCELLED', color: '#ef4444' },
+        ];
+
+        return statusBuckets.map((bucket) => ({
+          name: bucket.name,
+          value: orders.filter((order) => getStatusName(order.status) === bucket.key).length,
+          color: bucket.color,
+        }));
+      })();
 
   const getStatusColor = (status: OrderStatus | string): string => {
     switch (getStatusName(status)) {
@@ -248,7 +323,7 @@ export default function Dashboard(): JSX.Element {
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
                   formatter={(value) => {
                     const normalized = typeof value === 'number' ? value : 0;
-                    return [`${normalized}%`, ''];
+                    return isRetailer ? [`${normalized}%`, 'Share'] : [normalized, 'Orders'];
                   }}
                 />
                 <Legend />
@@ -290,13 +365,28 @@ export default function Dashboard(): JSX.Element {
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-navy-800">Recent Activity</h3>
-            <button type="button" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+            <Link to="/notifications" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
               View all
-            </button>
+            </Link>
           </div>
           <div className="space-y-4">
             {notifications.slice(0, 5).map((notification) => (
-              <div key={notification.id} className="flex items-start gap-3">
+              <button
+                key={notification.id}
+                type="button"
+                className="flex w-full items-start gap-3 text-left"
+                onClick={() => {
+                  if (!notification.read) {
+                    void notificationService.markAsRead(notification.id);
+                    setNotifications((prev) =>
+                      prev.map((item) =>
+                        item.id === notification.id ? ({ ...(item as object), read: true } as Notification) : item,
+                      ),
+                    );
+                  }
+                  navigate(notificationDestination(notification));
+                }}
+              >
                 <div
                   className={`w-2 h-2 rounded-full mt-2 ${
                     notification.type === NotificationType.ORDER
@@ -309,11 +399,15 @@ export default function Dashboard(): JSX.Element {
                   }`}
                 />
                 <div className="flex-1">
-                  <p className="text-sm text-navy-700">{notification.message}</p>
+                  <p className={`text-sm ${notification.read ? 'text-navy-500' : 'text-navy-700 font-medium'}`}>
+                    {shortenOrderIds(getNotificationTitle(notification))}
+                  </p>
+                  <p className="text-sm text-navy-700">{shortenOrderIds(notification.message)}</p>
                   <p className="text-xs text-navy-400 mt-1">{notification.time}</p>
                 </div>
-              </div>
+              </button>
             ))}
+            {notifications.length === 0 ? <p className="text-center text-navy-500 py-4">No recent activity</p> : null}
           </div>
         </div>
       </div>

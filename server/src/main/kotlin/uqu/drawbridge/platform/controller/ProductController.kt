@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import uqu.drawbridge.platform.*
+import uqu.drawbridge.platform.dto.PaginatedResponse
 import uqu.drawbridge.platform.model.Category
 import uqu.drawbridge.platform.model.Product
 import uqu.drawbridge.platform.service.ProductService
@@ -17,7 +18,32 @@ class ProductController(
     // ==================== PRODUCTS ====================
 
     @GetMapping
-    fun getAllProducts(): ResponseEntity<List<ProductDTO>> {
+    fun getAllProducts(
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "12") size: Int,
+        @RequestParam(required = false) search: String?,
+        @RequestParam(required = false, name = "category") categories: List<String>?,
+        @RequestParam(required = false) sort: String?,
+        @RequestParam(required = false, name = "brand") brands: List<String>?,
+        @RequestParam(required = false) minPrice: Double?,
+        @RequestParam(required = false) maxPrice: Double?
+    ): ResponseEntity<PaginatedResponse<ProductDTO>> {
+        return ResponseEntity.ok(
+            productService.getPublishedProductsPageDTO(
+                page = page,
+                size = size,
+                search = search,
+                categories = categories,
+                brands = brands,
+                minPrice = minPrice,
+                maxPrice = maxPrice,
+                sort = sort
+            )
+        )
+    }
+
+    @GetMapping("/all")
+    fun getAllPublishedProducts(): ResponseEntity<List<ProductDTO>> {
         return ResponseEntity.ok(productService.getPublishedProductsDTO())
     }
 
@@ -85,6 +111,11 @@ class ProductController(
     @GetMapping("/categories")
     fun getAllCategories(): ResponseEntity<List<CategoryDTO>> {
         return ResponseEntity.ok(productService.getAllCategoriesDTO())
+    }
+
+    @GetMapping("/brands")
+    fun getAllBrands(): ResponseEntity<List<String>> {
+        return ResponseEntity.ok(productService.getPublishedBrands())
     }
 
     @GetMapping("/categories/{id}")

@@ -7,6 +7,7 @@ import uqu.drawbridge.platform.repository.InvoiceRepository
 import uqu.drawbridge.platform.repository.PaymentMethodRepository
 import uqu.drawbridge.platform.repository.PaymentRepository
 import uqu.drawbridge.platform.*
+import uqu.drawbridge.platform.validation.RequestValidation
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.util.*
@@ -15,7 +16,8 @@ import java.util.*
 class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val invoiceRepository: InvoiceRepository,
-    private val paymentMethodRepository: PaymentMethodRepository
+    private val paymentMethodRepository: PaymentMethodRepository,
+    private val notificationService: NotificationService
 ) {
 
     // ==================== PAYMENT OPERATIONS ====================
@@ -57,7 +59,21 @@ class PaymentService(
         if (status == PaymentStatus.COMPLETED) {
             payment.completedAt = LocalDateTime.now()
         }
-        return paymentRepository.save(payment)
+        val savedPayment = paymentRepository.save(payment)
+
+        notificationService.sendEventNotification(
+            recipientId = savedPayment.ownerId,
+            type = NotificationType.PAYMENT,
+            eventKey = NotificationEventKey.PAYMENT_STATUS_UPDATED,
+            entityType = NotificationEntityType.PAYMENT,
+            entityId = savedPayment.id,
+            preferenceKey = NotificationPreferenceKey.PAYMENT_STATUS,
+            title = "Payment status updated",
+            message = "Payment ${savedPayment.id ?: ""} is now ${savedPayment.status.name}.",
+            deepLink = "/settings/payments"
+        )
+
+        return savedPayment
     }
 
     @Transactional
@@ -108,8 +124,6 @@ class PaymentService(
 
     @Transactional
     fun createInvoice(invoice: Invoice): Invoice {
-        invoice.invoiceNumber = generateInvoiceNumber()
-        invoice.issueDate = LocalDateTime.now()
         return invoiceRepository.save(invoice)
     }
 
@@ -241,11 +255,15 @@ class PaymentService(
     fun getPaymentsDTOByOrderId(orderId: String): List<PaymentDTO> = getPaymentsByOrderId(orderId).map { it.toDTO() }
 
     fun createPaymentDTO(request: CreatePaymentRequest): PaymentDTO {
+        RequestValidation.requireNotBlank(request.orderId, "orderId")
+        RequestValidation.requireNotBlank(request.ownerId, "ownerId")
+        RequestValidation.requireNotBlank(request.paymentMethodId, "paymentMethodId")
+        val amount = RequestValidation.parsePositiveBigDecimal(request.amount.toString(), "amount")
         val payment = Payment(
             orderId = request.orderId,
             ownerId = request.ownerId,
             paymentMethodId = request.paymentMethodId,
-            amount = BigDecimal(request.amount),
+            amount = amount,
             status = PaymentStatus.PENDING,
             transactionRef = request.transactionRef,
             completedAt = LocalDateTime.now()
@@ -264,12 +282,16 @@ class PaymentService(
     fun getInvoiceDTOByOrderId(orderId: String): InvoiceDTO? = getInvoiceByOrderId(orderId)?.toDTO()
 
     fun createInvoiceDTO(request: CreateInvoiceRequest): InvoiceDTO {
+        RequestValidation.requireNotBlank(request.orderId, "orderId")
+        RequestValidation.requireNotBlank(request.invoiceNumber, "invoiceNumber")
+        RequestValidation.requireNotBlank(request.currency, "currency")
+        val totalAmount = RequestValidation.parsePositiveBigDecimal(request.totalAmount.toString(), "totalAmount")
         val invoice = Invoice(
             orderId = request.orderId,
             invoiceNumber = request.invoiceNumber,
             issueDate = LocalDateTime.parse(request.issueDate),
             dueDate = LocalDateTime.parse(request.dueDate),
-            totalAmount = BigDecimal(request.totalAmount),
+            totalAmount = totalAmount,
             currency = request.currency
         )
         return createInvoice(invoice).toDTO()
@@ -279,6 +301,9 @@ class PaymentService(
         getPaymentMethodsByOwner(ownerId).map { it.toDTO() }
 
     fun addPaymentMethodDTO(request: CreatePaymentMethodRequest): PaymentMethodDTO {
+        RequestValidation.requireNotBlank(request.ownerId, "ownerId")
+        RequestValidation.requireNotBlank(request.type, "type")
+        RequestValidation.requireNotBlank(request.maskedDetails, "maskedDetails")
         val paymentMethod = PaymentMethod(
             ownerId = request.ownerId,
             type = PaymentMethodType.valueOf(request.type),

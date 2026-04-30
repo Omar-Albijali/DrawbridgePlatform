@@ -53,7 +53,7 @@ export default function ProductForm(): JSX.Element {
       .then(([product, serverImages]) => {
         setName(product.name);
         setDescription(product.description);
-        setPrice(String(product.originalPrice ?? product.price));
+        setPrice(String(product.price));
         setStock(String(product.stock));
         setGtin(String(product.gtin ?? ''));
         const category = categories.find((item) => item.name === product.category);
@@ -196,7 +196,6 @@ export default function ProductForm(): JSX.Element {
           name: name.trim(),
           description: description.trim(),
           price: Number(price),
-          originalPrice: null,
           image: '',
           category: categoryName,
           categoryId,
@@ -219,7 +218,6 @@ export default function ProductForm(): JSX.Element {
           name: name.trim(),
           description: description.trim(),
           price: Number(price),
-          originalPrice: null,
           image: '',
           category: categoryName,
           categoryId,

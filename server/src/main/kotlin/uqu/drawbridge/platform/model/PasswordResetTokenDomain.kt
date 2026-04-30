@@ -5,20 +5,20 @@ import java.time.LocalDateTime
 
 @Entity
 @Table(name = "password_reset_tokens")
-open class PasswordResetToken(
+class PasswordResetToken(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(nullable = false, unique = true)
-    open var token: String,
+    var token: String,
 
     @Column(nullable = false)
-    open var userId: String,
+    var userId: String,
 
     @Column(nullable = false)
-    open var expiresAt: LocalDateTime,
+    var expiresAt: LocalDateTime,
 
     @Column(nullable = false)
-    open var used: Boolean = false
+    var used: Boolean = false
 )
 

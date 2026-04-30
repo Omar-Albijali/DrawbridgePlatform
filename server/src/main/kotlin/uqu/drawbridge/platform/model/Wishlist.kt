@@ -8,16 +8,16 @@ import java.time.LocalDateTime
     name = "wishlists",
     uniqueConstraints = [UniqueConstraint(columnNames = ["userId", "productId"])]
 )
-open class Wishlist(
+class Wishlist(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(nullable = false)
-    open var userId: String,
+    var userId: String,
 
     @Column(nullable = false)
-    open var productId: String,
+    var productId: String,
 
     @Column(nullable = false, updatable = false)
-    open var createdAt: LocalDateTime = LocalDateTime.now()
+    var createdAt: LocalDateTime = LocalDateTime.now()
 )

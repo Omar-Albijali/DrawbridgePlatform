@@ -1,10 +1,11 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 import kotlinx.serialization.Serializable
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class CartItemDTO(
@@ -15,7 +16,6 @@ data class CartItemDTO(
     val addedAt: String? // LocalDateTime -> String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class ShoppingCartDTO(
@@ -25,7 +25,6 @@ data class ShoppingCartDTO(
     val items: Array<CartItemDTO>?
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class AddToCartRequest(

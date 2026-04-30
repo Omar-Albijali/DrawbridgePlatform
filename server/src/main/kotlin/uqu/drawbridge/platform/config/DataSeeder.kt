@@ -29,6 +29,27 @@ class DataSeeder(
     @Bean
     fun seedData(): CommandLineRunner {
         return CommandLineRunner {
+            if (categoryRepository.count() == 0L) {
+                println("SEEDING DEFAULT CATEGORIES...")
+                val defaultCategoryNames = listOf(
+                    "Food & Beverages",
+                    "Supplies",
+                    "Electronics",
+                    "Equipment",
+                    "Packaging",
+                    "Cleaning & Hygiene",
+                    "Baking & Ingredients",
+                    "Dairy & Refrigerated",
+                    "Frozen Foods",
+                    "Snacks & Confectionery",
+                    "Beverage Accessories",
+                    "Office & Admin"
+                )
+                defaultCategoryNames.forEach { categoryName ->
+                    categoryRepository.save(Category(name = categoryName))
+                }
+            }
+
             if (userRepository.count() > 0) return@CommandLineRunner
 
             println("SEEDING DATA...")
@@ -98,9 +119,10 @@ class DataSeeder(
 
 
             // 2. Categories
-            val catFood = categoryRepository.save(Category(name = "Food & Beverages"))
-            val catSupplies = categoryRepository.save(Category(name = "Supplies"))
-            val catElectronics = categoryRepository.save(Category(name = "Electronics"))
+            val categoriesByName = categoryRepository.findAll().associateBy { it.name }
+            val catFood = categoriesByName["Food & Beverages"] ?: categoryRepository.save(Category(name = "Food & Beverages"))
+            val catSupplies = categoriesByName["Supplies"] ?: categoryRepository.save(Category(name = "Supplies"))
+            val catElectronics = categoriesByName["Electronics"] ?: categoryRepository.save(Category(name = "Electronics"))
 
             // 3. Products
             val p1 = Product(
@@ -173,7 +195,7 @@ class DataSeeder(
                 autoOrderConfig = AutoOrderConfig(
                     enabled = true,
                     minThreshold = 10,
-                    reorderQuantity = 20,
+                    reorderQuantity = 20
             )))
 
             inventoryItemRepository.save(InventoryItem(

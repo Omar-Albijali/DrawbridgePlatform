@@ -1,10 +1,11 @@
+@file:OptIn(kotlin.js.ExperimentalJsExport::class)
+
 package uqu.drawbridge.platform
 
-import kotlin.js.ExperimentalJsExport
+
 import kotlin.js.JsExport
 import kotlinx.serialization.Serializable
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 enum class PaymentStatus {
@@ -16,7 +17,6 @@ enum class PaymentStatus {
     CANCELLED
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 enum class PaymentMethodType {
@@ -27,7 +27,6 @@ enum class PaymentMethodType {
     CASH_ON_DELIVERY
 }
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class PaymentDTO(
@@ -41,7 +40,6 @@ data class PaymentDTO(
     val completedAt: String // LocalDateTime -> String (ISO 8601)
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class InvoiceDTO(
@@ -54,7 +52,6 @@ data class InvoiceDTO(
     val currency: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class PaymentMethodDTO(
@@ -65,7 +62,6 @@ data class PaymentMethodDTO(
     val isDefault: Boolean
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class CreatePaymentRequest(
@@ -76,7 +72,6 @@ data class CreatePaymentRequest(
     val transactionRef: String
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class CreatePaymentMethodRequest(
@@ -86,7 +81,6 @@ data class CreatePaymentMethodRequest(
     val isDefault: Boolean
 )
 
-@OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable
 data class CreateInvoiceRequest(

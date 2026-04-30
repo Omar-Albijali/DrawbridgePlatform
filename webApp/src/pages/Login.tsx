@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
@@ -14,6 +14,7 @@ const Login: React.FC = () => {
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isResending, setIsResending] = useState(false);
 	const [showResend, setShowResend] = useState(false);
+	const demoLoginTriggeredRef = useRef<string | null>(null);
 
 	const { login } = useAuth();
 	const navigate = useNavigate();
@@ -67,6 +68,48 @@ const Login: React.FC = () => {
 			setIsResending(false);
 		}
 	};
+
+	useEffect(() => {
+		const demo = new URLSearchParams(location.search).get('demo')?.toLowerCase();
+		if (!demo || demoLoginTriggeredRef.current === demo) {
+			return;
+		}
+
+		const demoEmail =
+			demo === 'retailer'
+				? 'retailer@test.com'
+				: demo === 'wholesaler'
+					? 'wholesaler@test.com'
+					: null;
+
+		if (!demoEmail) {
+			return;
+		}
+
+		demoLoginTriggeredRef.current = demo;
+		setEmail(demoEmail);
+		setPassword('password');
+		setRememberMe(true);
+		setError('');
+		setInfo('');
+		setShowResend(false);
+		setIsSubmitting(true);
+
+		void (async () => {
+			const result = await login(demoEmail, 'password', true);
+
+			if (result.success) {
+				navigate(getReturnPath(), { replace: true });
+			} else if (result.reason === 'unverified') {
+				setError('Your email is not verified yet.');
+				setShowResend(true);
+			} else {
+				setError('Invalid email or password. Use retailer@test.com / wholesaler@test.com and password: password');
+			}
+
+			setIsSubmitting(false);
+		})();
+	}, [location.search, login, navigate]);
 
 	return (
 		<div className="relative grid min-h-screen place-items-center overflow-hidden px-4 py-10">
@@ -186,7 +229,14 @@ const Login: React.FC = () => {
 
 					<div className="mt-6 rounded-xl border border-slate-200 bg-white/70 p-4 dark:border-white/10 dark:bg-slate-900/70">
 						<p className="text-center text-xs text-slate-500 dark:text-slate-300">
-							<strong>Demo Email:</strong> retailer@test.com or wholesaler@test.com
+							<strong>Demo Login:</strong>{' '}
+							<a href="/login?demo=retailer" className="font-semibold text-primary-700 hover:text-primary-600 dark:text-primary-300">
+								Retailer Account
+							</a>{' '}
+							or{' '}
+							<a href="/login?demo=wholesaler" className="font-semibold text-primary-700 hover:text-primary-600 dark:text-primary-300">
+								Wholesaler Account
+							</a>
 							<br />
 							<strong>Password:</strong> password
 						</p>

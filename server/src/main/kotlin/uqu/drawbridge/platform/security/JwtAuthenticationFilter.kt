@@ -3,6 +3,8 @@ package uqu.drawbridge.platform.security
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import io.jsonwebtoken.JwtException
+import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.core.userdetails.UserDetailsService
@@ -29,20 +31,26 @@ class JwtAuthenticationFilter(
         }
 
         val jwt = authHeader.substring(7)
-        val userEmail = jwtService.extractUsername(jwt)
+        try {
+            val userEmail = jwtService.extractUsername(jwt)
 
-        if (userEmail != null && SecurityContextHolder.getContext().authentication == null) {
-            val userDetails = userDetailsService.loadUserByUsername(userEmail)
+            if (userEmail != null && SecurityContextHolder.getContext().authentication == null) {
+                val userDetails = userDetailsService.loadUserByUsername(userEmail)
 
-            if (jwtService.validateToken(jwt, userDetails)) {
-                val authToken = UsernamePasswordAuthenticationToken(
-                    userDetails,
-                    null,
-                    userDetails.authorities
-                )
-                authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
-                SecurityContextHolder.getContext().authentication = authToken
+                if (jwtService.validateToken(jwt, userDetails)) {
+                    val authToken = UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.authorities
+                    )
+                    authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
+                    SecurityContextHolder.getContext().authentication = authToken
+                }
             }
+        } catch (_: UsernameNotFoundException) {
+            SecurityContextHolder.clearContext()
+        } catch (_: JwtException) {
+            SecurityContextHolder.clearContext()
         }
 
         filterChain.doFilter(request, response)

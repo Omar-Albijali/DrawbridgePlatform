@@ -14,26 +14,26 @@ import uqu.drawbridge.platform.PaymentStatus
 
 @Entity
 @Table(name = "order_groups")
-open class OrderGroup(
+class OrderGroup(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(nullable = false)
-    open var retailerId: String,
+    var retailerId: String,
 
     @Column(nullable = false)
-    open var groupTotal: BigDecimal,
+    var groupTotal: BigDecimal,
 
     @Column(nullable = false, updatable = false)
-    open var createdAt: LocalDateTime = LocalDateTime.now(),
+    var createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    open var paymentStatus: PaymentStatus = PaymentStatus.PENDING,
+    var paymentStatus: PaymentStatus = PaymentStatus.PENDING,
 
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
     @JoinColumn(name = "order_group_id", nullable = false)
-    open var orders: MutableList<Order> = mutableListOf()
+    var orders: MutableList<Order> = mutableListOf()
 )
 
 
@@ -42,52 +42,52 @@ open class OrderGroup(
 
 @Entity
 @Table(name = "orders")
-open class Order(
+class Order(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(name = "order_group_id", insertable = false, updatable = false)
-    open var orderGroupId: String? = null,
+    var orderGroupId: String? = null,
 
     @Column(nullable = false)
-    open var retailerId: String,
+    var retailerId: String,
 
     @Column(nullable = false)
-    open var wholesalerId: String,
+    var wholesalerId: String,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    open var status: OrderStatus = OrderStatus.PENDING,
+    var status: OrderStatus = OrderStatus.PENDING,
 
     @Column(nullable = false)
-    open var subtotal: BigDecimal,
+    var subtotal: BigDecimal,
 
     @Column(nullable = false)
-    open var autoOrder: Boolean = false,
+    var autoOrder: Boolean = false,
 
     // Wholesaler-specific shipping & tracking
     @Enumerated(EnumType.STRING)
     @Column(nullable = true)
-    open var shippingMethod: ShippingMethod? = null,
+    var shippingMethod: ShippingMethod? = null,
 
     @Column(nullable = true)
-    open var trackingNumber: String? = null,
+    var trackingNumber: String? = null,
 
     @Column(nullable = true)
-    open var trackingUrl: String? = null,
+    var trackingUrl: String? = null,
 
     @Column(nullable = true)
-    open var estimatedDelivery: LocalDateTime? = null,
+    var estimatedDelivery: LocalDateTime? = null,
 
     @Column(nullable = true)
-    open var shippedAt: LocalDateTime? = null,
+    var shippedAt: LocalDateTime? = null,
 
     @Column(nullable = true)
-    open var deliveredAt: LocalDateTime? = null,
+    var deliveredAt: LocalDateTime? = null,
 
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
     @JoinColumn(name = "order_id", nullable = false)
-    open var orderItems: MutableList<OrderItem> = mutableListOf()
+    var orderItems: MutableList<OrderItem> = mutableListOf()
 )
 
 
@@ -95,19 +95,19 @@ open class Order(
 
 @Entity
 @Table(name = "order_items")
-open class OrderItem(
+class OrderItem(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
-    open var id: String? = null,
+    var id: String? = null,
 
     @Column(name = "order_id", insertable = false, updatable = false, nullable = false)
-    open var orderId: String? = null,
+    var orderId: String? = null,
 
     @Column(nullable = false)
-    open var productId: String,
+    var productId: String,
 
     @Column(nullable = false)
-    open var quantity: Int,
+    var quantity: Int,
 
     @Column(nullable = false)
-    open var unitPrice: BigDecimal
+    var unitPrice: BigDecimal
 )

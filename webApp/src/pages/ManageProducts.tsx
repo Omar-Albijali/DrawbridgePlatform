@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Edit2, Eye, EyeOff, Package, PackagePlus, Plus, Search, Star, Trash2 } from 'lucide-react';
+import { AlertTriangle, Edit2, Eye, EyeOff, History, Package, PackagePlus, Plus, Search, Star, Trash2 } from 'lucide-react';
+import InventoryHistoryPanel from '../components/InventoryHistoryPanel';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { productService } from '../services/productService';
@@ -12,6 +13,7 @@ export default function ManageProducts(): JSX.Element {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
 
   const fetchProducts = async (): Promise<void> => {
     if (!user?.id) {
@@ -201,9 +203,6 @@ export default function ManageProducts(): JSX.Element {
                   <td className="px-6 py-4 text-right">
                     <div>
                       <span className="font-semibold text-navy-800">{product.price.toFixed(2)} SAR</span>
-                      {product.originalPrice && product.originalPrice > product.price && (
-                        <span className="block text-xs text-navy-400 line-through">{product.originalPrice.toFixed(2)} SAR</span>
-                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
@@ -235,6 +234,14 @@ export default function ManageProducts(): JSX.Element {
                         title={product.published ? 'Unpublish' : 'Publish'}
                       >
                         {product.published ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHistoryProduct(product)}
+                        className="p-2 text-navy-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="View stock history"
+                      >
+                        <History className="w-4 h-4" />
                       </button>
                       <button
                         type="button"
@@ -276,6 +283,15 @@ export default function ManageProducts(): JSX.Element {
           </div>
         )}
       </div>
+
+      <InventoryHistoryPanel
+        isOpen={historyProduct !== null}
+        onClose={() => setHistoryProduct(null)}
+        title={historyProduct?.name ?? 'Stock history'}
+        subtitle="Product catalog stock"
+        productId={historyProduct?.id}
+        stockTargetType="PRODUCT_CATALOG"
+      />
     </PageShell>
   );
 }

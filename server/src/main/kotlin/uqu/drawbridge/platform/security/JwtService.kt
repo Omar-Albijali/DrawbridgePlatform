@@ -1,6 +1,7 @@
 package uqu.drawbridge.platform.security
 
 import io.jsonwebtoken.Claims
+import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
 import org.springframework.beans.factory.annotation.Value
@@ -43,27 +44,15 @@ class JwtService(
     }
 
     fun extractUsername(token: String): String? {
-        return try {
-            extractAllClaims(token).subject
-        } catch (e: Exception) {
-            null
-        }
+        return extractAllClaimsOrNull(token)?.subject
     }
 
     fun extractTokenId(token: String): String? {
-        return try {
-            extractAllClaims(token).id
-        } catch (e: Exception) {
-            null
-        }
+        return extractAllClaimsOrNull(token)?.id
     }
 
     fun extractExpiration(token: String): Date? {
-        return try {
-            extractAllClaims(token).expiration
-        } catch (e: Exception) {
-            null
-        }
+        return extractAllClaimsOrNull(token)?.expiration
     }
 
     fun revokeToken(token: String) {
@@ -77,15 +66,11 @@ class JwtService(
     }
 
     fun validateToken(token: String, userDetails: UserDetails): Boolean {
-        val username = extractUsername(token)
-        val tokenId = extractTokenId(token)
-        if (tokenId == null) return false
+        val claims = extractAllClaimsOrNull(token) ?: return false
+        val username = claims.subject
+        val tokenId = claims.id ?: return false
         if (revokedTokenRepository.existsById(tokenId)) return false
-        return username == userDetails.username && !isTokenExpired(token)
-    }
-
-    private fun isTokenExpired(token: String): Boolean {
-        return extractAllClaims(token).expiration.before(Date())
+        return username == userDetails.username && !claims.expiration.before(Date())
     }
 
     private fun extractAllClaims(token: String): Claims {
@@ -94,5 +79,15 @@ class JwtService(
             .build()
             .parseSignedClaims(token)
             .payload
+    }
+
+    private fun extractAllClaimsOrNull(token: String): Claims? {
+        return try {
+            extractAllClaims(token)
+        } catch (_: JwtException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
     }
 }
