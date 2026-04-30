@@ -258,7 +258,7 @@ class PaymentService(
         RequestValidation.requireNotBlank(request.orderId, "orderId")
         RequestValidation.requireNotBlank(request.ownerId, "ownerId")
         RequestValidation.requireNotBlank(request.paymentMethodId, "paymentMethodId")
-        val amount = RequestValidation.parsePositiveBigDecimal(request.amount, "amount")
+        val amount = RequestValidation.parsePositiveBigDecimal(request.amount.toString(), "amount")
         val payment = Payment(
             orderId = request.orderId,
             ownerId = request.ownerId,
@@ -285,7 +285,7 @@ class PaymentService(
         RequestValidation.requireNotBlank(request.orderId, "orderId")
         RequestValidation.requireNotBlank(request.invoiceNumber, "invoiceNumber")
         RequestValidation.requireNotBlank(request.currency, "currency")
-        val totalAmount = RequestValidation.parsePositiveBigDecimal(request.totalAmount, "totalAmount")
+        val totalAmount = RequestValidation.parsePositiveBigDecimal(request.totalAmount.toString(), "totalAmount")
         val invoice = Invoice(
             orderId = request.orderId,
             invoiceNumber = request.invoiceNumber,

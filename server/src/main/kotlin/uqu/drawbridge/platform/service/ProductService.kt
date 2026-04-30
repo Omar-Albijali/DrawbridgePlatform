@@ -330,7 +330,7 @@ class ProductService(
         RequestValidation.requireNotBlank(request.description, "description")
         RequestValidation.requireNotBlank(request.categoryId, "categoryId")
         RequestValidation.requirePositive(request.stock, "stock")
-        val parsedPrice = RequestValidation.parsePositiveBigDecimal(request.price, "price")
+        val parsedPrice = RequestValidation.parsePositiveBigDecimal(request.price.toString(), "price")
         val wholesaler = userRepository.findById(request.wholesalerId).orElseThrow {
             NoSuchElementException("Wholesaler not found: ${request.wholesalerId}")
         }
@@ -353,7 +353,7 @@ class ProductService(
         RequestValidation.requireNotBlank(request.description, "description")
         RequestValidation.requireNotBlank(request.categoryId, "categoryId")
         RequestValidation.requirePositive(request.stock, "stock")
-        val parsedPrice = RequestValidation.parsePositiveBigDecimal(request.price, "price")
+        val parsedPrice = RequestValidation.parsePositiveBigDecimal(request.price.toString(), "price")
         val existing = getProductById(id) ?: return null
         val previousStockQuantity = existing.stockQuantity
         existing.name = request.name
