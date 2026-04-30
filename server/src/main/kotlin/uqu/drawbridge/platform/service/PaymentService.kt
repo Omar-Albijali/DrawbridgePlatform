@@ -222,7 +222,7 @@ class PaymentService(
         orderId = this.orderId,
         ownerId = this.ownerId,
         paymentMethodId = this.paymentMethodId,
-        amount = this.amount.toPlainString(),
+        amount = this.amount.toDouble(),
         status = this.status,
         transactionRef = this.transactionRef,
         completedAt = this.completedAt.toString()
@@ -234,7 +234,7 @@ class PaymentService(
         invoiceNumber = this.invoiceNumber,
         issueDate = this.issueDate.toString(),
         dueDate = this.dueDate.toString(),
-        totalAmount = this.totalAmount.toPlainString(),
+        totalAmount = this.totalAmount.toDouble(),
         currency = this.currency
     )
 

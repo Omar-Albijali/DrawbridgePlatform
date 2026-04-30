@@ -457,7 +457,7 @@ class OrderService(
             uqu.drawbridge.platform.OrderGroupDTO(
                 id = group.id.orEmpty(),
                 retailerId = group.retailerId,
-                groupTotal = group.groupTotal.toPlainString(),
+                groupTotal = group.groupTotal.toDouble(),
                 paymentStatus = group.paymentStatus,
                 createdAt = group.createdAt.toString(),
                 orders = orders.toTypedArray()
@@ -494,7 +494,7 @@ class OrderService(
                     productCategory = categoryName,
                     productImageUrl = imageUrl,
                     quantity = item.quantity,
-                    unitPrice = item.unitPrice.toPlainString()
+                    unitPrice = item.unitPrice.toDouble()
                 )
             }
 
@@ -505,7 +505,7 @@ class OrderService(
                 retailerId = order.retailerId,
                 retailerName = retailer?.businessName ?: retailer?.representative?.name ?: "Unknown",
                 status = order.status,
-                subtotal = order.subtotal.toPlainString(),
+                subtotal = order.subtotal.toDouble(),
                 autoOrder = order.autoOrder,
                 shippingMethod = order.shippingMethod,
                 trackingNumber = order.trackingNumber,

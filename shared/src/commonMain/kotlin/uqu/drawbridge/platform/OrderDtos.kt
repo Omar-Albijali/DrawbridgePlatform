@@ -1,10 +1,9 @@
-@file:OptIn(kotlin.js.ExperimentalJsExport::class)
-
 package uqu.drawbridge.platform
 
-
+import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class OrderStatus {
     PENDING,
@@ -19,6 +18,7 @@ enum class OrderStatus {
     RETURNED
 }
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class ShippingMethod {
     STANDARD,
@@ -28,12 +28,14 @@ enum class ShippingMethod {
     CUSTOM
 }
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class TrackingInfoDTO(
     val trackingNumber: String,
     val trackingUrl: String
 )
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class OrderItemDTO(
     val id: String, // Long -> String for JS safety
@@ -42,9 +44,10 @@ data class OrderItemDTO(
     val productCategory: String,
     val productImageUrl: String?,
     val quantity: Int,
-    val unitPrice: String // BigDecimal -> String to preserve precision
+    val unitPrice: Double // BigDecimal -> Double
 )
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class OrderDTO(
     val id: String, // Long -> String
@@ -53,7 +56,7 @@ data class OrderDTO(
     val retailerId: String, // Long -> String
     val retailerName: String,
     val status: OrderStatus,
-    val subtotal: String, // BigDecimal -> String to preserve precision
+    val subtotal: Double, // BigDecimal -> Double
     val autoOrder: Boolean,
     val shippingMethod: ShippingMethod?,
     val trackingNumber: String?,
@@ -65,16 +68,18 @@ data class OrderDTO(
     val items: Array<OrderItemDTO> // List -> Array for JS interop
 )
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class OrderGroupDTO(
     val id: String, // Long -> String
     val retailerId: String, // Long -> String
-    val groupTotal: String, // BigDecimal -> String to preserve precision
+    val groupTotal: Double, // BigDecimal -> Double
     val paymentStatus: PaymentStatus,
     val createdAt: String, // LocalDateTime -> String
     val orders: Array<OrderDTO> // List -> Array
 )
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class UpdateOrderTrackingRequest(
     val shippingMethod: ShippingMethod? = null,

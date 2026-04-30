@@ -194,15 +194,15 @@ class ProductService(
         discount: ProductDiscount?
     ): ProductDTO {
         val originalPrice = if (discount != null) {
-            product.price.toPlainString()
+            product.price.toDouble()
         } else {
             null
         }
         val effectivePrice = if (discount != null) {
             val discountFactor = BigDecimal.ONE - (discount.discountPercentage / BigDecimal(100))
-            (product.price * discountFactor).toPlainString()
+            (product.price * discountFactor).toDouble()
         } else {
-            product.price.toPlainString()
+            product.price.toDouble()
         }
         val sortedImages = product.images.sortedBy { it.sortIndex }
 
