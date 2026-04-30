@@ -1,10 +1,9 @@
-@file:OptIn(kotlin.js.ExperimentalJsExport::class)
-
 package uqu.drawbridge.platform
 
-
+import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class PaymentStatus {
     PENDING,
@@ -15,6 +14,7 @@ enum class PaymentStatus {
     CANCELLED
 }
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class PaymentMethodType {
     CREDIT_CARD,
@@ -24,18 +24,20 @@ enum class PaymentMethodType {
     CASH_ON_DELIVERY
 }
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class PaymentDTO(
     val id: String, // Long -> String for JS safety
     val orderId: String, // Long -> String
     val ownerId: String, // Long -> String
     val paymentMethodId: String, // Long -> String
-    val amount: String, // BigDecimal -> String to preserve precision
+    val amount: Double, // BigDecimal -> Double
     val status: PaymentStatus,
     val transactionRef: String,
     val completedAt: String // LocalDateTime -> String (ISO 8601)
 )
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class InvoiceDTO(
     val id: String, // Long -> String for JS safety
@@ -43,10 +45,11 @@ data class InvoiceDTO(
     val invoiceNumber: String,
     val issueDate: String, // LocalDateTime -> String (ISO 8601)
     val dueDate: String, // LocalDateTime -> String (ISO 8601)
-    val totalAmount: String, // BigDecimal -> String to preserve precision
+    val totalAmount: Double, // BigDecimal -> Double
     val currency: String
 )
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class PaymentMethodDTO(
     val id: String, // Long -> String for JS safety
@@ -56,15 +59,17 @@ data class PaymentMethodDTO(
     val isDefault: Boolean
 )
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CreatePaymentRequest(
     val orderId: String,
     val ownerId: String,
     val paymentMethodId: String,
-    val amount: String,
+    val amount: Double,
     val transactionRef: String
 )
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CreatePaymentMethodRequest(
     val ownerId: String,
@@ -73,12 +78,13 @@ data class CreatePaymentMethodRequest(
     val isDefault: Boolean
 )
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CreateInvoiceRequest(
     val orderId: String,
     val invoiceNumber: String,
     val issueDate: String,
     val dueDate: String,
-    val totalAmount: String,
+    val totalAmount: Double,
     val currency: String
 )
