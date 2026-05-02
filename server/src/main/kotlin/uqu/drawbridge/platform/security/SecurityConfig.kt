@@ -23,6 +23,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
+    private val posApiKeyAuthenticationFilter: PosApiKeyAuthenticationFilter,
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
     private val userDetailsService: UserDetailsService,
     @Value("\${app.cors.allowed-origins}")
@@ -38,6 +39,7 @@ class SecurityConfig(
                 auth
                     .requestMatchers("/api/auth/logout").authenticated()
                     .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/api/pos/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
                     .requestMatchers("/api/uploads/**").permitAll()
                     .requestMatchers("/", "/main", "/templates/**").permitAll()
@@ -47,6 +49,7 @@ class SecurityConfig(
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(posApiKeyAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
             .headers { it.frameOptions { fo -> fo.disable() } } // For H2 console
 
         return http.build()

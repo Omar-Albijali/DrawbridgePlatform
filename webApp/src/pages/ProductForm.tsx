@@ -24,6 +24,7 @@ export default function ProductForm(): JSX.Element {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
+  const [gtin, setGtin] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [images, setImages] = useState<ImageItem[]>([]);
@@ -54,6 +55,7 @@ export default function ProductForm(): JSX.Element {
         setDescription(product.description);
         setPrice(String(product.price));
         setStock(String(product.stock));
+        setGtin(String(product.gtin ?? ''));
         const category = categories.find((item) => item.name === product.category);
         setCategoryId(category?.id ?? '');
 
@@ -169,6 +171,10 @@ export default function ProductForm(): JSX.Element {
       setError('Valid stock quantity is required');
       return;
     }
+    if (!gtin || !Number.isInteger(Number(gtin)) || Number(gtin) < 0) {
+      setError('Valid GTIN is required');
+      return;
+    }
     if (!categoryId) {
       setError('Please select a category');
       return;
@@ -196,6 +202,7 @@ export default function ProductForm(): JSX.Element {
           wholesalerId: user.id,
           brand: '',
           stock: Number(stock),
+          gtin: gtin,
         };
 
         await productService.update(productId, updateRequest);
@@ -217,6 +224,7 @@ export default function ProductForm(): JSX.Element {
           wholesalerId: user.id,
           brand: '',
           stock: Number(stock),
+          gtin: gtin,
         } as unknown as CreateProductRequest;
 
         const created = await productService.create(request);
@@ -363,6 +371,20 @@ export default function ProductForm(): JSX.Element {
                   onChange={(event) => setStock(event.target.value)}
                   placeholder="0"
                   min="0"
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">
+                  GTIN <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={gtin}
+                  onChange={(event) => setGtin(event.target.value)}
+                  placeholder="e.g. 123456789"
+                  min="0"
+                  step="1"
                   className="input"
                 />
               </div>

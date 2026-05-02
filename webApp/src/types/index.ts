@@ -58,7 +58,11 @@ import {
     UpdateOrderTrackingRequest,
     AddToCartRequest,
     UpdateUserProfileRequest,
-    ChangePasswordRequest
+    ChangePasswordRequest,
+    PosIntegrationConfigDTO,
+    PosIntegrationConfigUpdateRequest,
+    PosIntegrationApiKeyRotateResponse,
+    PosIntegrationEventLogDTO
 } from 'shared';
 
 export {
@@ -117,7 +121,11 @@ export {
     AddToCartRequest,
     UpdateOrderTrackingRequest,
     UpdateUserProfileRequest,
-    ChangePasswordRequest
+    ChangePasswordRequest,
+    PosIntegrationConfigDTO,
+    PosIntegrationConfigUpdateRequest,
+    PosIntegrationApiKeyRotateResponse,
+    PosIntegrationEventLogDTO
 };
 
 export type User = UserDTO;
@@ -138,6 +146,12 @@ export type Payment = PaymentDTO;
 export type Invoice = InvoiceDTO;
 export type PaymentMethod = PaymentMethodDTO;
 export type SupportTicket = SupportTicketDTO;
+
+type KotlinDataShape<T> = Omit<T, 'copy' | 'hashCode' | 'equals'>;
+export type PosIntegrationConfig = KotlinDataShape<PosIntegrationConfigDTO>;
+export type PosIntegrationConfigUpdate = KotlinDataShape<PosIntegrationConfigUpdateRequest>;
+export type PosIntegrationApiKeyRotate = KotlinDataShape<PosIntegrationApiKeyRotateResponse>;
+export type PosIntegrationEventLog = KotlinDataShape<PosIntegrationEventLogDTO>;
 
 export interface SupportTicketChat {
     id: string;

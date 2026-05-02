@@ -186,4 +186,15 @@ class InventoryController(
             .recoverCatching { OffsetDateTime.parse(normalized).toLocalDateTime() }
             .getOrElse { throw IllegalArgumentException("Invalid date filter: $normalized") }
     }
+    // ==================== POS SCAN ====================
+
+    @PostMapping("/scan")
+    fun scanBarcode(@RequestBody request: PosScanRequest): ResponseEntity<PosScanResponse> {
+        val result = inventoryService.scanByGtin(request.retailerId, request.gtin)
+        return if (result.message == "OK") {
+            ResponseEntity.ok(result)
+        } else {
+            ResponseEntity.status(HttpStatus.NOT_FOUND).body(result)
+        }
+    }
 }

@@ -4,8 +4,10 @@ package uqu.drawbridge.platform
 
 
 import kotlin.js.JsExport
+import kotlinx.serialization.Serializable
 
 @JsExport
+@Serializable
 enum class OrderStatus {
     PENDING,
     CONFIRMED,
@@ -20,6 +22,7 @@ enum class OrderStatus {
 }
 
 @JsExport
+@Serializable
 enum class ShippingMethod {
     STANDARD,
     EXPRESS,
@@ -29,12 +32,14 @@ enum class ShippingMethod {
 }
 
 @JsExport
+@Serializable
 data class TrackingInfoDTO(
     val trackingNumber: String,
     val trackingUrl: String
 )
 
 @JsExport
+@Serializable
 data class OrderItemDTO(
     val id: String, // Long -> String for JS safety
     val productId: String, // Long -> String
@@ -46,6 +51,7 @@ data class OrderItemDTO(
 )
 
 @JsExport
+@Serializable
 data class OrderDTO(
     val id: String, // Long -> String
     val orderGroupId: String, // Long -> String
@@ -66,6 +72,7 @@ data class OrderDTO(
 )
 
 @JsExport
+@Serializable
 data class OrderGroupDTO(
     val id: String, // Long -> String
     val retailerId: String, // Long -> String
@@ -76,6 +83,7 @@ data class OrderGroupDTO(
 )
 
 @JsExport
+@Serializable
 data class UpdateOrderTrackingRequest(
     val shippingMethod: ShippingMethod? = null,
     val trackingNumber: String? = null,

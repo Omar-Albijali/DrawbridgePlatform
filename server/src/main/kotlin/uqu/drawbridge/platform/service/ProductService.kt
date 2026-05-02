@@ -204,7 +204,8 @@ class ProductService(
             rating = product.averageRating.toDouble(),
             reviews = product.ratingCount,
             supplier = product.wholesaler.businessName,
-            published = product.published
+            published = product.published,
+            gtin = product.gtin
         )
     }
 
@@ -323,6 +324,7 @@ class ProductService(
             categoryId = request.categoryId,
             price = parsedPrice,
             stockQuantity = request.stock,
+            gtin = request.gtin,
             published = true
         )
         return createProduct(product).toDTO()
@@ -343,6 +345,7 @@ class ProductService(
         existing.categoryId = request.categoryId
         existing.price = parsedPrice
         existing.stockQuantity = request.stock
+        existing.gtin = request.gtin
         val savedProduct = productRepository.save(existing)
         logProductStockChange(savedProduct, previousStockQuantity, savedProduct.stockQuantity, "Product stock updated")
         return savedProduct.toDTO()

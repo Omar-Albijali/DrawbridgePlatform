@@ -1,10 +1,9 @@
-@file:OptIn(kotlin.js.ExperimentalJsExport::class)
-
 package uqu.drawbridge.platform
 
-
+import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class SupportTicketCategory {
     ORDER,
@@ -13,6 +12,7 @@ enum class SupportTicketCategory {
     OTHER
 }
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 enum class SupportTicketStatus {
     OPEN,
@@ -20,6 +20,7 @@ enum class SupportTicketStatus {
     CLOSED
 }
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class SupportTicketDTO(
     val id: String,
@@ -34,6 +35,7 @@ data class SupportTicketDTO(
     val updatedAt: String
 )
 
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 data class CreateTicketRequest(
     val subject: String,

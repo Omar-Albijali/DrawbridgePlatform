@@ -13,6 +13,7 @@ kotlin {
 
     sourceSets {
         androidMain.dependencies {
+            implementation(projects.composeApp)
             implementation(projects.shared)
 //            implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.activity.compose)
@@ -59,7 +60,6 @@ android {
 
 
 dependencies {
-//    implementation(projects.composeApp)
 //    implementation(libs.androidx.activity.compose)
     debugImplementation(libs.compose.uiTooling)
 }

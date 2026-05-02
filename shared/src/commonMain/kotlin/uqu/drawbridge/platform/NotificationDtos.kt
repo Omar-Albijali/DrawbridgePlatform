@@ -4,8 +4,10 @@ package uqu.drawbridge.platform
 
 
 import kotlin.js.JsExport
+import kotlinx.serialization.Serializable
 
 @JsExport
+@Serializable
 enum class NotificationChannel {
     SYSTEM,
     SMS,
@@ -14,6 +16,7 @@ enum class NotificationChannel {
 }
 
 @JsExport
+@Serializable
 enum class NotificationType {
     ORDER,
     STOCK,
@@ -53,6 +56,7 @@ enum class NotificationPreferenceKey {
 }
 
 @JsExport
+@Serializable
 data class NotificationDTO(
     val id: String, // Long -> String for JS safety
     val type: NotificationType,

@@ -4,8 +4,10 @@ package uqu.drawbridge.platform
 
 
 import kotlin.js.JsExport
+import kotlinx.serialization.Serializable
 
 @JsExport
+@Serializable
 enum class ScheduleType {
     THRESHOLD_BASED,
     DAILY,
@@ -15,6 +17,7 @@ enum class ScheduleType {
 }
 
 @JsExport
+@Serializable
 enum class InventoryStatus {
     LOW_STOCK,
     OPTIMAL,
@@ -22,6 +25,7 @@ enum class InventoryStatus {
 }
 
 @JsExport
+@Serializable
 data class InventoryItemDTO(
     val id: String, // Long -> String for JS safety
     val name: String,
@@ -36,6 +40,7 @@ data class InventoryItemDTO(
 )
 
 @JsExport
+@Serializable
 data class AutoOrderConfigDTO(
     val enabled: Boolean,
     val minThreshold: Int,
@@ -49,6 +54,7 @@ data class AutoOrderConfigDTO(
 )
 
 @JsExport
+@Serializable
 data class CreateInventoryItemRequest(
     val productId: String, // Long -> String
     val retailerId: String, // Long -> String
@@ -58,6 +64,7 @@ data class CreateInventoryItemRequest(
 )
 
 @JsExport
+@Serializable
 data class UpdateAutoOrderConfigRequest(
     val enabled: Boolean,
     val minThreshold: Int,
@@ -66,4 +73,19 @@ data class UpdateAutoOrderConfigRequest(
     val intervalDays: Int?,
     val dayOfWeek: String?,
     val dayOfMonth: String?
+)
+
+@JsExport
+@Serializable
+data class PosScanRequest(
+    val retailerId: String,
+    val gtin: String
+)
+
+@JsExport
+@Serializable
+data class PosScanResponse(
+    val productName: String,
+    val newStock: Int,
+    val message: String
 )

@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   Bell,
+  Cable,
   CheckCheck,
   CreditCard,
   Heart,
@@ -66,6 +67,7 @@ const retailerLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/marketplace', label: 'Marketplace', icon: Store },
   { to: '/inventory', label: 'Inventory', icon: Store },
+  { to: '/pos-integration', label: 'POS', icon: Cable },
   { to: '/orders', label: 'Orders', icon: ReceiptText },
   { to: '/support', label: 'Support', icon: LifeBuoy },
 ] as const;
