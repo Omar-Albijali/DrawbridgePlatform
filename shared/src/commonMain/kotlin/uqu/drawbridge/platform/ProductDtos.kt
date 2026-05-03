@@ -4,8 +4,10 @@ package uqu.drawbridge.platform
 
 
 import kotlin.js.JsExport
+import kotlinx.serialization.Serializable
 
 @JsExport
+@Serializable
 data class ProductDTO(
     val id: String, // Long -> String for JS safety
     val name: String,
@@ -16,6 +18,7 @@ data class ProductDTO(
     val category: String,
     val brand: String,
     val stock: Int,
+    val gtin: String,
     val rating: Double,
     val reviews: Int,
     val supplier: String,
@@ -23,6 +26,7 @@ data class ProductDTO(
 )
 
 @JsExport
+@Serializable
 data class CategoryDTO(
     val id: String, // Long -> String for JS safety
     val name: String,
@@ -30,6 +34,7 @@ data class CategoryDTO(
 )
 
 @JsExport
+@Serializable
 data class CreateProductRequest(
     val name: String,
     val description: String,
@@ -39,10 +44,12 @@ data class CreateProductRequest(
     val categoryId: String, // Long -> String
     val wholesalerId: String, // Long -> String
     val brand: String,
-    val stock: Int
+    val stock: Int,
+    val gtin: String
 )
 
 @JsExport
+@Serializable
 data class ImageUploadResponse(
     val id: String?, // Long -> String
     val url: String,
@@ -50,6 +57,7 @@ data class ImageUploadResponse(
 )
 
 @JsExport
+@Serializable
 data class ProductImageResponse(
     val id: String?, // Long -> String
     val url: String,

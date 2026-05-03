@@ -25,7 +25,8 @@ class InventoryAuditService(
     private val inventoryAuditLogRepository: InventoryAuditLogRepository,
     private val inventoryItemRepository: InventoryItemRepository,
     private val productRepository: ProductRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val posOutboundInventoryEventService: PosOutboundInventoryEventService
 ) {
     @Transactional(propagation = Propagation.MANDATORY)
     fun logStockChange(
@@ -50,7 +51,7 @@ class InventoryAuditService(
             else -> InventoryAuditChangeType.UPDATE
         }
 
-        return inventoryAuditLogRepository.save(
+        val savedLog = inventoryAuditLogRepository.save(
             InventoryAuditLog(
                 productId = productId,
                 inventoryItemId = inventoryItemId,
@@ -66,6 +67,8 @@ class InventoryAuditService(
                 createdAt = LocalDateTime.now()
             )
         )
+        runCatching { posOutboundInventoryEventService.captureInventoryAuditChange(savedLog) }
+        return savedLog
     }
 
     @Transactional(readOnly = true)

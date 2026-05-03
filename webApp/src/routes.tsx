@@ -29,6 +29,7 @@ import Support from './pages/Support';
 import Reports from './pages/Reports';
 import Landing from './pages/Landing';
 import ProductDetail from './pages/ProductDetail';
+import PosIntegration from './pages/PosIntegration';
 import { UserRole } from './types';
 
 function withTransition(element: ReactElement): ReactElement {
@@ -121,6 +122,14 @@ export const router = createBrowserRouter([
         element: withTransition(
           <BlockWholesalerInventory>
             <Inventory />
+          </BlockWholesalerInventory>,
+        ),
+      },
+      {
+        path: 'pos-integration',
+        element: withTransition(
+          <BlockWholesalerInventory>
+            <PosIntegration />
           </BlockWholesalerInventory>,
         ),
       },

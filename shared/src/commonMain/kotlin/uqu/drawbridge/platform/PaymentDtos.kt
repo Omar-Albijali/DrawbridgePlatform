@@ -4,8 +4,10 @@ package uqu.drawbridge.platform
 
 
 import kotlin.js.JsExport
+import kotlinx.serialization.Serializable
 
 @JsExport
+@Serializable
 enum class PaymentStatus {
     PENDING,
     PROCESSING,
@@ -16,6 +18,7 @@ enum class PaymentStatus {
 }
 
 @JsExport
+@Serializable
 enum class PaymentMethodType {
     CREDIT_CARD,
     DEBIT_CARD,
@@ -25,6 +28,7 @@ enum class PaymentMethodType {
 }
 
 @JsExport
+@Serializable
 data class PaymentDTO(
     val id: String, // Long -> String for JS safety
     val orderId: String, // Long -> String
@@ -37,6 +41,7 @@ data class PaymentDTO(
 )
 
 @JsExport
+@Serializable
 data class InvoiceDTO(
     val id: String, // Long -> String for JS safety
     val orderId: String, // Long -> String
@@ -48,6 +53,7 @@ data class InvoiceDTO(
 )
 
 @JsExport
+@Serializable
 data class PaymentMethodDTO(
     val id: String, // Long -> String for JS safety
     val ownerId: String, // Long -> String
@@ -57,6 +63,7 @@ data class PaymentMethodDTO(
 )
 
 @JsExport
+@Serializable
 data class CreatePaymentRequest(
     val orderId: String,
     val ownerId: String,
@@ -66,6 +73,7 @@ data class CreatePaymentRequest(
 )
 
 @JsExport
+@Serializable
 data class CreatePaymentMethodRequest(
     val ownerId: String,
     val type: String,
@@ -74,6 +82,7 @@ data class CreatePaymentMethodRequest(
 )
 
 @JsExport
+@Serializable
 data class CreateInvoiceRequest(
     val orderId: String,
     val invoiceNumber: String,

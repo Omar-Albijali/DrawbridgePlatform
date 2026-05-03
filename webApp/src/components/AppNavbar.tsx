@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
   Bell,
+  Cable,
   CheckCheck,
   CreditCard,
   Heart,
@@ -65,8 +66,9 @@ const retailerLinks = [
   { to: '/dashboard', labelKey: 'navigation.dashboard', icon: LayoutDashboard },
   { to: '/marketplace', labelKey: 'navigation.marketplace', icon: Store },
   { to: '/inventory', labelKey: 'navigation.inventory', icon: Store },
+  { to: '/pos-integration', labelKey: 'navigation.posIntegration', icon: Cable },
   { to: '/orders', labelKey: 'navigation.orders', icon: ReceiptText },
-  { to: '/support', labelKey: 'navigation.support', icon: LifeBuoy },
+  { to: '/support', labelKey: 'navigation.support', icon: Lifebuoy },
 ] as const;
 
 const wholesalerLinks = [

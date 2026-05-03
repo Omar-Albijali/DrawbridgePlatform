@@ -4,8 +4,10 @@ package uqu.drawbridge.platform
 
 
 import kotlin.js.JsExport
+import kotlinx.serialization.Serializable
 
 @JsExport
+@Serializable
 data class CartItemDTO(
     val id: String?, // Long -> String for JS safety
     val productId: String, // Long -> String
@@ -15,6 +17,7 @@ data class CartItemDTO(
 )
 
 @JsExport
+@Serializable
 data class ShoppingCartDTO(
     val id: String, // Long -> String for JS safety
     val retailerId: String, // Long -> String
@@ -23,6 +26,7 @@ data class ShoppingCartDTO(
 )
 
 @JsExport
+@Serializable
 data class AddToCartRequest(
     val productId: String, // Long -> String
     val quantity: Int
