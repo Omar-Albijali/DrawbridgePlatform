@@ -68,7 +68,7 @@ const retailerLinks = [
   { to: '/inventory', labelKey: 'navigation.inventory', icon: Store },
   { to: '/pos-integration', labelKey: 'navigation.posIntegration', icon: Cable },
   { to: '/orders', labelKey: 'navigation.orders', icon: ReceiptText },
-  { to: '/support', labelKey: 'navigation.support', icon: Lifebuoy },
+  { to: '/support', labelKey: 'navigation.support', icon: LifeBuoy },
 ] as const;
 
 const wholesalerLinks = [
