@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Heart, ShoppingCart, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { formatCurrency } from '../../i18n/display';
 import { UserRole, type Product } from '../../types';
 
 interface ProductCardProps {
@@ -19,6 +21,7 @@ export default function ProductCard({
                                       canAddToCart = true,
                                       onAuthRequired,
                                     }: ProductCardProps): JSX.Element {
+  const { t } = useTranslation();
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { user } = useAuth();
@@ -64,7 +67,7 @@ export default function ProductCard({
           />
           {(product.stock ?? 0) < 20 && (
               <span className="buyer-product-card__badge absolute top-3 right-3 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-            Low Stock
+            {t('marketplace.card.lowStock')}
           </span>
           )}
         </div>
@@ -78,7 +81,7 @@ export default function ProductCard({
                         ? 'bg-red-500 text-white scale-110'
                         : 'bg-white text-navy-400 hover:text-red-500 hover:scale-110'
                 }`}
-                title={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+                title={inWishlist ? t('marketplace.card.removeWishlist') : t('marketplace.card.addWishlist')}
             >
               <Heart className={`w-4 h-4 transition-all duration-200 ${inWishlist ? 'fill-white' : ''}`} />
             </button>
@@ -102,11 +105,11 @@ export default function ProductCard({
 
           <div className="flex items-baseline gap-2 mb-4">
           <span className="buyer-product-card__price text-xl font-bold text-navy-800">
-            SAR {product.price.toFixed(2)}
+            {formatCurrency(product.price)}
           </span>
           </div>
 
-          <p className="text-xs text-navy-500 mb-4">Supplied by: {product.supplier}</p>
+          <p className="text-xs text-navy-500 mb-4">{t('marketplace.card.suppliedBy', { supplier: product.supplier })}</p>
 
           {canAddToCart ? (
               <button
@@ -122,12 +125,12 @@ export default function ProductCard({
                 {added ? (
                     <>
                       <ShoppingCart className="w-4 h-4 fill-white" />
-                      Added!
+                      {t('marketplace.card.added')}
                     </>
                 ) : (
                     <>
                       <ShoppingCart className="w-4 h-4" />
-                      {isAuthenticated ? 'Add to Cart' : 'Sign in to add'}
+                      {isAuthenticated ? t('marketplace.card.addToCart') : t('marketplace.card.signInToAdd')}
                     </>
                 )}
               </button>

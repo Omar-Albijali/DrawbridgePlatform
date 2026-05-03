@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle, Bell, CreditCard, Mail, MessageSquare, Package } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   notificationService,
@@ -15,11 +16,11 @@ interface ChannelChipProps {
   channel: NotificationChannelValue;
 }
 
-function channelLabel(channel: NotificationChannelValue): string {
-  if (channel === 'EMAIL') return 'Email';
-  if (channel === 'SMS') return 'SMS';
-  if (channel === 'PUSH') return 'Push';
-  return 'System';
+function channelLabel(channel: NotificationChannelValue, t: ReturnType<typeof useTranslation>['t']): string {
+  if (channel === 'EMAIL') return t('notifications.email');
+  if (channel === 'SMS') return t('notifications.sms');
+  if (channel === 'PUSH') return t('notifications.push');
+  return t('notifications.system');
 }
 
 function channelIcon(channel: NotificationChannelValue): ReactNode {
@@ -30,7 +31,8 @@ function channelIcon(channel: NotificationChannelValue): ReactNode {
 }
 
 function ChannelChip({ enabled, loading, onToggle, channel }: ChannelChipProps): JSX.Element {
-  const label = channelLabel(channel);
+  const { t } = useTranslation();
+  const label = channelLabel(channel, t);
   const activeColorClass =
     channel === 'EMAIL'
       ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-400/40 dark:bg-blue-500/15 dark:text-blue-200'
@@ -49,7 +51,7 @@ function ChannelChip({ enabled, loading, onToggle, channel }: ChannelChipProps):
           : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
       } disabled:cursor-not-allowed disabled:opacity-60`}
       aria-pressed={enabled}
-      aria-label={`${enabled ? 'Disable' : 'Enable'} ${label} channel`}
+      aria-label={enabled ? t('notifications.disableChannel', { channel: label }) : t('notifications.enableChannel', { channel: label })}
     >
       {channelIcon(channel)}
       <span>{enabled ? '✓' : ''}</span>
@@ -66,14 +68,15 @@ interface NotificationSection {
   iconWrapClass: string;
   items: {
     id: string;
-    label: string;
-    description: string;
+    labelKey: string;
+    descriptionKey: string;
     preferenceKey: NotificationPreferenceKeyValue;
     channels: NotificationChannelValue[];
   }[];
 }
 
 export default function Notifications(): JSX.Element {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isRetailer = user?.role === UserRole.RETAILER;
   const [status, setStatus] = useState<string>('');
@@ -87,36 +90,36 @@ export default function Notifications(): JSX.Element {
     () => [
       {
         id: 'orderConfirmation',
-        label: 'Order Confirmation',
-        description: 'Receive confirmation when your order is placed',
+        labelKey: 'notifications.preferences.orderConfirmation.label',
+        descriptionKey: 'notifications.preferences.orderConfirmation.description',
         preferenceKey: 'ORDER_CONFIRMATION' as NotificationPreferenceKeyValue,
         channels: ['EMAIL', 'SMS', 'PUSH'] as NotificationChannelValue[],
       },
       {
         id: 'shippingStatus',
-        label: 'Shipping Status Changes',
-        description: 'Get notified when your order ships or arrives',
+        labelKey: 'notifications.preferences.shippingStatus.label',
+        descriptionKey: 'notifications.preferences.shippingStatus.description',
         preferenceKey: 'SHIPPING_STATUS' as NotificationPreferenceKeyValue,
         channels: ['EMAIL', 'SMS', 'PUSH'] as NotificationChannelValue[],
       },
       {
         id: 'lowStockWarning',
-        label: 'Low Stock Warning',
-        description: 'Alert when inventory falls below threshold',
+        labelKey: 'notifications.preferences.lowStockWarning.label',
+        descriptionKey: 'notifications.preferences.lowStockWarning.description',
         preferenceKey: 'LOW_STOCK_WARNING' as NotificationPreferenceKeyValue,
         channels: ['EMAIL', 'SMS', 'PUSH'] as NotificationChannelValue[],
       },
       {
         id: 'autoRestockConfirmation',
-        label: 'Auto-Restock Confirmation',
-        description: 'Confirmation when auto-restock orders are placed',
+        labelKey: 'notifications.preferences.autoRestockConfirmation.label',
+        descriptionKey: 'notifications.preferences.autoRestockConfirmation.description',
         preferenceKey: 'AUTO_RESTOCK_CONFIRMATION' as NotificationPreferenceKeyValue,
         channels: ['EMAIL', 'SMS', 'PUSH'] as NotificationChannelValue[],
       },
       {
         id: 'paymentStatus',
-        label: 'Payment Status Updates',
-        description: 'Get updates when payments are processed, completed, or refunded',
+        labelKey: 'notifications.preferences.paymentStatus.label',
+        descriptionKey: 'notifications.preferences.paymentStatus.description',
         preferenceKey: 'PAYMENT_STATUS' as NotificationPreferenceKeyValue,
         channels: ['EMAIL', 'SMS', 'PUSH'] as NotificationChannelValue[],
       },
@@ -154,10 +157,10 @@ export default function Notifications(): JSX.Element {
         user.id,
         notificationService.buildPreferenceRequest(preferenceKey, channelValue, enabled),
       );
-      setStatus('Preferences saved successfully.');
+      setStatus(t('notifications.saved'));
     } catch (_error) {
       setPreferences((prev) => ({ ...prev, [stateKey]: previous }));
-      setStatus('Failed to save preference. Please try again.');
+      setStatus(t('notifications.saveFailed'));
     } finally {
       setIsSaving((prev) => ({ ...prev, [stateKey]: false }));
       window.setTimeout(() => setStatus(''), 2200);
@@ -188,7 +191,7 @@ export default function Notifications(): JSX.Element {
         setPreferences(nextPrefs);
         setPushEnabled(subscriptions.length > 0);
       } catch (_error) {
-        setStatus('Unable to load saved notification settings.');
+      setStatus(t('notifications.loadFailed'));
       }
     };
 
@@ -202,14 +205,14 @@ export default function Notifications(): JSX.Element {
       if (!pushEnabled) {
         const subscribed = await notificationService.subscribeBrowserPush(user.id);
         setPushEnabled(subscribed);
-        setStatus(subscribed ? 'Browser push enabled.' : 'Unable to enable browser push notifications.');
+        setStatus(subscribed ? t('notifications.pushEnabled') : t('notifications.pushEnableFailed'));
       } else {
         const unsubscribed = await notificationService.unsubscribeBrowserPush();
         setPushEnabled(!unsubscribed ? pushEnabled : false);
-        setStatus(unsubscribed ? 'Browser push disabled.' : 'Unable to disable browser push notifications.');
+        setStatus(unsubscribed ? t('notifications.pushDisabled') : t('notifications.pushDisableFailed'));
       }
     } catch (_error) {
-      setStatus(pushEnabled ? 'Unable to disable browser push notifications.' : 'Unable to enable browser push notifications.');
+      setStatus(pushEnabled ? t('notifications.pushDisableFailed') : t('notifications.pushEnableFailed'));
     } finally {
       setIsPushLoading(false);
       window.setTimeout(() => setStatus(''), 2200);
@@ -219,7 +222,7 @@ export default function Notifications(): JSX.Element {
   const sections: NotificationSection[] = [
     {
       id: 'order',
-      title: 'Order Updates',
+      title: t('notifications.sections.order'),
       icon: <Package className="w-5 h-5 text-primary-600" />,
       sectionClass: 'border-primary-100 bg-gradient-to-r from-primary-50 to-blue-50/80 dark:border-white/10 dark:from-slate-900 dark:to-slate-900/80',
       iconWrapClass: 'bg-primary-100 dark:bg-primary-500/20',
@@ -232,7 +235,7 @@ export default function Notifications(): JSX.Element {
       ? [
           {
             id: 'inventory',
-            title: 'Inventory Alerts',
+            title: t('notifications.sections.inventory'),
             icon: <AlertTriangle className="w-5 h-5 text-amber-500" />,
             sectionClass: 'border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50/80 dark:border-white/10 dark:from-slate-900 dark:to-slate-900/80',
             iconWrapClass: 'bg-amber-100 dark:bg-amber-500/20',
@@ -245,7 +248,7 @@ export default function Notifications(): JSX.Element {
       : []),
     {
       id: 'payments',
-      title: 'Payment Updates',
+      title: t('notifications.sections.payments'),
       icon: <CreditCard className="w-5 h-5 text-emerald-600" />,
       sectionClass: 'border-emerald-100 bg-gradient-to-r from-emerald-50 to-lime-50/80 dark:border-white/10 dark:from-slate-900 dark:to-slate-900/80',
       iconWrapClass: 'bg-emerald-100 dark:bg-emerald-500/20',
@@ -258,8 +261,8 @@ export default function Notifications(): JSX.Element {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-navy-800 dark:text-slate-100">Notification Preferences</h1>
-        <p className="mt-1 text-navy-500 dark:text-slate-300">Control notification channels for each event</p>
+        <h1 className="text-2xl font-bold text-navy-800 dark:text-slate-100">{t('notifications.preferencesTitle')}</h1>
+        <p className="mt-1 text-navy-500 dark:text-slate-300">{t('notifications.preferencesDescription')}</p>
         {status ? <p className="mt-2 text-sm font-medium text-primary-700 dark:text-primary-300">{status}</p> : null}
       </div>
 
@@ -269,16 +272,16 @@ export default function Notifications(): JSX.Element {
             <Bell className="w-6 h-6 text-primary-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-navy-800 dark:text-slate-100">Notification Channels</h3>
+            <h3 className="font-semibold text-navy-800 dark:text-slate-100">{t('notifications.channels')}</h3>
             <div className="flex items-center gap-4 mt-1">
               <span className="flex items-center gap-1.5 text-sm text-navy-600 dark:text-slate-300">
-                <Mail className="w-4 h-4" /> Email
+                <Mail className="w-4 h-4" /> {t('notifications.email')}
               </span>
               <span className="flex items-center gap-1.5 text-sm text-navy-600 dark:text-slate-300">
-                <MessageSquare className="w-4 h-4" /> SMS
+                <MessageSquare className="w-4 h-4" /> {t('notifications.sms')}
               </span>
               <span className="flex items-center gap-1.5 text-sm text-navy-600 dark:text-slate-300">
-                <Bell className="w-4 h-4" /> Push
+                <Bell className="w-4 h-4" /> {t('notifications.push')}
               </span>
             </div>
           </div>
@@ -288,9 +291,9 @@ export default function Notifications(): JSX.Element {
       <div className="card">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-navy-800 dark:text-slate-100">Browser Push Subscription</h3>
+            <h3 className="text-lg font-semibold text-navy-800 dark:text-slate-100">{t('notifications.browserPush')}</h3>
             <p className="mt-1 text-sm text-navy-500 dark:text-slate-300">
-              Enable this device for real-time push notifications.
+              {t('notifications.browserPushDescription')}
             </p>
           </div>
           <button
@@ -303,7 +306,7 @@ export default function Notifications(): JSX.Element {
                 : 'bg-primary-600 text-white hover:bg-primary-700'
             } disabled:cursor-not-allowed disabled:opacity-60`}
           >
-            {isPushLoading ? 'Saving...' : pushEnabled ? 'Disable Push' : 'Enable Push'}
+            {isPushLoading ? t('notifications.saving') : pushEnabled ? t('notifications.disablePush') : t('notifications.enablePush')}
           </button>
         </div>
       </div>
@@ -319,8 +322,8 @@ export default function Notifications(): JSX.Element {
           <div>
             {section.items.map((item) => (
               <div key={item.id} className="border-b border-gray-100 py-4 last:border-0 dark:border-white/10">
-                <h4 className="font-medium text-navy-800 dark:text-slate-100">{item.label}</h4>
-                <p className="mt-0.5 text-sm text-navy-500 dark:text-slate-300">{item.description}</p>
+                <h4 className="font-medium text-navy-800 dark:text-slate-100">{t(item.labelKey)}</h4>
+                <p className="mt-0.5 text-sm text-navy-500 dark:text-slate-300">{t(item.descriptionKey)}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {item.channels.map((channel) => {
                     const key = `${item.preferenceKey}:${channel}`;
@@ -338,7 +341,7 @@ export default function Notifications(): JSX.Element {
                   })}
                 </div>
                 {item.channels.some((channel) => isSaving[`${item.preferenceKey}:${channel}`]) ? (
-                  <p className="pb-1 pt-2 text-xs text-navy-500">Saving...</p>
+                  <p className="pb-1 pt-2 text-xs text-navy-500">{t('notifications.saving')}</p>
                 ) : null}
               </div>
             ))}

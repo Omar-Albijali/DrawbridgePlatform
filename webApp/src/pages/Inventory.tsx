@@ -1,16 +1,19 @@
 import { KeyboardEvent, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { AlertTriangle, Package, Plus, RefreshCw, Search, Trash2, XCircle, Settings2, Calendar, Activity, X, Check, Slash, History } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import AddInventoryModal from '../components/AddInventoryModal/AddInventoryModal';
 import AutoRestockModal from '../components/AutoRestockModal/AutoRestockModal';
 import InventoryHistoryPanel from '../components/InventoryHistoryPanel';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { inventoryService } from '../services/inventoryService';
+import { dayOfWeekLabel, formatDate } from '../i18n/display';
 import type { AutoOrderConfigDTO, CreateInventoryItemRequest, InventoryItem } from '../types';
 import { InventoryStatus, ScheduleType, UserRole } from '../types';
 
 export default function Inventory(): JSX.Element {
+  const { t } = useTranslation();
   const { user } = useAuth();
 
   const isRetailer = user?.role === UserRole.RETAILER;
@@ -81,7 +84,7 @@ export default function Inventory(): JSX.Element {
   };
 
   const handleDelete = async (item: InventoryItem): Promise<void> => {
-    if (!window.confirm(`Are you sure you want to remove ${item.name} from your inventory?`)) {
+    if (!window.confirm(t('inventory.confirmRemove', { name: item.name }))) {
       return;
     }
 
@@ -182,29 +185,27 @@ export default function Inventory(): JSX.Element {
     const config = item.autoOrderConfig;
     const scheduleType = config?.scheduleType;
 
-    console.log(scheduleType);
-
     if (scheduleType == ScheduleType.THRESHOLD_BASED) {
-      return `${config?.minThreshold ?? 0} Units`;
+      return t('inventory.schedule.units', { count: config?.minThreshold ?? 0 });
     }
 
     if (scheduleType == ScheduleType.DAILY) {
-      return `Daily`;
+      return t('inventory.schedule.daily');
     }
 
     if (scheduleType == ScheduleType.WEEKLY) {
-      return `Weekly on ${config?.dayOfWeek}`;
+      return t('inventory.schedule.weekly', { day: dayOfWeekLabel(t, config?.dayOfWeek ?? '') });
     }
 
     if (scheduleType == ScheduleType.MONTHLY) {
-      return `Monthly on ${config?.dayOfMonth}`;
+      return t('inventory.schedule.monthly', { day: config?.dayOfMonth });
     }
 
     if (scheduleType == ScheduleType.INTERVAL_DAYS) {
-      return `Every ${config?.intervalDays} Days`;
+      return t('inventory.schedule.interval', { count: config?.intervalDays ?? 0 });
     }
 
-    return "Not Scheduled";
+    return t('inventory.schedule.notScheduled');
   };
 
   const formatNextRestockDate = (value?: string | null): string | null => {
@@ -217,7 +218,7 @@ export default function Inventory(): JSX.Element {
       return null;
     }
 
-    return parsed.toLocaleDateString(undefined, {
+    return formatDate(parsed, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -238,12 +239,12 @@ export default function Inventory(): JSX.Element {
 
   return (
     <PageShell
-      title="Inventory Management"
-      description="Track and manage your stock levels"
+      title={t('inventory.title')}
+      description={t('inventory.description')}
       actions={
         <button type="button" onClick={() => setIsAddModalOpen(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
-          Add Product
+          {t('inventory.addProduct')}
         </button>
       }
     >
@@ -257,7 +258,7 @@ export default function Inventory(): JSX.Element {
               <Package className="w-5 h-5 text-primary-600" />
             </div>
             <div>
-              <p className="text-sm text-navy-500">Total Items</p>
+              <p className="text-sm text-navy-500">{t('inventory.totalItems')}</p>
               <p className="text-xl font-bold text-navy-800">{inventory.length}</p>
             </div>
           </div>
@@ -268,7 +269,7 @@ export default function Inventory(): JSX.Element {
               <AlertTriangle className="w-5 h-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-sm text-navy-500">Low Stock</p>
+              <p className="text-sm text-navy-500">{t('inventory.lowStock')}</p>
               <p className="text-xl font-bold text-amber-600">{lowStockCount}</p>
             </div>
           </div>
@@ -279,7 +280,7 @@ export default function Inventory(): JSX.Element {
               <XCircle className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-sm text-navy-500">Out of Stock</p>
+              <p className="text-sm text-navy-500">{t('inventory.outOfStock')}</p>
               <p className="text-xl font-bold text-red-600">{outOfStockCount}</p>
             </div>
           </div>
@@ -290,7 +291,7 @@ export default function Inventory(): JSX.Element {
               <RefreshCw className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <p className="text-sm text-navy-500">Auto-Restock</p>
+              <p className="text-sm text-navy-500">{t('inventory.autoRestock')}</p>
               <p className="text-xl font-bold text-green-600">{autoRestockEnabled}</p>
             </div>
           </div>
@@ -304,7 +305,7 @@ export default function Inventory(): JSX.Element {
             type="text"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search inventory..."
+            placeholder={t('inventory.searchPlaceholder')}
             className="w-full pl-10 pr-4 py-2.5 bg-gray-100 border border-transparent rounded-lg focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
           />
         </div>
@@ -312,11 +313,11 @@ export default function Inventory(): JSX.Element {
 
       <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-[#0f1219] shadow-2xl mt-6">
         <div className="grid grid-cols-12 gap-4 px-4 py-2.5 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em]">
-          <div className="col-span-4">Product Descriptor</div>
-          <div className="col-span-2 text-center">Stock Qty</div>
-          <div className="col-span-1 text-center">Stock Status</div>
-          <div className="col-span-2 text-center">Next Restock</div>
-          <div className="col-span-3 text-right pr-6">Restock Automation</div>
+          <div className="col-span-4">{t('inventory.productDescriptor')}</div>
+          <div className="col-span-2 text-center">{t('inventory.stockQty')}</div>
+          <div className="col-span-1 text-center">{t('inventory.stockStatus')}</div>
+          <div className="col-span-2 text-center">{t('inventory.nextRestock')}</div>
+          <div className="col-span-3 text-right pr-6">{t('inventory.automation')}</div>
         </div>
 
         <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -343,7 +344,7 @@ export default function Inventory(): JSX.Element {
                         type="button"
                         onClick={() => setHistoryItem(item)}
                         className="p-1 text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                        title="View stock history"
+                        title={t('inventory.viewStockHistory')}
                       >
                         <History className="w-3.5 h-3.5" />
                       </button>
@@ -351,15 +352,15 @@ export default function Inventory(): JSX.Element {
                         type="button"
                         onClick={() => void handleDelete(item)}
                         className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                        title="Delete from inventory"
+                        title={t('inventory.deleteFromInventory')}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                     <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
-                      <span>ID: {item.id ? item.id.substring(0, 8).toUpperCase() : 'UNKNOWN'}</span>
+                      <span>{t('inventory.itemId', { id: item.id ? item.id.substring(0, 8).toUpperCase() : t('common.unknown') })}</span>
                       <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
-                      <span className="uppercase">{item.supplier ?? 'UNKNOWN SUPPLIER'}</span>
+                      <span className="uppercase">{item.supplier ?? t('inventory.unknownSupplier')}</span>
                     </div>
                   </div>
                 </div>
@@ -396,7 +397,7 @@ export default function Inventory(): JSX.Element {
                           onClick={() => void saveStockEdit(item)}
                           disabled={isSavingStock}
                           className="p-0.5 text-emerald-600 hover:bg-emerald-500/10 rounded transition-colors disabled:opacity-50"
-                          title="Confirm change"
+                          title={t('inventory.confirmChange')}
                         >
                           <Check className="w-3.5 h-3.5" />
                         </button>
@@ -405,7 +406,7 @@ export default function Inventory(): JSX.Element {
                           onClick={cancelStockEdit}
                           disabled={isSavingStock}
                           className="p-0.5 text-slate-500 hover:bg-slate-800/20 rounded transition-colors disabled:opacity-50"
-                          title="Cancel"
+                          title={t('common.cancel')}
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -421,7 +422,7 @@ export default function Inventory(): JSX.Element {
                       : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700'
                       }`}
                   >
-                    {isLow ? 'Critical Low' : 'Stable'}
+                    {isLow ? t('common.criticalLow') : t('common.stable')}
                   </span>
                 </div>
 
@@ -451,12 +452,12 @@ export default function Inventory(): JSX.Element {
                       {item.autoRestock ? (
                         <>
                           <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                          Active
+                          {t('common.active')}
                         </>
                       ) : (
                         <>
                           <Slash className="w-3 h-3 rotate-12" />
-                          Not Active
+                          {t('common.notActive')}
                         </>
                       )}
                     </button>
@@ -475,7 +476,7 @@ export default function Inventory(): JSX.Element {
                         <div className="flex flex-col">
                           <span className="text-[11px] font-bold text-slate-900 dark:text-slate-200 whitespace-nowrap">{ScheduleSummary(item)}</span>
                           <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest whitespace-nowrap">
-                            {item.autoOrderConfig?.scheduleType == ScheduleType.THRESHOLD_BASED ? 'Threshold' : 'Recurrence'}
+                            {item.autoOrderConfig?.scheduleType == ScheduleType.THRESHOLD_BASED ? t('inventory.threshold') : t('inventory.recurrence')}
                           </span>
                         </div>
                       </div>
@@ -498,8 +499,8 @@ export default function Inventory(): JSX.Element {
         {filteredInventory.length === 0 && (
           <div className="text-center py-12">
             <Package className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-300 mb-2">No items found</h3>
-            <p className="text-slate-500">Try adjusting your search query</p>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-300 mb-2">{t('inventory.noItems')}</h3>
+            <p className="text-slate-500">{t('inventory.adjustSearch')}</p>
           </div>
         )}
       </div>
@@ -511,7 +512,7 @@ export default function Inventory(): JSX.Element {
       <InventoryHistoryPanel
         isOpen={historyItem !== null}
         onClose={() => setHistoryItem(null)}
-        title={historyItem?.name ?? 'Stock history'}
+        title={historyItem?.name ?? t('inventory.stockHistory')}
         subtitle={historyItem?.supplier ?? undefined}
         inventoryItemId={historyItem?.id}
         stockTargetType="RETAILER_INVENTORY"

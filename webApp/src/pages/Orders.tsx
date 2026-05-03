@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 import { useEffect, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowUpDown,
   Copy,
@@ -23,7 +24,8 @@ import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { orderService } from '../services/orderService';
 import { reorderOrderToCart } from '../utils/reorderOrder';
-import { Order, OrderStatus, UserRole } from '../types';
+import { formatCurrency, formatDate, orderStatusLabel } from '../i18n/display';
+import { OrderStatus, UserRole, type Order, type OrderItem } from '../types';
 
 type SortField = 'id' | 'placedAt' | 'subtotal' | 'status' | 'retailerName';
 type SortOrder = 'asc' | 'desc';
@@ -34,9 +36,11 @@ function getStatusName(status: OrderStatus | string | null | undefined): string 
 }
 
 export default function Orders(): JSX.Element {
+  const { i18n, t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const isWholesaler = user?.role === UserRole.WHOLESALER;
+  const isRtl = i18n.resolvedLanguage === 'ar';
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,7 +91,7 @@ export default function Orders(): JSX.Element {
       let updatedOrder: Order | null = null;
 
       if (action === 'cancel') {
-        if (window.confirm('Are you sure you want to cancel this order?')) {
+        if (window.confirm(t('orders.confirmCancel'))) {
           updatedOrder = await orderService.cancel(orderId);
         }
       } else {
@@ -118,7 +122,7 @@ export default function Orders(): JSX.Element {
       );
     } catch (error) {
       console.error(`Failed to ${String(action)} order`, error);
-      alert(`Failed to ${String(action)} order`);
+      alert(t('orders.failedAction', { action: String(action) }));
     }
   };
 
@@ -135,28 +139,28 @@ export default function Orders(): JSX.Element {
       const { addedItems, failedItems, failedProductNames } = await reorderOrderToCart(user.id, order);
 
       if (addedItems === 0 && failedItems === 0) {
-        alert('This order has no items to re-order.');
+        alert(t('orders.noItemsToReorder'));
         return;
       }
 
       if (addedItems === 0) {
-        alert('Unable to re-order items from this order right now.');
+        alert(t('orders.unableToReorder'));
         return;
       }
 
       if (failedItems > 0) {
         const preview = failedProductNames.slice(0, 2).join(', ');
-        const suffix = failedItems > 2 ? ', and more' : '';
-        const details = preview ? ` Unavailable: ${preview}${suffix}.` : '';
-        alert(`Added ${addedItems} item(s) to your cart. ${failedItems} item(s) could not be added.${details}`);
+        const suffix = failedItems > 2 ? t('orders.andMore') : '';
+        const details = preview ? t('orders.unavailableItems', { items: preview, suffix }) : '';
+        alert(t('orders.reorderPartial', { added: addedItems, failed: failedItems, details }));
       } else {
-        alert('Order items were added to your cart.');
+        alert(t('orders.reorderSuccess'));
       }
 
       navigate('/cart');
     } catch (error) {
       console.error('Failed to reorder order', error);
-      alert('Failed to re-order this order');
+      alert(t('orders.reorderFailed'));
     } finally {
       setReorderingOrderId(null);
       setOpenMenuId(null);
@@ -247,26 +251,26 @@ export default function Orders(): JSX.Element {
 
   return (
     <PageShell
-      title={isWholesaler ? 'Customer Orders' : 'My Orders'}
-      description={isWholesaler ? 'Manage and fulfill customer orders' : 'Track your order history and status'}
+      title={isWholesaler ? t('orders.customerTitle') : t('orders.myTitle')}
+      description={isWholesaler ? t('orders.customerDescription') : t('orders.myDescription')}
     >
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'All Orders', count: orders.length, color: 'bg-navy-100 text-navy-700' },
+          { label: t('orders.allOrders'), count: orders.length, color: 'bg-navy-100 text-navy-700' },
           {
-            label: 'Pending',
+            label: t('orders.pending'),
             count: orders.filter((order) => getStatusName(order.status) === 'PENDING').length,
             color: 'bg-gray-100 text-gray-700',
           },
           {
-            label: 'Active',
+            label: t('orders.active'),
             count: orders.filter((order) => ['CONFIRMED', 'PROCESSING', 'SHIPPED'].includes(getStatusName(order.status)))
               .length,
             color: 'bg-blue-100 text-blue-700',
           },
           {
-            label: 'Completed',
+            label: t('orders.completed'),
             count: orders.filter((order) => getStatusName(order.status) === 'DELIVERED').length,
             color: 'bg-green-100 text-green-700',
           },
@@ -283,7 +287,7 @@ export default function Orders(): JSX.Element {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by Order ID or Retailer..."
+            placeholder={t('orders.searchPlaceholder')}
             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -296,13 +300,13 @@ export default function Orders(): JSX.Element {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="all">All Status</option>
-              <option value={OrderStatus.PENDING.name}>Pending</option>
-              <option value={OrderStatus.CONFIRMED.name}>Confirmed</option>
-              <option value={OrderStatus.PROCESSING.name}>Processing</option>
-              <option value={OrderStatus.SHIPPED.name}>Shipped</option>
-              <option value={OrderStatus.DELIVERED.name}>Delivered</option>
-              <option value={OrderStatus.CANCELLED.name}>Cancelled</option>
+              <option value="all">{t('orders.allStatus')}</option>
+              <option value={OrderStatus.PENDING.name}>{t('orders.status.PENDING')}</option>
+              <option value={OrderStatus.CONFIRMED.name}>{t('orders.status.CONFIRMED')}</option>
+              <option value={OrderStatus.PROCESSING.name}>{t('orders.status.PROCESSING')}</option>
+              <option value={OrderStatus.SHIPPED.name}>{t('orders.status.SHIPPED')}</option>
+              <option value={OrderStatus.DELIVERED.name}>{t('orders.status.DELIVERED')}</option>
+              <option value={OrderStatus.CANCELLED.name}>{t('orders.status.CANCELLED')}</option>
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
@@ -315,17 +319,17 @@ export default function Orders(): JSX.Element {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th
-                  className="text-left px-6 py-4 text-sm font-semibold text-navy-700 cursor-pointer hover:bg-gray-100"
+                  className={`${isRtl ? 'text-right' : 'text-left'} px-6 py-4 text-sm font-semibold text-navy-700 cursor-pointer hover:bg-gray-100`}
                   onClick={() => handleSort('id')}
                 >
-                  Order ID
+                  {t('orders.orderId')}
                 </th>
                 <th
                   className="text-left px-6 py-4 text-sm font-semibold text-navy-700 cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('placedAt')}
                 >
                   <div className="flex items-center gap-2">
-                    Date
+                    {t('common.date')}
                     <ArrowUpDown className="w-3 h-3" />
                   </div>
                 </th>
@@ -336,29 +340,35 @@ export default function Orders(): JSX.Element {
                   >
                     <div className="flex items-center gap-2">
                       <Store className="w-4 h-4" />
-                      Retailer
+                      {t('orders.retailer')}
                     </div>
                   </th>
                 )}
                 <th className="text-left px-6 py-4 text-sm font-semibold text-navy-700">
                   <div className="flex items-center gap-2">
                     <Tags className="w-4 h-4" />
-                    Categories
+                    {t('common.categories')}
                   </div>
                 </th>
                 <th
                   className="text-right px-6 py-4 text-sm font-semibold text-navy-700 cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('subtotal')}
                 >
-                  Total
+                  {t('common.total')}
                 </th>
-                <th className="text-center px-6 py-4 text-sm font-semibold text-navy-700">Status</th>
-                <th className="text-center px-6 py-4 text-sm font-semibold text-navy-700">Actions</th>
+                <th className="text-center px-6 py-4 text-sm font-semibold text-navy-700">{t('common.status')}</th>
+                <th className="text-center px-6 py-4 text-sm font-semibold text-navy-700">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredOrders.map((order) => {
-                const categories = Array.from(new Set(order.items.map((item) => item.productCategory))).slice(0, 3);
+                const categories: string[] = Array.from(
+                  new Set<string>(
+                    (order.items ?? [])
+                      .map((item: OrderItem) => item.productCategory)
+                      .filter((category: unknown): category is string => typeof category === 'string' && category.length > 0),
+                  ),
+                ).slice(0, 3);
                 const status = getStatusName(order.status);
 
                 return (
@@ -367,10 +377,10 @@ export default function Orders(): JSX.Element {
                     className="hover:bg-gray-50 transition-colors cursor-pointer"
                     onClick={() => navigate(`/orders/${order.id}`)}
                   >
-                    <td className="px-6 py-4">
+                    <td className={`${isRtl ? 'text-right' : 'text-left'} px-6 py-4`}>
                       <p className="font-medium text-navy-800">#{order.id}</p>
                     </td>
-                    <td className="px-6 py-4 text-navy-600">{new Date(order.placedAt).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-navy-600">{formatDate(order.placedAt)}</td>
                     {isWholesaler && <td className="px-6 py-4 text-navy-800 font-medium">{order.retailerName}</td>}
                     <td className="px-6 py-4 text-navy-600">
                       <div className="flex flex-wrap gap-1">
@@ -381,13 +391,13 @@ export default function Orders(): JSX.Element {
                         ))}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right font-semibold text-navy-800">SAR {order.subtotal.toFixed(2)}</td>
+                    <td className="px-6 py-4 text-right font-semibold text-navy-800">{formatCurrency(order.subtotal)}</td>
                     <td className="px-6 py-4 text-center">
                       <span
                         className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium capitalize ${getStatusColor(order.status)}`}
                       >
                         {getStatusIcon(order.status)}
-                        {status.toLowerCase().replace('_', ' ')}
+                        {orderStatusLabel(t, order.status)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -399,7 +409,7 @@ export default function Orders(): JSX.Element {
                                 className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-100"
                                 onClick={(e) => handleAction(OrderStatus.CONFIRMED, order.id, e)}
                               >
-                                Accept
+                                {t('orders.accept')}
                               </button>
                             )}
                             {status === 'CONFIRMED' && (
@@ -407,7 +417,7 @@ export default function Orders(): JSX.Element {
                                 className="px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-xs font-medium hover:bg-amber-100"
                                 onClick={(e) => handleAction(OrderStatus.PROCESSING, order.id, e)}
                               >
-                                Process
+                                {t('orders.process')}
                               </button>
                             )}
                             {status === 'PROCESSING' && (
@@ -415,7 +425,7 @@ export default function Orders(): JSX.Element {
                                 className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100"
                                 onClick={(e) => handleAction(OrderStatus.SHIPPED, order.id, e)}
                               >
-                                Ship
+                                {t('orders.ship')}
                               </button>
                             )}
                             {status === 'SHIPPED' && (
@@ -423,7 +433,7 @@ export default function Orders(): JSX.Element {
                                 className="px-3 py-1 bg-green-50 text-green-600 rounded-lg text-xs font-medium hover:bg-green-100"
                                 onClick={(e) => handleAction(OrderStatus.DELIVERED, order.id, e)}
                               >
-                                Deliver
+                                {t('orders.deliver')}
                               </button>
                             )}
                           </>
@@ -431,7 +441,7 @@ export default function Orders(): JSX.Element {
                           !['DELIVERED', 'SHIPPED', 'CANCELLED'].includes(status) && (
                             <button
                               className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Cancel Order"
+                              title={t('orders.cancelOrder')}
                               onClick={(e) => handleAction('cancel', order.id, e)}
                             >
                               <XCircle className="w-4 h-4" />
@@ -442,7 +452,7 @@ export default function Orders(): JSX.Element {
                         <div className="relative">
                           <button
                             className={`p-2 rounded-lg transition-colors ${openMenuId === order.id ? 'bg-gray-100 text-navy-800' : 'text-navy-500 hover:text-navy-700 hover:bg-gray-100'}`}
-                            title="More Actions"
+                            title={t('orders.moreActions')}
                             onClick={(e) => {
                               e.stopPropagation();
                               const rect = e.currentTarget.getBoundingClientRect();
@@ -469,7 +479,7 @@ export default function Orders(): JSX.Element {
                                   }}
                                 >
                                   <Eye className="w-4 h-4 text-navy-400 dark:text-slate-400" />
-                                  View Details
+                                  {t('orders.viewDetails')}
                                 </button>
                                 {!isWholesaler && (
                                   <button
@@ -484,7 +494,7 @@ export default function Orders(): JSX.Element {
                                     }}
                                   >
                                     <Copy className="w-4 h-4 text-navy-400 dark:text-slate-400" />
-                                    {reorderingOrderId === order.id ? 'Re-ordering...' : 'Re-order'}
+                                    {reorderingOrderId === order.id ? t('orders.reordering') : t('orders.reorder')}
                                   </button>
                                 )}
                                 <button
@@ -495,7 +505,7 @@ export default function Orders(): JSX.Element {
                                         }}
                                 >
                                   <FileText className="w-4 h-4 text-navy-400 dark:text-slate-400" />
-                                  Download Invoice
+                                  {t('orders.downloadInvoice')}
                                 </button>
                                 <button
                                   className="w-full flex items-center gap-3 px-4 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors dark:text-slate-200 dark:hover:bg-slate-800"
@@ -505,7 +515,7 @@ export default function Orders(): JSX.Element {
                                   }}
                                 >
                                   <MessageSquare className="w-4 h-4 text-navy-400 dark:text-slate-400" />
-                                  Contact Support
+                                  {t('orders.contactSupport')}
                                 </button>
                                 {!isWholesaler && !['DELIVERED', 'SHIPPED', 'CANCELLED'].includes(status) && (
                                   <button
@@ -516,7 +526,7 @@ export default function Orders(): JSX.Element {
                                     }}
                                   >
                                     <XCircle className="w-4 h-4" />
-                                    Cancel Order
+                                    {t('orders.cancelOrder')}
                                   </button>
                                 )}
                               </div>,
@@ -531,7 +541,7 @@ export default function Orders(): JSX.Element {
             </tbody>
           </table>
 
-          {filteredOrders.length === 0 && <div className="p-8 text-center text-navy-500">No orders found matching your criteria.</div>}
+          {filteredOrders.length === 0 && <div className="p-8 text-center text-navy-500">{t('orders.noOrdersFound')}</div>}
         </div>
       </div>
     </PageShell>

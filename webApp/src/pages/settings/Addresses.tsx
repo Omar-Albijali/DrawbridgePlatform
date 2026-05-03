@@ -1,9 +1,11 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Check, Edit2, MapPin, Plus, Trash2, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { addressService } from '../../services/addressService';
 import { Address, CreateAddressRequest } from '../../types';
 
 export default function Addresses(): JSX.Element {
+  const { t } = useTranslation();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -35,7 +37,7 @@ export default function Addresses(): JSX.Element {
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value } as unknown as CreateAddressRequest));
+    setFormData((prev: CreateAddressRequest) => ({ ...prev, [name]: value } as unknown as CreateAddressRequest));
   };
 
   const resetForm = () => {
@@ -64,7 +66,7 @@ export default function Addresses(): JSX.Element {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this address?')) return;
+    if (!window.confirm(t('settings.addresses.confirmDelete'))) return;
 
     try {
       await addressService.deleteAddress(id);
@@ -95,13 +97,13 @@ export default function Addresses(): JSX.Element {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-navy-800">Address Management</h1>
-          <p className="text-navy-500 mt-1">Manage your shipping and billing addresses</p>
+          <h1 className="text-2xl font-bold text-navy-800">{t('settings.addresses.title')}</h1>
+          <p className="text-navy-500 mt-1">{t('settings.addresses.description')}</p>
         </div>
         {!isEditing && (
           <button onClick={() => setIsEditing(true)} className="btn-primary px-4 py-2 flex items-center gap-2">
             <Plus className="w-4 h-4" />
-            Add New Address
+            {t('settings.addresses.addNew')}
           </button>
         )}
       </div>
@@ -109,7 +111,7 @@ export default function Addresses(): JSX.Element {
       {isEditing && (
         <div className="card border-2 border-primary-100 animate-fade-in-up">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-navy-800">{editId ? 'Edit Address' : 'New Address'}</h3>
+            <h3 className="text-lg font-semibold text-navy-800">{editId ? t('settings.addresses.edit') : t('settings.addresses.new')}</h3>
             <button onClick={resetForm} className="text-navy-400 hover:text-navy-600">
               <X className="w-5 h-5" />
             </button>
@@ -117,7 +119,7 @@ export default function Addresses(): JSX.Element {
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label className="label">Street Address</label>
+                <label className="label">{t('settings.addresses.streetAddress')}</label>
                 <input
                   type="text"
                   name="street"
@@ -125,11 +127,11 @@ export default function Addresses(): JSX.Element {
                   onChange={handleInputChange}
                   required
                   className="input"
-                  placeholder="123 Main St"
+                  placeholder={t('settings.addresses.streetPlaceholder')}
                 />
               </div>
               <div>
-                <label className="label">City</label>
+                <label className="label">{t('settings.addresses.city')}</label>
                 <input
                   type="text"
                   name="city"
@@ -137,11 +139,11 @@ export default function Addresses(): JSX.Element {
                   onChange={handleInputChange}
                   required
                   className="input"
-                  placeholder="City"
+                  placeholder={t('settings.addresses.city')}
                 />
               </div>
               <div>
-                <label className="label">State / Province</label>
+                <label className="label">{t('settings.addresses.state')}</label>
                 <input
                   type="text"
                   name="state"
@@ -149,11 +151,11 @@ export default function Addresses(): JSX.Element {
                   onChange={handleInputChange}
                   required
                   className="input"
-                  placeholder="State"
+                  placeholder={t('settings.addresses.state')}
                 />
               </div>
               <div>
-                <label className="label">Zip Code</label>
+                <label className="label">{t('settings.addresses.zipCode')}</label>
                 <input
                   type="text"
                   name="zipCode"
@@ -161,11 +163,11 @@ export default function Addresses(): JSX.Element {
                   onChange={handleInputChange}
                   required
                   className="input"
-                  placeholder="Zip Code"
+                  placeholder={t('settings.addresses.zipCode')}
                 />
               </div>
               <div>
-                <label className="label">Country</label>
+                <label className="label">{t('settings.addresses.country')}</label>
                 <input
                   type="text"
                   name="country"
@@ -173,7 +175,7 @@ export default function Addresses(): JSX.Element {
                   onChange={handleInputChange}
                   required
                   className="input"
-                  placeholder="Country"
+                  placeholder={t('settings.addresses.country')}
                 />
               </div>
             </div>
@@ -183,11 +185,11 @@ export default function Addresses(): JSX.Element {
                 onClick={resetForm}
                 className="px-4 py-2 text-navy-600 hover:bg-navy-50 rounded-lg transition-colors"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button type="submit" className="btn-primary px-6 py-2 flex items-center gap-2">
                 <Check className="w-4 h-4" />
-                Save Address
+                {t('settings.addresses.saveAddress')}
               </button>
             </div>
           </form>
@@ -196,11 +198,11 @@ export default function Addresses(): JSX.Element {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {isLoading ? (
-          <div className="col-span-full py-12 text-center text-navy-400">Loading addresses...</div>
+          <div className="col-span-full py-12 text-center text-navy-400">{t('settings.addresses.loading')}</div>
         ) : addresses.length === 0 && !isEditing ? (
           <div className="col-span-full py-12 text-center text-navy-400 bg-gray-50 rounded-xl border-dashed border-2 border-gray-200">
             <MapPin className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p>No addresses found. Add one to get started.</p>
+            <p>{t('settings.addresses.empty')}</p>
           </div>
         ) : (
           addresses.map((address) => (

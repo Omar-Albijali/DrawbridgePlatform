@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertTriangle, Bell, CheckCheck, CreditCard, Package, Shield } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { notificationService } from '../services/notificationService';
@@ -9,6 +10,7 @@ import {
   notificationDestination,
   shortenOrderIds,
 } from '../utils/notificationHelpers';
+import { notificationTypeLabel } from '../i18n/display';
 import { NotificationType, type Notification } from '../types';
 
 function typeStyles(type: NotificationType): {
@@ -17,7 +19,6 @@ function typeStyles(type: NotificationType): {
   card: string;
   iconWrap: string;
   chip: string;
-  label: string;
 } {
   if (type === NotificationType.ORDER) {
     return {
@@ -26,7 +27,6 @@ function typeStyles(type: NotificationType): {
       card: 'border-primary-200 bg-gradient-to-r from-primary-50 to-blue-50/70 dark:border-primary-800/60 dark:from-primary-900/30 dark:to-blue-900/20',
       iconWrap: 'bg-primary-100 ring-1 ring-primary-200 dark:bg-primary-900/35 dark:ring-primary-800/70',
       chip: 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
-      label: 'Order',
     };
   }
   if (type === NotificationType.STOCK) {
@@ -36,7 +36,6 @@ function typeStyles(type: NotificationType): {
       card: 'border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50/70 dark:border-amber-800/60 dark:from-amber-900/25 dark:to-orange-900/20',
       iconWrap: 'bg-amber-100 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:ring-amber-800/70',
       chip: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-      label: 'Inventory',
     };
   }
   if (type === NotificationType.PAYMENT) {
@@ -46,7 +45,6 @@ function typeStyles(type: NotificationType): {
       card: 'border-emerald-200 bg-gradient-to-r from-emerald-50 to-lime-50/70 dark:border-emerald-800/60 dark:from-emerald-900/25 dark:to-lime-900/20',
       iconWrap: 'bg-emerald-100 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:ring-emerald-800/70',
       chip: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-      label: 'Payment',
     };
   }
   return {
@@ -55,12 +53,12 @@ function typeStyles(type: NotificationType): {
     card: 'border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100/70 dark:border-slate-700 dark:from-slate-800/70 dark:to-slate-900/70',
     iconWrap: 'bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700',
     chip: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
-    label: 'System',
   };
 }
 
 
 export default function NotificationsInbox(): JSX.Element {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -101,12 +99,12 @@ export default function NotificationsInbox(): JSX.Element {
   };
 
   return (
-    <PageShell title="Notifications" description="Your inbox for system, order, inventory, and payment updates.">
+    <PageShell title={t('notifications.title')} description={t('notifications.description')}>
       <div className="card space-y-4 border border-slate-200 bg-gradient-to-b from-white to-slate-50/50 dark:border-white/10 dark:from-slate-900 dark:to-slate-900/60">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-primary-600" />
-            <p className="font-semibold text-slate-900 dark:text-slate-100">Inbox</p>
+            <p className="font-semibold text-slate-900 dark:text-slate-100">{t('notifications.inbox')}</p>
           </div>
           <button
             type="button"
@@ -114,18 +112,18 @@ export default function NotificationsInbox(): JSX.Element {
             onClick={() => void markAll()}
           >
             <CheckCheck className="h-4 w-4" />
-            Mark all read
+            {t('navigation.markAllRead')}
           </button>
         </div>
 
-        {isLoading ? <p className="text-sm text-slate-500 dark:text-slate-400">Loading notifications...</p> : null}
+        {isLoading ? <p className="text-sm text-slate-500 dark:text-slate-400">{t('notifications.loading')}</p> : null}
 
         {!isLoading && notifications.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-slate-500 dark:border-slate-700 dark:text-slate-400">
-            No notifications yet.
+            {t('notifications.none')}
             <div className="mt-2">
               <Link className="text-primary-600 hover:text-primary-700" to="/dashboard">
-                Back to dashboard
+                {t('notifications.backToDashboard')}
               </Link>
             </div>
           </div>
@@ -156,7 +154,7 @@ export default function NotificationsInbox(): JSX.Element {
                         {shortenOrderIds(getNotificationTitle(notification))}
                       </p>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${styles.chip}`}>
-                        {styles.label}
+                        {notificationTypeLabel(t, notification.type)}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{shortenOrderIds(notification.message)}</p>
@@ -164,7 +162,7 @@ export default function NotificationsInbox(): JSX.Element {
                   </div>
                   {!notification.read ? (
                     <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-semibold text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">
-                      New
+                      {t('notifications.new')}
                     </span>
                   ) : null}
                 </div>

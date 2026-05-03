@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
   Bell,
@@ -21,7 +22,9 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useTheme } from '../contexts/ThemeContext';
+import LanguageToggle from './LanguageToggle';
 import { notificationService } from '../services/notificationService';
+import { notificationTypeLabel } from '../i18n/display';
 import {
   getNotificationTitle,
   notificationDestination,
@@ -29,12 +32,11 @@ import {
 } from '../utils/notificationHelpers';
 import { NotificationType, UserRole, type Notification } from '../types';
 
-function itemStyles(type: NotificationType): { icon: JSX.Element; wrap: string; label: string; labelClass: string } {
+function itemStyles(type: NotificationType): { icon: JSX.Element; wrap: string; labelClass: string } {
   if (type === NotificationType.ORDER) {
     return {
       icon: <Package className="h-3.5 w-3.5 text-primary-700 dark:text-primary-300" />,
       wrap: 'bg-primary-100 ring-1 ring-primary-200 dark:bg-primary-900/35 dark:ring-primary-800/70',
-      label: 'Order',
       labelClass: 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
     };
   }
@@ -42,7 +44,6 @@ function itemStyles(type: NotificationType): { icon: JSX.Element; wrap: string; 
     return {
       icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" />,
       wrap: 'bg-amber-100 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:ring-amber-800/70',
-      label: 'Inventory',
       labelClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
     };
   }
@@ -50,43 +51,42 @@ function itemStyles(type: NotificationType): { icon: JSX.Element; wrap: string; 
     return {
       icon: <CreditCard className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-300" />,
       wrap: 'bg-emerald-100 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:ring-emerald-800/70',
-      label: 'Payment',
       labelClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
     };
   }
   return {
     icon: <Shield className="h-3.5 w-3.5 text-slate-700 dark:text-slate-300" />,
     wrap: 'bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700',
-    label: 'System',
     labelClass: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
   };
 }
 
 const retailerLinks = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/marketplace', label: 'Marketplace', icon: Store },
-  { to: '/inventory', label: 'Inventory', icon: Store },
-  { to: '/orders', label: 'Orders', icon: ReceiptText },
-  { to: '/support', label: 'Support', icon: LifeBuoy },
+  { to: '/dashboard', labelKey: 'navigation.dashboard', icon: LayoutDashboard },
+  { to: '/marketplace', labelKey: 'navigation.marketplace', icon: Store },
+  { to: '/inventory', labelKey: 'navigation.inventory', icon: Store },
+  { to: '/orders', labelKey: 'navigation.orders', icon: ReceiptText },
+  { to: '/support', labelKey: 'navigation.support', icon: LifeBuoy },
 ] as const;
 
 const wholesalerLinks = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/marketplace', label: 'Marketplace', icon: Store },
-  { to: '/products', label: 'Products', icon: Store },
-  { to: '/orders', label: 'Orders', icon: ReceiptText },
-  { to: '/support', label: 'Support', icon: LifeBuoy },
+  { to: '/dashboard', labelKey: 'navigation.dashboard', icon: LayoutDashboard },
+  { to: '/marketplace', labelKey: 'navigation.marketplace', icon: Store },
+  { to: '/products', labelKey: 'navigation.products', icon: Store },
+  { to: '/orders', labelKey: 'navigation.orders', icon: ReceiptText },
+  { to: '/support', labelKey: 'navigation.support', icon: LifeBuoy },
 ] as const;
 
 export default function AppNavbar(): JSX.Element {
   const { dark, toggleTheme } = useTheme();
+  const { t } = useTranslation();
   const { isAuthenticated, user, logout } = useAuth();
   const { itemCount } = useCart();
   const navigate = useNavigate();
   const isWholesaler = user?.role === UserRole.WHOLESALER;
   const navLinks = isAuthenticated
     ? (isWholesaler ? wholesalerLinks : retailerLinks)
-    : [{ to: '/marketplace', label: 'Marketplace', icon: Store }];
+    : [{ to: '/marketplace', labelKey: 'navigation.marketplace', icon: Store }];
   const brandPath = isAuthenticated ? '/dashboard' : '/';
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -94,7 +94,7 @@ export default function AppNavbar(): JSX.Element {
   const [unreadCount, setUnreadCount] = useState(0);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const notificationMenuRef = useRef<HTMLDivElement | null>(null);
-  const displayName = (user?.name ?? '').trim() || 'Account';
+  const displayName = (user?.name ?? '').trim() || t('navigation.account');
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent): void => {
@@ -195,7 +195,7 @@ export default function AppNavbar(): JSX.Element {
                   }
                 >
                   <Icon className="h-4 w-4" />
-                  <span>{link.label}</span>
+                  <span>{t(link.labelKey)}</span>
                 </NavLink>
               );
             })}
@@ -203,12 +203,14 @@ export default function AppNavbar(): JSX.Element {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          <LanguageToggle />
+
           <button
             type="button"
             onClick={toggleTheme}
             className="grid h-10 w-10 place-items-center rounded-full border border-slate-300 bg-slate-100 text-slate-700 transition hover:bg-slate-200 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-            aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
-            title={dark ? 'Light mode' : 'Dark mode'}
+            aria-label={dark ? t('common.theme.switchToLight') : t('common.theme.switchToDark')}
+            title={dark ? t('common.theme.light') : t('common.theme.dark')}
           >
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
@@ -219,10 +221,10 @@ export default function AppNavbar(): JSX.Element {
                 to="/login"
                 className="hidden rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:text-primary-600 dark:text-slate-200 dark:hover:text-primary-300 sm:inline-flex"
               >
-                Sign In
+                {t('navigation.signInTitle')}
               </Link>
               <Link to="/register" className="btn-primary rounded-lg px-4 py-2 text-sm">
-                Get Started
+                {t('navigation.getStartedTitle')}
               </Link>
             </>
           ) : (
@@ -232,8 +234,8 @@ export default function AppNavbar(): JSX.Element {
                   type="button"
                   onClick={() => setIsNotificationsOpen((open) => !open)}
                   className="relative grid h-10 w-10 place-items-center rounded-full border border-slate-300 bg-white text-slate-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200"
-                  aria-label="Notifications"
-                  title="Notifications"
+                  aria-label={t('navigation.notifications')}
+                  title={t('navigation.notifications')}
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 ? (
@@ -246,20 +248,20 @@ export default function AppNavbar(): JSX.Element {
                 {isNotificationsOpen ? (
                   <div className="absolute right-0 z-50 mt-2 w-96 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-white/10 dark:bg-slate-900">
                     <div className="mb-2 flex items-center justify-between px-2 py-1">
-                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Notifications</p>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{t('navigation.notifications')}</p>
                       <button
                         type="button"
                         onClick={() => void handleMarkAllRead()}
                         className="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-300 dark:hover:text-primary-200"
                       >
                         <CheckCheck className="h-3.5 w-3.5" />
-                        Mark all read
+                        {t('navigation.markAllRead')}
                       </button>
                     </div>
 
                     <div className="max-h-96 space-y-1 overflow-y-auto">
                       {notifications.length === 0 ? (
-                        <p className="rounded-lg px-3 py-6 text-center text-sm text-slate-500 dark:text-slate-400">No notifications yet.</p>
+                        <p className="rounded-lg px-3 py-6 text-center text-sm text-slate-500 dark:text-slate-400">{t('navigation.noNotifications')}</p>
                       ) : (
                         notifications.map((notification) => (
                           (() => {
@@ -297,7 +299,7 @@ export default function AppNavbar(): JSX.Element {
                                     {shortenOrderIds(getNotificationTitle(notification))}
                                   </p>
                                   <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${styles.labelClass}`}>
-                                    {styles.label}
+                                    {notificationTypeLabel(t, notification.type)}
                                   </span>
                                 </div>
                                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{shortenOrderIds(notification.message)}</p>
@@ -316,7 +318,7 @@ export default function AppNavbar(): JSX.Element {
                       onClick={() => setIsNotificationsOpen(false)}
                       className="mt-2 block rounded-lg px-3 py-2 text-center text-sm font-semibold text-primary-600 hover:bg-primary-50 hover:text-primary-700 dark:text-primary-300 dark:hover:bg-primary-500/10 dark:hover:text-primary-200"
                     >
-                      Open full inbox
+                      {t('navigation.openFullInbox')}
                     </Link>
                   </div>
                 ) : null}
@@ -327,16 +329,16 @@ export default function AppNavbar(): JSX.Element {
     <Link
       to="/wishlist"
       className="relative grid h-10 w-10 place-items-center rounded-full border border-slate-300 bg-white text-slate-700 transition hover:border-red-300 hover:text-red-500 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200"
-      aria-label="Wishlist"
-      title="Wishlist"
+      aria-label={t('navigation.wishlist')}
+      title={t('navigation.wishlist')}
     >
       <Heart className="h-4 w-4" />
     </Link>
     <Link
       to="/cart"
       className="relative grid h-10 w-10 place-items-center rounded-full border border-slate-300 bg-white text-slate-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-primary-400/40 dark:hover:text-primary-300"
-      aria-label="Cart"
-      title="Cart"
+      aria-label={t('navigation.cart')}
+      title={t('navigation.cart')}
     >
       <ShoppingCart className="h-4 w-4" />
       {itemCount > 0 ? (
@@ -372,7 +374,7 @@ export default function AppNavbar(): JSX.Element {
                       className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
                       <Settings className="h-4 w-4 text-primary-600 dark:text-primary-300" />
-                      Settings
+                      {t('navigation.settings')}
                     </Link>
                     <button
                       type="button"
@@ -380,7 +382,7 @@ export default function AppNavbar(): JSX.Element {
                       className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
                     >
                       <LogOut className="h-4 w-4" />
-                      Logout
+                      {t('navigation.logout')}
                     </button>
                   </div>
                 ) : null}

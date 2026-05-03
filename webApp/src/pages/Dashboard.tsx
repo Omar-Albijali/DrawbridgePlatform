@@ -14,7 +14,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -23,12 +22,14 @@ import {
   YAxis,
 } from 'recharts';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { inventoryService } from '../services/inventoryService';
 import { notificationService } from '../services/notificationService';
 import { orderService } from '../services/orderService';
 import { getNotificationTitle, notificationDestination, shortenOrderIds } from '../utils/notificationHelpers';
+import { formatCurrency, formatDate, orderStatusLabel } from '../i18n/display';
 import { InventoryStatus, NotificationType, UserRole, type InventoryItem, type Notification, type Order, type OrderStatus } from '../types';
 
 interface KpiCardProps {
@@ -53,7 +54,27 @@ interface PieStat {
   color: string;
 }
 
+interface ChartLegendProps {
+  data: PieStat[];
+  direction: 'ltr' | 'rtl';
+}
+
+function ChartLegend({ data, direction }: ChartLegendProps): JSX.Element {
+  return (
+    <div dir={direction} className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-navy-600">
+      {data.map((entry) => (
+        <div key={entry.name} className="inline-flex items-center gap-2">
+          <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: entry.color }} />
+          <span className="whitespace-nowrap">{entry.name}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function KpiCard({ title, value, change, icon, iconBg, valueColor }: KpiCardProps): JSX.Element {
+  const { t } = useTranslation();
+
   return (
     <div className="card">
       <div className="flex items-start justify-between">
@@ -63,7 +84,7 @@ function KpiCard({ title, value, change, icon, iconBg, valueColor }: KpiCardProp
           {change !== undefined && (
             <div className={`flex items-center gap-1 mt-2 text-sm ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {change >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-              <span>{Math.abs(change)}% vs last month</span>
+              <span>{t('dashboard.kpi.changeVsLastMonth', { change: Math.abs(change) })}</span>
             </div>
           )}
         </div>
@@ -74,6 +95,7 @@ function KpiCard({ title, value, change, icon, iconBg, valueColor }: KpiCardProp
 }
 
 export default function Dashboard(): JSX.Element {
+  const { i18n, t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const isRetailer = user?.role === UserRole.RETAILER;
@@ -135,26 +157,26 @@ export default function Dashboard(): JSX.Element {
 
   const retailerKpis: KpiCardProps[] = [
     {
-      title: 'Total Orders',
+      title: t('dashboard.kpi.totalOrders'),
       value: totalOrders.toString(),
       icon: <ShoppingBag className="w-6 h-6 text-primary-600" />,
       iconBg: 'bg-primary-100',
     },
     {
-      title: 'Pending Orders',
+      title: t('dashboard.kpi.pendingOrders'),
       value: pendingCount.toString(),
       icon: <AlertTriangle className="w-6 h-6 text-amber-600" />,
       iconBg: 'bg-amber-100',
       valueColor: 'text-amber-600',
     },
     {
-      title: 'Total Spend',
-      value: `SAR ${totalAmount.toLocaleString()}`,
+      title: t('dashboard.kpi.totalSpend'),
+      value: formatCurrency(totalAmount, { maximumFractionDigits: 0 }),
       icon: <DollarSign className="w-6 h-6 text-green-600" />,
       iconBg: 'bg-green-100',
     },
     {
-      title: 'Processing',
+      title: t('dashboard.kpi.processing'),
       value: processingCount.toString(),
       icon: <Truck className="w-6 h-6 text-blue-600" />,
       iconBg: 'bg-blue-100',
@@ -163,26 +185,26 @@ export default function Dashboard(): JSX.Element {
 
   const wholesalerKpis: KpiCardProps[] = [
     {
-      title: 'Total Orders',
+      title: t('dashboard.kpi.totalOrders'),
       value: totalOrders.toString(),
       icon: <Package className="w-6 h-6 text-primary-600" />,
       iconBg: 'bg-primary-100',
     },
     {
-      title: 'Pending Orders',
+      title: t('dashboard.kpi.pendingOrders'),
       value: pendingCount.toString(),
       icon: <AlertTriangle className="w-6 h-6 text-amber-600" />,
       iconBg: 'bg-amber-100',
       valueColor: 'text-amber-600',
     },
     {
-      title: 'Total Revenue',
-      value: `SAR ${totalAmount.toLocaleString()}`,
+      title: t('dashboard.kpi.totalRevenue'),
+      value: formatCurrency(totalAmount, { maximumFractionDigits: 0 }),
       icon: <DollarSign className="w-6 h-6 text-green-600" />,
       iconBg: 'bg-green-100',
     },
     {
-      title: 'Processing',
+      title: t('dashboard.kpi.processing'),
       value: processingCount.toString(),
       icon: <BarChart3 className="w-6 h-6 text-purple-600" />,
       iconBg: 'bg-purple-100',
@@ -190,7 +212,8 @@ export default function Dashboard(): JSX.Element {
   ];
 
   const kpis = isRetailer ? retailerKpis : wholesalerKpis;
-  const monthFormatter = new Intl.DateTimeFormat('en', { month: 'short' });
+  const chartDirection = i18n.resolvedLanguage === 'ar' ? 'rtl' : 'ltr';
+  const monthFormatter = new Intl.DateTimeFormat(i18n.resolvedLanguage === 'ar' ? 'ar-SA' : 'en', { month: 'short' });
 
   const chartData: MonthlyStat[] = (() => {
     const now = new Date();
@@ -227,18 +250,18 @@ export default function Dashboard(): JSX.Element {
           totalItems > 0 ? Number(((count / totalItems) * 100).toFixed(1)) : 0;
 
         return [
-          { name: 'Optimal', value: asPercentage(optimal), color: '#10b981' },
-          { name: 'Low Stock', value: asPercentage(lowStock), color: '#f59e0b' },
-          { name: 'Out of Stock', value: asPercentage(outOfStock), color: '#ef4444' },
+          { name: t('dashboard.inventoryState.optimal'), value: asPercentage(optimal), color: '#10b981' },
+          { name: t('dashboard.inventoryState.lowStock'), value: asPercentage(lowStock), color: '#f59e0b' },
+          { name: t('dashboard.inventoryState.outOfStock'), value: asPercentage(outOfStock), color: '#ef4444' },
         ];
       })()
     : (() => {
         const statusBuckets = [
-          { name: 'Delivered', key: 'DELIVERED', color: '#10b981' },
-          { name: 'Shipped', key: 'SHIPPED', color: '#3b82f6' },
-          { name: 'Processing', key: 'PROCESSING', color: '#f59e0b' },
-          { name: 'Pending', key: 'PENDING', color: '#6b7280' },
-          { name: 'Cancelled', key: 'CANCELLED', color: '#ef4444' },
+          { name: t('orders.status.DELIVERED'), key: 'DELIVERED', color: '#10b981' },
+          { name: t('orders.status.SHIPPED'), key: 'SHIPPED', color: '#3b82f6' },
+          { name: t('orders.status.PROCESSING'), key: 'PROCESSING', color: '#f59e0b' },
+          { name: t('orders.status.PENDING'), key: 'PENDING', color: '#6b7280' },
+          { name: t('orders.status.CANCELLED'), key: 'CANCELLED', color: '#ef4444' },
         ];
 
         return statusBuckets.map((bucket) => ({
@@ -277,8 +300,8 @@ export default function Dashboard(): JSX.Element {
 
   return (
     <PageShell
-      title={`Welcome back, ${user?.name?.split(' ')[0] ?? 'there'}!`}
-      description={`Here's what's happening with your ${isRetailer ? 'business' : 'store'} today.`}
+      title={t('dashboard.welcome', { name: user?.name?.split(' ')[0] ?? t('dashboard.fallbackName') })}
+      description={t('dashboard.description', { scope: isRetailer ? t('dashboard.business') : t('dashboard.store') })}
     >
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -289,18 +312,25 @@ export default function Dashboard(): JSX.Element {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 card">
-          <h3 className="text-lg font-semibold text-navy-800 mb-4">{isRetailer ? 'Monthly Expenses' : 'Monthly Sales'}</h3>
-          <div className="h-80">
+          <h3 className="text-lg font-semibold text-navy-800 mb-4">{isRetailer ? t('dashboard.monthlyExpenses') : t('dashboard.monthlySales')}</h3>
+          <div dir={chartDirection === 'rtl' ? 'ltr' : undefined} className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="month" stroke="#627d98" />
-                <YAxis stroke="#627d98" />
+                <YAxis
+                  stroke="#627d98"
+                  orientation="left"
+                  mirror={false}
+                  tickMargin={chartDirection === 'rtl' ? 20 : 8}
+                  width={chartDirection === 'rtl' ? 84 : 60}
+                  tick={chartDirection === 'rtl' ? { dx: -8 } : undefined}
+                />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
                   formatter={(value) => {
                     const normalized = typeof value === 'number' ? value : 0;
-                    return [`SAR ${normalized.toLocaleString()}`, isRetailer ? 'Expenses' : 'Sales'];
+                    return [formatCurrency(normalized), isRetailer ? t('dashboard.expenses') : t('dashboard.sales')];
                   }}
                 />
                 <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} />
@@ -310,25 +340,27 @@ export default function Dashboard(): JSX.Element {
         </div>
 
         <div className="card">
-          <h3 className="text-lg font-semibold text-navy-800 mb-4">{isRetailer ? 'Inventory Composition' : 'Order Status'}</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                  {pieData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
-                  formatter={(value) => {
-                    const normalized = typeof value === 'number' ? value : 0;
-                    return isRetailer ? [`${normalized}%`, 'Share'] : [normalized, 'Orders'];
-                  }}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+          <h3 className="text-lg font-semibold text-navy-800 mb-4">{isRetailer ? t('dashboard.inventoryComposition') : t('dashboard.orderStatus')}</h3>
+          <div className="flex h-80 flex-col">
+            <div className="min-h-0 flex-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                    {pieData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                    formatter={(value) => {
+                      const normalized = typeof value === 'number' ? value : 0;
+                      return isRetailer ? [`${normalized}%`, t('dashboard.share')] : [normalized, t('navigation.orders')];
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <ChartLegend data={pieData} direction={chartDirection} />
           </div>
         </div>
       </div>
@@ -336,9 +368,9 @@ export default function Dashboard(): JSX.Element {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-navy-800">Recent Orders</h3>
+            <h3 className="text-lg font-semibold text-navy-800">{t('dashboard.recentOrders')}</h3>
             <a href="/orders" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-              View all
+              {t('dashboard.viewAll')}
             </a>
           </div>
           <div className="space-y-3">
@@ -347,26 +379,26 @@ export default function Dashboard(): JSX.Element {
                 <div>
                   <p className="font-medium text-navy-800">{order.id}</p>
                   <p className="text-sm text-navy-500">
-                    {new Date(order.placedAt).toLocaleDateString()} • {order.items?.length ?? 0} items
+                    {formatDate(order.placedAt)} • {t('dashboard.items', { count: order.items?.length ?? 0 })}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-navy-800">SAR {(order.subtotal ?? 0).toFixed(2)}</p>
+                  <p className="font-semibold text-navy-800">{formatCurrency(order.subtotal ?? 0)}</p>
                   <span className={`text-xs px-2 py-1 rounded-full capitalize ${getStatusColor(order.status)}`}>
-                    {getStatusName(order.status).toLowerCase().replace('_', ' ')}
+                    {orderStatusLabel(t, order.status)}
                   </span>
                 </div>
               </div>
             ))}
-            {orders.length === 0 && <p className="text-center text-navy-500 py-4">No recent orders</p>}
+            {orders.length === 0 && <p className="text-center text-navy-500 py-4">{t('dashboard.noRecentOrders')}</p>}
           </div>
         </div>
 
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-navy-800">Recent Activity</h3>
+            <h3 className="text-lg font-semibold text-navy-800">{t('dashboard.recentActivity')}</h3>
             <Link to="/notifications" className="text-sm text-primary-600 hover:text-primary-700 font-medium">
-              View all
+              {t('dashboard.viewAll')}
             </Link>
           </div>
           <div className="space-y-4">
@@ -407,7 +439,7 @@ export default function Dashboard(): JSX.Element {
                 </div>
               </button>
             ))}
-            {notifications.length === 0 ? <p className="text-center text-navy-500 py-4">No recent activity</p> : null}
+            {notifications.length === 0 ? <p className="text-center text-navy-500 py-4">{t('dashboard.noRecentActivity')}</p> : null}
           </div>
         </div>
       </div>

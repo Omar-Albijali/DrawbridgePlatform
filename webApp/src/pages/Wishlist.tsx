@@ -1,9 +1,12 @@
 import { Heart, ShoppingCart, Trash2, Package } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import PageShell from '../components/PageShell';
 import { useWishlist } from '../contexts/WishlistContext';
 import { useCart } from '../contexts/CartContext';
+import { formatCurrency } from '../i18n/display';
 
 export default function Wishlist(): JSX.Element {
+  const { t } = useTranslation();
   const { items, isLoading, removeFromWishlist } = useWishlist();
   const { addToCart } = useCart();
 
@@ -22,17 +25,17 @@ export default function Wishlist(): JSX.Element {
 
   return (
     <PageShell
-      title="Wishlist"
-      description={items.length > 0 ? `${items.length} saved item${items.length !== 1 ? 's' : ''}` : 'Items you have saved for later'}
+      title={t('wishlist.title')}
+      description={items.length > 0 ? t('wishlist.descriptionSaved', { count: items.length }) : t('wishlist.descriptionEmpty')}
     >
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
           <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <Heart className="w-10 h-10 text-gray-300" />
           </div>
-          <h3 className="text-lg font-semibold text-navy-800 mb-2">Your wishlist is empty</h3>
+          <h3 className="text-lg font-semibold text-navy-800 mb-2">{t('wishlist.emptyTitle')}</h3>
           <p className="text-navy-400 text-sm max-w-xs">
-            Save products you're interested in and come back to them later.
+            {t('wishlist.emptyDescription')}
           </p>
         </div>
       ) : (
@@ -56,10 +59,10 @@ export default function Wishlist(): JSX.Element {
               <div className="space-y-3">
                 <div>
                   <h3 className="font-semibold text-navy-800 text-sm line-clamp-2 leading-snug">
-                    {item.product?.name ?? 'Product unavailable'}
+                    {item.product?.name ?? t('wishlist.productUnavailable')}
                   </h3>
                   <p className="text-primary-600 font-bold text-base mt-1">
-                    {item.product ? `SAR ${Number(item.product.price).toFixed(2)}` : 'Unavailable'}
+                    {item.product ? formatCurrency(Number(item.product.price)) : t('wishlist.unavailable')}
                   </p>
                 </div>
 
@@ -70,7 +73,7 @@ export default function Wishlist(): JSX.Element {
                         className="flex-1 btn-primary text-xs py-2 flex items-center justify-center gap-1.5"
                     >
                         <ShoppingCart className="w-3.5 h-3.5" />
-                        Move to Cart
+                        {t('wishlist.moveToCart')}
                     </button>
                     <button
                         type="button"

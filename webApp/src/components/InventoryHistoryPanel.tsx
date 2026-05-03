@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowDown, ArrowUp, Clock3, Package, RefreshCw, ShoppingBag, Terminal, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   inventoryAuditService,
   type InventoryAuditLog,
   type InventoryAuditSourceType,
   type InventoryStockTargetType,
 } from '../services/inventoryAuditService';
+import { formatDateTime } from '../i18n/display';
 
 interface InventoryHistoryPanelProps {
   isOpen: boolean;
@@ -19,47 +21,33 @@ interface InventoryHistoryPanelProps {
 
 const PAGE_SIZE = 10;
 
-const sourceStyles: Record<InventoryAuditSourceType, { label: string; className: string; icon: JSX.Element }> = {
+const sourceStyles: Record<InventoryAuditSourceType, { labelKey: string; className: string; icon: JSX.Element }> = {
   MANUAL: {
-    label: 'Manual',
+    labelKey: 'inventory.history.sources.MANUAL',
     className: 'bg-blue-50 text-blue-700 border-blue-200',
     icon: <Activity className="w-3.5 h-3.5" />,
   },
   ORDER: {
-    label: 'Order',
+    labelKey: 'inventory.history.sources.ORDER',
     className: 'bg-indigo-50 text-indigo-700 border-indigo-200',
     icon: <ShoppingBag className="w-3.5 h-3.5" />,
   },
   RESTOCK: {
-    label: 'Restock',
+    labelKey: 'inventory.history.sources.RESTOCK',
     className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     icon: <RefreshCw className="w-3.5 h-3.5" />,
   },
   POS: {
-    label: 'POS',
+    labelKey: 'inventory.history.sources.POS',
     className: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
     icon: <Terminal className="w-3.5 h-3.5" />,
   },
   SYSTEM: {
-    label: 'System',
+    labelKey: 'inventory.history.sources.SYSTEM',
     className: 'bg-slate-100 text-slate-700 border-slate-200',
     icon: <Package className="w-3.5 h-3.5" />,
   },
 };
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function formatAmount(amount: number): string {
   return amount > 0 ? `+${amount}` : String(amount);
@@ -86,6 +74,7 @@ export default function InventoryHistoryPanel({
   inventoryItemId,
   stockTargetType,
 }: InventoryHistoryPanelProps): JSX.Element | null {
+  const { t } = useTranslation();
   const [logs, setLogs] = useState<InventoryAuditLog[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -130,13 +119,13 @@ export default function InventoryHistoryPanel({
         setTotalElements(result.totalElements);
       } catch (reason) {
         console.error('Failed to load stock history', reason);
-        setError('Unable to load stock history');
+        setError(t('inventory.history.loadError'));
       } finally {
         setIsLoading(false);
         setIsLoadingMore(false);
       }
     },
-    [canLoad, inventoryItemId, productId, stockTargetType],
+    [canLoad, inventoryItemId, productId, stockTargetType, t],
   );
 
   useEffect(() => {
@@ -157,7 +146,7 @@ export default function InventoryHistoryPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button type="button" aria-label="Close history" className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" onClick={onClose} />
+      <button type="button" aria-label={t('inventory.history.close')} className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" onClick={onClose} />
 
       <aside className="relative ml-auto flex h-full w-full max-w-xl flex-col bg-white shadow-2xl dark:bg-slate-950">
         <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-800">
@@ -165,7 +154,7 @@ export default function InventoryHistoryPanel({
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
                 <Clock3 className="h-4 w-4" />
-                Stock History
+                {t('inventory.history.title')}
               </div>
               <h2 className="mt-2 truncate text-xl font-semibold text-slate-950 dark:text-white">{title}</h2>
               {subtitle && <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
@@ -174,7 +163,7 @@ export default function InventoryHistoryPanel({
               type="button"
               onClick={onClose}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:hover:bg-slate-900 dark:hover:text-white"
-              title="Close"
+              title={t('common.close')}
             >
               <X className="h-4 w-4" />
             </button>
@@ -195,14 +184,14 @@ export default function InventoryHistoryPanel({
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                 <Package className="h-6 w-6" />
               </div>
-              <h3 className="mt-4 text-base font-semibold text-slate-900 dark:text-white">No stock history yet</h3>
-              <p className="mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">Stock changes will appear here as soon as this item is updated.</p>
+              <h3 className="mt-4 text-base font-semibold text-slate-900 dark:text-white">{t('inventory.history.emptyTitle')}</h3>
+              <p className="mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">{t('inventory.history.emptyDescription')}</p>
             </div>
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-                <span>{totalElements} event{totalElements === 1 ? '' : 's'}</span>
-                <span>Newest first</span>
+                <span>{t('inventory.history.event', { count: totalElements })}</span>
+                <span>{t('inventory.history.newestFirst')}</span>
               </div>
 
               {logs.map((log) => {
@@ -220,7 +209,7 @@ export default function InventoryHistoryPanel({
                           <div className="flex items-center gap-2">
                             <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold ${source.className}`}>
                               {source.icon}
-                              {source.label}
+                              {t(source.labelKey)}
                             </span>
                             <span className={`rounded-md border px-2 py-0.5 text-xs font-bold ${getAmountClass(log.changeAmount)}`}>
                               {formatAmount(log.changeAmount)}
@@ -231,17 +220,25 @@ export default function InventoryHistoryPanel({
                           </p>
                         </div>
                       </div>
-                      <time className="shrink-0 text-right text-xs font-medium text-slate-500 dark:text-slate-400">{formatDateTime(log.createdAt)}</time>
+                      <time className="shrink-0 text-right text-xs font-medium text-slate-500 dark:text-slate-400">
+                        {formatDateTime(log.createdAt, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </time>
                     </div>
 
                     <div className="mt-4 grid grid-cols-1 gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium text-slate-400">Changed by</span>
+                        <span className="font-medium text-slate-400">{t('inventory.history.changedBy')}</span>
                         <span className="truncate text-right font-semibold text-slate-700 dark:text-slate-300">{log.changedBy}</span>
                       </div>
                       {log.reason && (
                         <div className="flex items-start justify-between gap-3">
-                          <span className="font-medium text-slate-400">Reason</span>
+                          <span className="font-medium text-slate-400">{t('inventory.history.reason')}</span>
                           <span className="text-right font-medium text-slate-700 dark:text-slate-300">{log.reason}</span>
                         </div>
                       )}
@@ -261,7 +258,7 @@ export default function InventoryHistoryPanel({
               disabled={!hasMore || isLoadingMore}
               className="w-full rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900"
             >
-              {isLoadingMore ? 'Loading...' : hasMore ? 'Load more' : 'All history loaded'}
+              {isLoadingMore ? t('common.loading') : hasMore ? t('inventory.history.loadMore') : t('inventory.history.allLoaded')}
             </button>
           </div>
         )}

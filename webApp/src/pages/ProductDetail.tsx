@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart, Star, Package } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { productService } from '../services/productService';
+import { formatCurrency } from '../i18n/display';
 import { UserRole, type Product } from '../types';
 
 export default function ProductDetail(): JSX.Element {
+    const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { isAuthenticated, user } = useAuth();
@@ -47,7 +50,7 @@ export default function ProductDetail(): JSX.Element {
         setTimeout(() => setAdded(false), 1500);
     };
 
-    const allImages = product?.images ?? [];
+    const allImages = (product?.images ?? []) as string[];
 
     if (loading) {
         return (
@@ -70,7 +73,7 @@ export default function ProductDetail(): JSX.Element {
                 className="mb-6 flex items-center gap-2 text-sm font-medium text-navy-500 hover:text-navy-800 transition-colors"
             >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Marketplace
+                {t('marketplace.detail.back')}
             </button>
 
             <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
@@ -130,19 +133,19 @@ export default function ProductDetail(): JSX.Element {
                             ))}
                         </div>
                         <span className="text-sm font-medium text-navy-700">{product.rating ?? 0}</span>
-                        <span className="text-sm text-navy-400">({product.reviews ?? 0} reviews)</span>
+                        <span className="text-sm text-navy-400">({t('marketplace.detail.reviews', { count: product.reviews ?? 0 })})</span>
                     </div>
 
                     {/* Price */}
                     <div className="flex items-baseline gap-3">
             <span className="text-3xl font-extrabold text-navy-900">
-              SAR {product.price.toFixed(2)}
+              {formatCurrency(product.price)}
             </span>
                     </div>
 
                     {/* Supplier */}
                     <p className="text-sm text-navy-500">
-                        Supplied by:{' '}
+                        {t('marketplace.detail.suppliedBy')}{' '}
                         <span className="font-semibold text-navy-700">{product.supplier}</span>
                     </p>
 
@@ -158,7 +161,9 @@ export default function ProductDetail(): JSX.Element {
                                         : 'text-red-600'
                             }`}
                         >
-              {(product.stock ?? 0) > 0 ? `${product.stock} units in stock` : 'Out of stock'}
+              {(product.stock ?? 0) > 0
+                ? t('marketplace.detail.unitsInStock', { count: product.stock ?? 0 })
+                : t('marketplace.detail.outOfStock')}
             </span>
                     </div>
 
@@ -166,9 +171,9 @@ export default function ProductDetail(): JSX.Element {
 
                     {/* Description */}
                     <div>
-                        <h2 className="mb-2 text-base font-semibold text-navy-800">Description</h2>
+                        <h2 className="mb-2 text-base font-semibold text-navy-800">{t('marketplace.detail.description')}</h2>
                         <p className="text-sm leading-relaxed text-navy-600">
-                            {product.description || 'No description provided.'}
+                            {product.description || t('marketplace.detail.noDescription')}
                         </p>
                     </div>
 
@@ -176,7 +181,7 @@ export default function ProductDetail(): JSX.Element {
                     {!isWholesaler && (
                         <div className="flex flex-col gap-3 pt-2">
                             <div className="flex items-center gap-3">
-                                <span className="text-sm font-medium text-navy-700">Quantity</span>
+                                <span className="text-sm font-medium text-navy-700">{t('marketplace.detail.quantity')}</span>
                                 <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden">
                                     <button
                                         type="button"
@@ -211,7 +216,13 @@ export default function ProductDetail(): JSX.Element {
                                 }`}
                             >
                                 <ShoppingCart className="h-5 w-5" />
-                                {added ? 'Added to Cart!' : (product.stock ?? 0) === 0 ? 'Out of Stock' : isAuthenticated ? 'Add to Cart' : 'Sign in to add'}
+                                {added
+                                  ? t('marketplace.detail.addedToCart')
+                                  : (product.stock ?? 0) === 0
+                                    ? t('marketplace.detail.outOfStockTitle')
+                                    : isAuthenticated
+                                      ? t('marketplace.card.addToCart')
+                                      : t('marketplace.card.signInToAdd')}
                             </button>
                         </div>
                     )}

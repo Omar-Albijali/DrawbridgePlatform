@@ -1,10 +1,11 @@
 import type { Notification } from '../types';
+import i18n from '../i18n';
 
 const ORDER_UUID_REGEX = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 
 export function getNotificationTitle(notification: Notification): string {
   const maybeTitle = (notification as Notification & { title?: string }).title;
-  return maybeTitle && maybeTitle.trim().length > 0 ? maybeTitle : 'Notification';
+  return maybeTitle && maybeTitle.trim().length > 0 ? maybeTitle : i18n.t('navigation.notifications');
 }
 
 export function shortenOrderIds(text: string): string {
@@ -15,4 +16,3 @@ export function notificationDestination(notification: Notification): string {
   const withDeepLink = notification as Notification & { deepLink?: string };
   return withDeepLink.deepLink ?? '/notifications';
 }
-

@@ -1,4 +1,4 @@
-import type { Order } from '../types';
+import type { Order, OrderItem } from '../types';
 import { cartService } from '../services/cartService';
 
 export interface ReorderToCartResult {
@@ -8,7 +8,7 @@ export interface ReorderToCartResult {
 }
 
 export async function reorderOrderToCart(retailerId: string, order: Order): Promise<ReorderToCartResult> {
-  const orderItems = (order.items ?? []).filter((item) => item.quantity > 0);
+  const orderItems = (order.items ?? []).filter((item: OrderItem) => item.quantity > 0);
 
   if (orderItems.length === 0) {
     return {
@@ -19,13 +19,13 @@ export async function reorderOrderToCart(retailerId: string, order: Order): Prom
   }
 
   const results = await Promise.allSettled(
-    orderItems.map((item) => cartService.addItem(retailerId, item.productId, item.quantity)),
+    orderItems.map((item: OrderItem) => cartService.addItem(retailerId, item.productId, item.quantity)),
   );
 
   const failedProductNames: string[] = [];
   let addedItems = 0;
 
-  results.forEach((result, index) => {
+  results.forEach((result: PromiseSettledResult<unknown>, index: number) => {
     if (result.status === 'fulfilled') {
       addedItems += 1;
       return;

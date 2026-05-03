@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import AppNavbar from '../components/AppNavbar';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -9,13 +10,14 @@ interface MainLayoutProps {
 export default function MainLayout({ requireAuth = true }: MainLayoutProps): JSX.Element {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
+  const { t } = useTranslation();
 
   if (requireAuth && isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4 text-slate-600 dark:text-slate-300">
         <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white/80 px-5 py-3 shadow-sm dark:border-white/10 dark:bg-slate-900/70">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-500 border-t-transparent" />
-          <p className="text-sm font-medium">Loading...</p>
+          <p className="text-sm font-medium">{t('common.loading')}</p>
         </div>
       </div>
     );

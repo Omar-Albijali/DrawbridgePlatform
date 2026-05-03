@@ -1,10 +1,12 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { CreditCard, Plus, Star, Trash2, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { paymentService } from '../../services/paymentService';
 import { CreatePaymentMethodRequest, PaymentMethodDTO } from '../../types';
 
 export default function Payments(): JSX.Element {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [methods, setMethods] = useState<PaymentMethodDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -92,12 +94,12 @@ export default function Payments(): JSX.Element {
       setIsModalOpen(false);
     } catch (error) {
       console.error('Failed to add payment method', error);
-      alert('Failed to add payment method');
+      alert(t('payments.addFailed'));
     }
   };
 
   const handleDeleteCard = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this payment method?')) return;
+    if (!window.confirm(t('payments.confirmDelete'))) return;
 
     try {
       await paymentService.deletePaymentMethod(id);
@@ -155,14 +157,14 @@ export default function Payments(): JSX.Element {
   );
 
   if (isLoading && methods.length === 0) {
-    return <div className="text-center py-8">Loading payment methods...</div>;
+    return <div className="text-center py-8">{t('payments.loading')}</div>;
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-navy-800">Payment Methods</h1>
-        <p className="text-navy-500 mt-1">Manage your saved payment methods</p>
+        <h1 className="text-2xl font-bold text-navy-800">{t('payments.title')}</h1>
+        <p className="text-navy-500 mt-1">{t('payments.description')}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -184,7 +186,7 @@ export default function Payments(): JSX.Element {
                   {method.isDefault && (
                     <span className="flex items-center gap-1 text-xs bg-white/20 px-2 py-1 rounded-full">
                       <Star className="w-3 h-3 fill-current" />
-                      Default
+                      {t('common.default')}
                     </span>
                   )}
                 </div>
@@ -197,7 +199,7 @@ export default function Payments(): JSX.Element {
                   <div>
                     {parsed.expiry && (
                       <>
-                        <p className="text-xs text-white/60 uppercase">Expires</p>
+                        <p className="text-xs text-white/60 uppercase">{t('payments.expires')}</p>
                         <p className="font-medium">{parsed.expiry}</p>
                       </>
                     )}
@@ -207,7 +209,7 @@ export default function Payments(): JSX.Element {
                       <button
                         onClick={() => handleSetDefault(method.id)}
                         className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-                        title="Set as default"
+                        title={t('payments.setDefault')}
                       >
                         <Star className="w-4 h-4" />
                       </button>
@@ -215,7 +217,7 @@ export default function Payments(): JSX.Element {
                     <button
                       onClick={() => handleDeleteCard(method.id)}
                       className="p-2 bg-red-500/20 hover:bg-red-500/40 rounded-lg transition-colors"
-                      title="Delete card"
+                      title={t('payments.deleteCard')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -233,7 +235,7 @@ export default function Payments(): JSX.Element {
           <div className="w-12 h-12 rounded-full bg-navy-100 group-hover:bg-primary-100 flex items-center justify-center transition-colors">
             <Plus className="w-6 h-6 text-navy-500 group-hover:text-primary-600" />
           </div>
-          <span className="font-medium text-navy-600 group-hover:text-primary-600">Add Payment Method</span>
+          <span className="font-medium text-navy-600 group-hover:text-primary-600">{t('payments.addMethod')}</span>
         </button>
       </div>
 
@@ -244,7 +246,7 @@ export default function Payments(): JSX.Element {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-primary-600" />
-                <h3 className="text-lg font-semibold text-navy-800">Add New Card</h3>
+                <h3 className="text-lg font-semibold text-navy-800">{t('payments.addNewCard')}</h3>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                 <X className="w-5 h-5 text-navy-500" />
@@ -253,18 +255,18 @@ export default function Payments(): JSX.Element {
 
             <div className="space-y-4">
               <div>
-                <label className="label">Cardholder Name</label>
+                <label className="label">{t('payments.cardholderName')}</label>
                 <input
                   type="text"
                   name="name"
                   value={newCard.name}
                   onChange={handleInputChange}
                   className="input"
-                  placeholder="Name on card"
+                  placeholder={t('payments.nameOnCard')}
                 />
               </div>
               <div>
-                <label className="label">Card Number</label>
+                <label className="label">{t('payments.cardNumber')}</label>
                 <input
                   type="text"
                   name="number"
@@ -277,19 +279,19 @@ export default function Payments(): JSX.Element {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Expiry Date</label>
+                  <label className="label">{t('payments.expiryDate')}</label>
                   <input
                     type="text"
                     name="expiry"
                     value={newCard.expiry}
                     onChange={handleInputChange}
                     className="input"
-                    placeholder="MM/YY"
+                    placeholder={t('payments.expiryPlaceholder')}
                     maxLength={5}
                   />
                 </div>
                 <div>
-                  <label className="label">CVV</label>
+                  <label className="label">{t('payments.cvv')}</label>
                   <input
                     type="text"
                     name="cvv"
@@ -305,14 +307,14 @@ export default function Payments(): JSX.Element {
 
             <div className="flex gap-3 mt-6">
               <button onClick={() => setIsModalOpen(false)} className="btn-secondary flex-1 py-2.5">
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleAddCard}
                 disabled={!isFormValid}
                 className={`btn-primary flex-1 py-2.5 ${!isFormValid ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                Add Card
+                {t('payments.addCard')}
               </button>
             </div>
           </div>
