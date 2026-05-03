@@ -89,13 +89,13 @@ export default function Marketplace(): JSX.Element {
       ]);
 
       if (categoriesResult.status === 'fulfilled') {
-        setCategories(categoriesResult.value);
+        setCategories(Array.isArray(categoriesResult.value) ? categoriesResult.value : []);
       } else {
         console.error('Failed to fetch categories', categoriesResult.reason);
       }
 
       if (brandsResult.status === 'fulfilled') {
-        setBrands(brandsResult.value);
+        setBrands(Array.isArray(brandsResult.value) ? brandsResult.value : []);
       } else {
         console.error('Failed to fetch brands', brandsResult.reason);
       }
@@ -126,8 +126,9 @@ export default function Marketplace(): JSX.Element {
           controller.signal,
         );
 
-        setProducts(data.content);
-        setPagination(data);
+        const safeProducts = Array.isArray(data.content) ? data.content : [];
+        setProducts(safeProducts);
+        setPagination({ ...data, content: safeProducts });
       } catch (error) {
         if (controller.signal.aborted) {
           return;
