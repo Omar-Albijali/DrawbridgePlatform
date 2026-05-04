@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Package, Plus, Search, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { productService } from '../../services/productService';
 import type { CreateInventoryItemRequest, Product } from '../../types';
@@ -11,6 +12,7 @@ interface AddInventoryModalProps {
 }
 
 export default function AddInventoryModal({ isOpen, onClose, onAdd }: AddInventoryModalProps): JSX.Element | null {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [step, setStep] = useState<1 | 2>(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,8 +100,8 @@ export default function AddInventoryModal({ isOpen, onClose, onAdd }: AddInvento
                 <Plus className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold">Add Product to Inventory</h2>
-                <p className="text-primary-100 text-sm">{step === 1 ? 'Select a product' : 'Configure stock details'}</p>
+                <h2 className="text-lg font-semibold">{t('inventory.modal.addTitle')}</h2>
+                <p className="text-primary-100 text-sm">{step === 1 ? t('inventory.modal.selectProduct') : t('inventory.modal.configureStock')}</p>
               </div>
             </div>
             <button
@@ -121,7 +123,7 @@ export default function AddInventoryModal({ isOpen, onClose, onAdd }: AddInvento
                   type="text"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search for products..."
+                  placeholder={t('inventory.modal.searchProducts')}
                   className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
                   autoFocus
                 />
@@ -134,7 +136,7 @@ export default function AddInventoryModal({ isOpen, onClose, onAdd }: AddInvento
               ) : (
                 <div className="space-y-2">
                   {products.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">No products found</div>
+                    <div className="text-center py-8 text-gray-500">{t('inventory.modal.noProducts')}</div>
                   ) : (
                     products.map((product) => (
                       <button
@@ -175,13 +177,13 @@ export default function AddInventoryModal({ isOpen, onClose, onAdd }: AddInvento
                   onClick={() => setStep(1)}
                   className="ml-auto text-sm text-primary-600 hover:text-primary-700 font-medium"
                 >
-                  Change
+                  {t('common.change')}
                 </button>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="label">Current Stock</label>
+                  <label className="label">{t('inventory.modal.currentStock')}</label>
                   <input
                     type="number"
                     value={currentStock}
@@ -192,8 +194,8 @@ export default function AddInventoryModal({ isOpen, onClose, onAdd }: AddInvento
                 </div>
 
                 <div>
-                  <label className="label">Minimum Threshold</label>
-                  <p className="text-xs text-navy-500 mb-2">Alert when stock falls below this level</p>
+                  <label className="label">{t('inventory.modal.minimumThreshold')}</label>
+                  <p className="text-xs text-navy-500 mb-2">{t('inventory.modal.thresholdHint')}</p>
                   <input
                     type="number"
                     value={minThreshold}
@@ -215,7 +217,7 @@ export default function AddInventoryModal({ isOpen, onClose, onAdd }: AddInvento
                       }`}
                     />
                   </button>
-                  <span className="text-sm font-medium text-navy-700">Enable Auto-Restock</span>
+                  <span className="text-sm font-medium text-navy-700">{t('inventory.modal.enableAutoRestock')}</span>
                 </div>
               </div>
             </div>
@@ -225,10 +227,10 @@ export default function AddInventoryModal({ isOpen, onClose, onAdd }: AddInvento
         {step === 2 && (
           <div className="px-6 py-4 bg-gray-50 flex gap-3 shrink-0">
             <button type="button" onClick={() => setStep(1)} className="flex-1 btn-secondary" disabled={isSubmitting}>
-              Back
+              {t('common.back')}
             </button>
             <button type="button" onClick={handleSubmit} className="flex-1 btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Adding...' : 'Add to Inventory'}
+              {isSubmitting ? t('inventory.modal.adding') : t('inventory.modal.addToInventory')}
             </button>
           </div>
         )}

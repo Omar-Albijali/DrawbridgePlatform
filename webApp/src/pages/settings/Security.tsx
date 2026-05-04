@@ -1,9 +1,11 @@
 import { useState, type ChangeEvent } from 'react';
 import { CheckCircle, Eye, EyeOff, Lock, Shield, Smartphone, XCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { userService } from '../../services/userService';
 
 export default function Security(): JSX.Element {
+  const { t } = useTranslation();
   const { user } = useAuth();
 
   const [showPasswords, setShowPasswords] = useState({
@@ -39,13 +41,13 @@ export default function Security(): JSX.Element {
     setFeedback(null);
     try {
       await userService.changePassword(user.id, passwords.current, passwords.new);
-      setFeedback({ type: 'success', message: 'Password updated successfully.' });
+      setFeedback({ type: 'success', message: t('settings.security.passwordUpdated') });
       setPasswords({ current: '', new: '', confirm: '' });
     } catch (error: unknown) {
       const message =
         error instanceof Error && error.message.includes('403')
-          ? 'Current password is incorrect.'
-          : 'Failed to update password. Please try again.';
+          ? t('settings.security.currentIncorrect')
+          : t('settings.security.updateFailed');
       setFeedback({ type: 'error', message });
     } finally {
       setIsSubmitting(false);
@@ -61,18 +63,18 @@ export default function Security(): JSX.Element {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-navy-800">Login & Security</h1>
-        <p className="text-navy-500 mt-1">Manage your password and account security</p>
+        <h1 className="text-2xl font-bold text-navy-800">{t('settings.security.title')}</h1>
+        <p className="text-navy-500 mt-1">{t('settings.security.description')}</p>
       </div>
 
       <div className="card">
         <div className="flex items-center gap-2 mb-6">
           <Lock className="w-5 h-5 text-primary-600" />
-          <h3 className="text-lg font-semibold text-navy-800">Change Password</h3>
+          <h3 className="text-lg font-semibold text-navy-800">{t('settings.security.changePassword')}</h3>
         </div>
         <div className="space-y-4 max-w-md">
           <div>
-            <label className="label">Current Password</label>
+            <label className="label">{t('settings.security.currentPassword')}</label>
             <div className="relative">
               <input
                 type={showPasswords.current ? 'text' : 'password'}
@@ -80,7 +82,7 @@ export default function Security(): JSX.Element {
                 value={passwords.current}
                 onChange={handlePasswordChange}
                 className="input pr-10"
-                placeholder="Enter current password"
+                placeholder={t('settings.security.enterCurrentPassword')}
               />
               <button
                 type="button"
@@ -93,7 +95,7 @@ export default function Security(): JSX.Element {
           </div>
 
           <div>
-            <label className="label">New Password</label>
+            <label className="label">{t('settings.security.newPassword')}</label>
             <div className="relative">
               <input
                 type={showPasswords.new ? 'text' : 'password'}
@@ -101,7 +103,7 @@ export default function Security(): JSX.Element {
                 value={passwords.new}
                 onChange={handlePasswordChange}
                 className="input pr-10"
-                placeholder="Enter new password"
+                placeholder={t('settings.security.enterNewPassword')}
               />
               <button
                 type="button"
@@ -114,7 +116,7 @@ export default function Security(): JSX.Element {
           </div>
 
           <div>
-            <label className="label">Confirm New Password</label>
+            <label className="label">{t('settings.security.confirmNewPassword')}</label>
             <div className="relative">
               <input
                 type={showPasswords.confirm ? 'text' : 'password'}
@@ -122,7 +124,7 @@ export default function Security(): JSX.Element {
                 value={passwords.confirm}
                 onChange={handlePasswordChange}
                 className="input pr-10"
-                placeholder="Confirm new password"
+                placeholder={t('settings.security.confirmNewPasswordPlaceholder')}
               />
               <button
                 type="button"
@@ -133,7 +135,7 @@ export default function Security(): JSX.Element {
               </button>
             </div>
             {passwords.new && passwords.confirm && passwords.new !== passwords.confirm && (
-              <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+              <p className="text-xs text-red-500 mt-1">{t('settings.security.passwordsMismatch')}</p>
             )}
           </div>
 
@@ -162,7 +164,7 @@ export default function Security(): JSX.Element {
             }`}
           >
             {isSubmitting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-            {isSubmitting ? 'Updating…' : 'Update Password'}
+            {isSubmitting ? t('settings.security.updating') : t('settings.security.updatePassword')}
           </button>
         </div>
       </div>
@@ -170,7 +172,7 @@ export default function Security(): JSX.Element {
       <div className="card">
         <div className="flex items-center gap-2 mb-6">
           <Shield className="w-5 h-5 text-primary-600" />
-          <h3 className="text-lg font-semibold text-navy-800">Two-Factor Authentication</h3>
+          <h3 className="text-lg font-semibold text-navy-800">{t('settings.security.twoFactor')}</h3>
         </div>
         <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
           <div className="flex items-center gap-4">
@@ -178,8 +180,8 @@ export default function Security(): JSX.Element {
               <Smartphone className="w-6 h-6 text-primary-600" />
             </div>
             <div>
-              <h4 className="font-medium text-navy-800">Authenticator App</h4>
-              <p className="text-sm text-navy-500">Secure your account with an authenticator app</p>
+              <h4 className="font-medium text-navy-800">{t('settings.security.authenticatorApp')}</h4>
+              <p className="text-sm text-navy-500">{t('settings.security.authenticatorDescription')}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -195,7 +197,7 @@ export default function Security(): JSX.Element {
                 }`}
               />
             </button>
-            {twoFactorEnabled && <button className="btn-secondary px-4 py-2 text-sm">Setup</button>}
+            {twoFactorEnabled && <button className="btn-secondary px-4 py-2 text-sm">{t('settings.security.setup')}</button>}
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, Package, Plus, Save, Star, Trash2, Upload } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { productService } from '../services/productService';
@@ -14,6 +15,7 @@ interface ImageItem {
 }
 
 export default function ProductForm(): JSX.Element {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id: productId } = useParams<{ id: string }>();
@@ -59,7 +61,7 @@ export default function ProductForm(): JSX.Element {
         const category = categories.find((item) => item.name === product.category);
         setCategoryId(category?.id ?? '');
 
-        const existingImages: ImageItem[] = (serverImages ?? []).map((image) => ({
+        const existingImages: ImageItem[] = (serverImages ?? []).map((image: { id?: string | null; url: string }) => ({
           id: image.id ?? undefined,
           url: image.url,
           isExisting: true,
@@ -68,7 +70,7 @@ export default function ProductForm(): JSX.Element {
       })
       .catch((reason) => {
         console.error('Failed to load product:', reason);
-        setError('Failed to load product data');
+        setError(t('products.form.errors.loadFailed'));
       })
       .finally(() => setIsLoading(false));
   }, [categories, isEditMode, productId]);
@@ -78,17 +80,17 @@ export default function ProductForm(): JSX.Element {
 
     for (const file of fileArray) {
       if (!file.type.startsWith('image/')) {
-        setError('Please select image files only');
+        setError(t('products.form.errors.imageOnly'));
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        setError('Each image must be less than 5MB');
+        setError(t('products.form.errors.imageTooLarge'));
         return;
       }
     }
 
     if (images.length + fileArray.length > 10) {
-      setError('Maximum 10 images per product');
+      setError(t('products.form.errors.maxImages'));
       return;
     }
 
@@ -156,19 +158,19 @@ export default function ProductForm(): JSX.Element {
 
   const handleSubmit = async (): Promise<void> => {
     if (!name.trim()) {
-      setError('Product name is required');
+      setError(t('products.form.errors.nameRequired'));
       return;
     }
     if (!description.trim()) {
-      setError('Description is required');
+      setError(t('products.form.errors.descriptionRequired'));
       return;
     }
     if (!price || Number(price) <= 0) {
-      setError('Valid price is required');
+      setError(t('products.form.errors.validPrice'));
       return;
     }
     if (!stock || Number(stock) < 0) {
-      setError('Valid stock quantity is required');
+      setError(t('products.form.errors.validStock'));
       return;
     }
     if (!gtin || !Number.isInteger(Number(gtin)) || Number(gtin) < 0) {
@@ -176,11 +178,11 @@ export default function ProductForm(): JSX.Element {
       return;
     }
     if (!categoryId) {
-      setError('Please select a category');
+      setError(t('products.form.errors.selectCategory'));
       return;
     }
     if (!user?.id) {
-      setError('You must be logged in');
+      setError(t('products.form.errors.loginRequired'));
       return;
     }
 
@@ -250,7 +252,7 @@ export default function ProductForm(): JSX.Element {
 
       navigate('/products');
     } catch (reason) {
-      const message = reason instanceof Error ? reason.message : 'Failed to save product';
+      const message = reason instanceof Error ? reason.message : t('products.form.errors.saveFailed');
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -267,8 +269,8 @@ export default function ProductForm(): JSX.Element {
 
   return (
     <PageShell
-      title={isEditMode ? 'Edit Product' : 'Add New Product'}
-      description={isEditMode ? 'Update product details and images' : 'Fill in the product details below'}
+      title={isEditMode ? t('products.form.editTitle') : t('products.form.addTitle')}
+      description={isEditMode ? t('products.form.editDescription') : t('products.form.addDescription')}
       actions={
         <div className="flex items-center gap-3">
           <button
@@ -279,11 +281,15 @@ export default function ProductForm(): JSX.Element {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <button type="button" onClick={() => navigate('/products')} className="btn-secondary" disabled={isSubmitting}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button type="button" onClick={() => void handleSubmit()} className="btn-primary flex items-center gap-2" disabled={isSubmitting}>
             <Save className="w-4 h-4" />
-            {isSubmitting ? (isEditMode ? 'Saving...' : 'Creating...') : isEditMode ? 'Save Changes' : 'Create Product'}
+            {isSubmitting
+              ? (isEditMode ? t('products.form.saving') : t('products.form.creating'))
+              : isEditMode
+                ? t('products.form.saveChanges')
+                : t('products.form.createProduct')}
           </button>
         </div>
       }
@@ -298,31 +304,31 @@ export default function ProductForm(): JSX.Element {
               <div className="w-9 h-9 bg-primary-100 rounded-lg flex items-center justify-center">
                 <Package className="w-4.5 h-4.5 text-primary-600" />
               </div>
-              <h2 className="text-lg font-semibold text-navy-800">Basic Information</h2>
+              <h2 className="text-lg font-semibold text-navy-800">{t('products.form.basicInfo')}</h2>
             </div>
 
             <div className="space-y-4">
               <div>
                 <label className="label">
-                  Product Name <span className="text-red-500">*</span>
+                  {t('products.form.productName')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="e.g. Premium Wireless Headphones"
+                  placeholder={t('products.form.productNamePlaceholder')}
                   className="input"
                 />
               </div>
 
               <div>
                 <label className="label">
-                  Description <span className="text-red-500">*</span>
+                  {t('products.form.description')} <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder="Describe your product..."
+                  placeholder={t('products.form.descriptionPlaceholder')}
                   rows={4}
                   className="input resize-none"
                 />
@@ -330,10 +336,10 @@ export default function ProductForm(): JSX.Element {
 
               <div>
                 <label className="label">
-                  Category <span className="text-red-500">*</span>
+                  {t('products.form.category')} <span className="text-red-500">*</span>
                 </label>
                 <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="input">
-                  <option value="">Select a category</option>
+                  <option value="">{t('products.form.selectCategory')}</option>
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.name}
@@ -345,11 +351,11 @@ export default function ProductForm(): JSX.Element {
           </div>
 
           <div className="card">
-            <h2 className="text-lg font-semibold text-navy-800 mb-5">Pricing &amp; Stock</h2>
+            <h2 className="text-lg font-semibold text-navy-800 mb-5">{t('products.form.pricingStock')}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="label">
-                  Price (SAR) <span className="text-red-500">*</span>
+                  {t('products.form.priceSar')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -363,7 +369,7 @@ export default function ProductForm(): JSX.Element {
               </div>
               <div>
                 <label className="label">
-                  Stock Quantity <span className="text-red-500">*</span>
+                  {t('products.form.stockQuantity')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -395,7 +401,7 @@ export default function ProductForm(): JSX.Element {
         <div className="lg:col-span-1">
           <div className="card sticky top-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-navy-800">Product Images</h2>
+              <h2 className="text-lg font-semibold text-navy-800">{t('products.form.images')}</h2>
               <span className="text-sm text-navy-400 font-medium">{images.length}/10</span>
             </div>
 
@@ -411,7 +417,7 @@ export default function ProductForm(): JSX.Element {
                     <div key={image.id ?? `${image.url}-${index}`} className="relative group">
                       <img
                         src={image.url}
-                        alt={`Product ${index + 1}`}
+                        alt={t('products.form.imageAlt', { index: index + 1 })}
                         draggable={false}
                         onDragStart={(event) => event.preventDefault()}
                         className={`w-full h-28 object-cover rounded-lg shadow-sm select-none ${
@@ -434,7 +440,7 @@ export default function ProductForm(): JSX.Element {
                               type="button"
                               onClick={() => moveImage(index, 'left')}
                               className="w-5 h-5 bg-black/60 hover:bg-black/80 text-white rounded flex items-center justify-center"
-                              title="Move left"
+                              title={t('products.form.moveLeft')}
                             >
                               <ChevronLeft className="w-3 h-3" />
                             </button>
@@ -444,7 +450,7 @@ export default function ProductForm(): JSX.Element {
                               type="button"
                               onClick={() => moveImage(index, 'right')}
                               className="w-5 h-5 bg-black/60 hover:bg-black/80 text-white rounded flex items-center justify-center"
-                              title="Move right"
+                              title={t('products.form.moveRight')}
                             >
                               <ChevronRight className="w-3 h-3" />
                             </button>
@@ -454,7 +460,7 @@ export default function ProductForm(): JSX.Element {
 
                       {index === 0 ? (
                         <span className="absolute bottom-1 left-1 text-[10px] bg-primary-600 text-white px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
-                          <Star className="w-2.5 h-2.5 fill-current" /> Main
+                          <Star className="w-2.5 h-2.5 fill-current" /> {t('products.form.main')}
                         </span>
                       ) : (
                         <button
@@ -462,7 +468,7 @@ export default function ProductForm(): JSX.Element {
                           onClick={() => setAsMain(index)}
                           className="absolute bottom-1 left-1 text-[10px] bg-black/60 hover:bg-primary-600 text-white px-1.5 py-0.5 rounded font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5"
                         >
-                          <Star className="w-2.5 h-2.5" /> Set main
+                          <Star className="w-2.5 h-2.5" /> {t('products.form.setMain')}
                         </button>
                       )}
                     </div>
@@ -475,7 +481,7 @@ export default function ProductForm(): JSX.Element {
                       className="w-full h-28 border-2 border-dashed border-gray-300 hover:border-primary-400 rounded-lg flex flex-col items-center justify-center gap-1 transition-colors hover:bg-gray-50"
                     >
                       <Plus className="w-5 h-5 text-gray-400" />
-                      <span className="text-xs text-gray-400">Add</span>
+                      <span className="text-xs text-gray-400">{t('products.form.add')}</span>
                     </button>
                   )}
                 </div>
@@ -493,8 +499,8 @@ export default function ProductForm(): JSX.Element {
                       <Upload className="w-7 h-7 text-gray-400" />
                     </div>
                     <div>
-                      <p className="text-sm text-navy-600 font-medium">Click to upload or drag and drop</p>
-                      <p className="text-xs text-navy-400 mt-1">PNG, JPG, WebP up to 5MB · Up to 10 images</p>
+                      <p className="text-sm text-navy-600 font-medium">{t('products.form.uploadPrompt')}</p>
+                      <p className="text-xs text-navy-400 mt-1">{t('products.form.uploadHint')}</p>
                     </div>
                   </div>
                 </div>
@@ -502,7 +508,7 @@ export default function ProductForm(): JSX.Element {
 
               {isDragOver && images.length > 0 && (
                 <div className="border-2 border-dashed border-primary-500 rounded-xl p-3 text-center bg-primary-50">
-                  <p className="text-sm text-primary-600 font-medium">Drop images here to add</p>
+                  <p className="text-sm text-primary-600 font-medium">{t('products.form.dropImages')}</p>
                 </div>
               )}
             </div>
@@ -523,7 +529,7 @@ export default function ProductForm(): JSX.Element {
 
             {images.length > 0 && (
               <p className="text-xs text-navy-400 mt-3">
-                The first image is the main product image. Drag and drop files or use the arrows to reorder.
+                {t('products.form.imageHelp')}
               </p>
             )}
           </div>

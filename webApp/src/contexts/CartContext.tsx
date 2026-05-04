@@ -11,6 +11,7 @@ import { useAuth } from './AuthContext';
 import { UserRole, type CartItem, type Product } from '../types';
 import { productService } from '../services/productService';
 import { cartService } from '../services/cartService';
+import i18n from '../i18n';
 
 const TAX_RATE = 0.15;
 
@@ -149,19 +150,19 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
 
   const checkout = useCallback(async (): Promise<{ success: boolean; message?: string }> => {
     if (!isAuthenticated) {
-      return { success: false, message: 'Please sign in to continue checkout.' };
+      return { success: false, message: i18n.t('cart.checkoutErrors.signIn') };
     }
 
     if (isWholesaler) {
-      return { success: false, message: 'Wholesale accounts cannot place retailer orders.' };
+      return { success: false, message: i18n.t('cart.checkoutErrors.wholesale') };
     }
 
     if (!user?.id) {
-      return { success: false, message: 'Missing user session. Please sign in again.' };
+      return { success: false, message: i18n.t('cart.checkoutErrors.missingSession') };
     }
 
     if (items.length === 0) {
-      return { success: false, message: 'Your cart is empty. Add items before checkout.' };
+      return { success: false, message: i18n.t('cart.checkoutErrors.emptyCart') };
     }
 
     try {
@@ -172,7 +173,7 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
       console.error('Checkout failed', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Checkout failed. Please try again.',
+        message: error instanceof Error ? error.message : i18n.t('cart.checkoutErrors.failed'),
       };
     }
   }, [clearCart, isAuthenticated, isWholesaler, items.length, user?.id]);

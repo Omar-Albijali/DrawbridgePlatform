@@ -1,30 +1,30 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Boxes, Globe2, ShieldCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import LandingNavbar from '../components/LandingNavbar';
 
 const landingFeatures = [
 	{
 		icon: Boxes,
-		title: 'Smart inventory',
-		description:
-			'Track stock in real time and plan replenishment with confidence across all storage locations.',
+		titleKey: 'landing.featureCards.inventoryTitle',
+		descriptionKey: 'landing.featureCards.inventoryDescription',
 	},
 	{
 		icon: Globe2,
-		title: 'Global marketplace',
-		description:
-			'Discover verified wholesale suppliers, compare options, and source products faster.',
+		titleKey: 'landing.featureCards.marketplaceTitle',
+		descriptionKey: 'landing.featureCards.marketplaceDescription',
 	},
 	{
 		icon: ShieldCheck,
-		title: 'Secure operations',
-		description:
-			'Run procurement workflows with trusted partners and auditable transaction history.',
+		titleKey: 'landing.featureCards.operationsTitle',
+		descriptionKey: 'landing.featureCards.operationsDescription',
 	},
 ];
 
 export default function Landing(): JSX.Element {
+	const { t } = useTranslation();
+
 	useEffect(() => {
 		const revealNodes = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'));
 		const observer = new IntersectionObserver(
@@ -91,33 +91,32 @@ export default function Landing(): JSX.Element {
 						data-reveal
 						className="rounded-full border border-primary-300/70 bg-primary-100/75 px-4 py-1.5 text-sm font-semibold uppercase tracking-[0.14em] text-primary-700 opacity-0 translate-y-6 transition-all duration-700 dark:border-primary-400/20 dark:bg-primary-500/10 dark:text-primary-200"
 					>
-						Next-gen B2B ecosystem
+						{t('landing.heroEyebrow')}
 					</p>
 					<h1
 						data-reveal
 						className="max-w-4xl text-4xl font-black leading-tight tracking-tight text-slate-900 opacity-0 translate-y-6 transition-all duration-700 delay-100 dark:text-white sm:text-5xl lg:text-6xl"
 					>
-						Your supply chain, orchestrated in one platform.
+						{t('landing.heroTitle')}
 					</h1>
 					<p
 						data-reveal
 						className="max-w-2xl text-lg text-slate-600 opacity-0 translate-y-6 transition-all duration-700 delay-200 dark:text-slate-300"
 					>
-						Connect with verified suppliers, optimize inventory flow, and move from discovery to fulfillment without
-						switching tools.
+						{t('landing.heroDescription')}
 					</p>
 					<div
 						data-reveal
 						className="flex flex-wrap gap-3 opacity-0 translate-y-6 transition-all duration-700 delay-300"
 					>
 						<Link to="/register" className="hover-target btn-primary rounded-lg px-6 py-3 text-sm uppercase tracking-wide">
-							Start trading
+							{t('landing.startTrading')}
 						</Link>
 						<Link
 							to="/marketplace"
 							className="hover-target inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-semibold uppercase tracking-wide text-slate-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-white/20 dark:bg-slate-900 dark:text-slate-200"
 						>
-							Explore marketplace
+							{t('landing.exploreMarketplace')}
 						</Link>
 					</div>
 				</div>
@@ -127,10 +126,10 @@ export default function Landing(): JSX.Element {
 				<div className="mx-auto w-full max-w-7xl space-y-8">
 					<div data-reveal className="max-w-2xl opacity-0 translate-y-6 transition-all duration-700">
 						<h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-							Built for operational scale
+							{t('landing.featuresTitle')}
 						</h2>
 						<p className="mt-2 text-slate-600 dark:text-slate-300">
-							Enterprise-grade workflows for modern wholesale commerce teams.
+							{t('landing.featuresDescription')}
 						</p>
 					</div>
 
@@ -139,7 +138,7 @@ export default function Landing(): JSX.Element {
 							const Icon = feature.icon;
 							return (
 								<article
-									key={feature.title}
+									key={feature.titleKey}
 									data-reveal
 									data-tilt
 									className="glass-panel rounded-2xl p-6 opacity-0 translate-y-6 transition-all duration-700 will-change-transform"
@@ -149,10 +148,10 @@ export default function Landing(): JSX.Element {
 										<Icon size={22} />
 									</div>
 									<h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-										{feature.title}
+										{t(feature.titleKey)}
 									</h3>
 									<p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
-										{feature.description}
+										{t(feature.descriptionKey)}
 									</p>
 								</article>
 							);
@@ -167,13 +166,13 @@ export default function Landing(): JSX.Element {
 					className="mx-auto flex w-full max-w-7xl flex-col items-start gap-4 rounded-3xl border border-primary-300/40 bg-gradient-to-r from-primary-500/15 to-cyan-400/15 p-8 opacity-0 translate-y-6 transition-all duration-700 dark:border-primary-400/20"
 				>
 					<h2 className="text-2xl font-bold text-slate-900 dark:text-slate-50">
-						Ready to modernize your supply network?
+						{t('landing.ctaTitle')}
 					</h2>
 					<p className="text-slate-600 dark:text-slate-300">
-						Create your account to start sourcing from trusted suppliers.
+						{t('landing.ctaDescription')}
 					</p>
 					<Link to="/register" className="hover-target btn-primary rounded-lg px-6 py-3 text-sm uppercase tracking-wide">
-						Create account
+						{t('landing.createAccount')}
 					</Link>
 				</div>
 			</section>
@@ -182,17 +181,17 @@ export default function Landing(): JSX.Element {
 				<div className="mx-auto flex w-full max-w-7xl flex-col gap-6 text-sm text-slate-500 dark:text-slate-300 md:flex-row md:items-end md:justify-between">
 					<div>
 						<h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Drawbridge</h3>
-						<p className="mt-1">Reliable wholesale commerce for procurement and sales teams.</p>
+						<p className="mt-1">{t('landing.footerDescription')}</p>
 					</div>
 					<div className="flex items-center gap-4 font-semibold">
 						<Link to="/marketplace" className="hover-target transition hover:text-primary-500">
-							Marketplace
+							{t('navigation.marketplace')}
 						</Link>
 						<Link to="/login" className="hover-target transition hover:text-primary-500">
-							Sign in
+							{t('navigation.signIn')}
 						</Link>
 						<Link to="/register" className="hover-target transition hover:text-primary-500">
-							Register
+							{t('landing.register')}
 						</Link>
 					</div>
 				</div>

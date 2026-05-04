@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Grid3X3, List, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import FilterSidebar, { type FilterOption } from '../components/FilterSidebar/FilterSidebar';
 import PageShell from '../components/PageShell';
 import ProductCard from '../components/ProductCard/ProductCard';
@@ -48,6 +49,7 @@ function buildPaginationItems(totalPages: number, currentPage: number): Paginati
 }
 
 export default function Marketplace(): JSX.Element {
+  const { t } = useTranslation();
   const { isAuthenticated, user } = useAuth();
   const isWholesaler = user?.role === UserRole.WHOLESALER;
   const navigate = useNavigate();
@@ -87,13 +89,13 @@ export default function Marketplace(): JSX.Element {
       ]);
 
       if (categoriesResult.status === 'fulfilled') {
-        setCategories(categoriesResult.value);
+        setCategories(Array.isArray(categoriesResult.value) ? categoriesResult.value : []);
       } else {
         console.error('Failed to fetch categories', categoriesResult.reason);
       }
 
       if (brandsResult.status === 'fulfilled') {
-        setBrands(brandsResult.value);
+        setBrands(Array.isArray(brandsResult.value) ? brandsResult.value : []);
       } else {
         console.error('Failed to fetch brands', brandsResult.reason);
       }
@@ -124,8 +126,9 @@ export default function Marketplace(): JSX.Element {
           controller.signal,
         );
 
-        setProducts(data.content);
-        setPagination(data);
+        const safeProducts = Array.isArray(data.content) ? data.content : [];
+        setProducts(safeProducts);
+        setPagination({ ...data, content: safeProducts });
       } catch (error) {
         if (controller.signal.aborted) {
           return;
@@ -134,7 +137,7 @@ export default function Marketplace(): JSX.Element {
         console.error('Failed to fetch marketplace products', error);
         setProducts([]);
         setPagination(null);
-        setProductsError('Unable to load products right now. Please try again.');
+        setProductsError(t('marketplace.loadError'));
       } finally {
         if (!controller.signal.aborted) {
           setIsFetchingProducts(false);
@@ -146,7 +149,7 @@ export default function Marketplace(): JSX.Element {
     void fetchMarketplaceProducts();
 
     return () => controller.abort();
-  }, [currentPage, debouncedSearchQuery, priceRange, reloadNonce, selectedBrands, selectedCategories, sortBy]);
+  }, [currentPage, debouncedSearchQuery, priceRange, reloadNonce, selectedBrands, selectedCategories, sortBy, t]);
 
   const categoryOptions = useMemo(
     () =>
@@ -238,8 +241,8 @@ export default function Marketplace(): JSX.Element {
 
   return (
     <PageShell
-      title="Marketplace"
-      description="Discover products from trusted wholesalers"
+      title={t('marketplace.title')}
+      description={t('marketplace.description')}
       actions={
         !isAuthenticated ? (
           <button
@@ -247,7 +250,7 @@ export default function Marketplace(): JSX.Element {
             onClick={() => redirectToLogin()}
             className="rounded-full border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-100"
           >
-            Sign in to add items and checkout
+            {t('marketplace.signInToCheckout')}
           </button>
         ) : undefined
       }
@@ -260,7 +263,7 @@ export default function Marketplace(): JSX.Element {
               type="text"
               value={searchQuery}
               onChange={(event) => handleSearchChange(event.target.value)}
-              placeholder="Search products..."
+              placeholder={t('marketplace.searchPlaceholder')}
               className="w-full rounded-lg border border-transparent bg-gray-100 py-2.5 pl-10 pr-4 transition-colors focus:border-primary-500 focus:bg-white focus:ring-1 focus:ring-primary-500"
             />
             {searchQuery && (
@@ -279,11 +282,11 @@ export default function Marketplace(): JSX.Element {
             onChange={(event) => handleSortChange(event.target.value)}
             className="rounded-lg border border-transparent bg-gray-100 px-4 py-2.5 text-navy-700 focus:border-primary-500 focus:bg-white focus:ring-1 focus:ring-primary-500"
           >
-            <option value="featured">Featured</option>
-            <option value="price-low">Price: Low to High</option>
-            <option value="price-high">Price: High to Low</option>
-            <option value="rating">Top Rated</option>
-            <option value="newest">Newest</option>
+            <option value="featured">{t('marketplace.sort.featured')}</option>
+            <option value="price-low">{t('marketplace.sort.priceLow')}</option>
+            <option value="price-high">{t('marketplace.sort.priceHigh')}</option>
+            <option value="rating">{t('marketplace.sort.rating')}</option>
+            <option value="newest">{t('marketplace.sort.newest')}</option>
           </select>
 
           <div className="flex items-center rounded-lg bg-gray-100 p-1">
@@ -313,7 +316,7 @@ export default function Marketplace(): JSX.Element {
             className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2.5 text-navy-700 lg:hidden"
           >
             <SlidersHorizontal className="h-5 w-5" />
-            Filters
+            {t('marketplace.filters')}
             {activeFilterCount > 0 && (
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-xs text-white">
                 {activeFilterCount}
@@ -344,21 +347,22 @@ export default function Marketplace(): JSX.Element {
               <p className="text-sm font-medium text-navy-800 dark:text-slate-100">
                 {pagination && pagination.totalElements > 0 ? (
                   <>
-                    Showing <span className="text-primary-600">{showingStart}-{showingEnd}</span> of{' '}
-                    <span className="text-primary-600">{pagination.totalElements}</span> products
+                    {t('marketplace.showing', { start: showingStart, end: showingEnd, total: pagination.totalElements })}
                   </>
                 ) : (
-                  'Discover products from trusted wholesalers'
+                  t('marketplace.description')
                 )}
               </p>
               <p className="mt-1 text-xs text-navy-500 dark:text-slate-300">
-                {pagination && pagination.totalPages > 0 ? `Page ${pagination.currentPage + 1} of ${pagination.totalPages}` : 'Fresh results update automatically as you refine filters.'}
+                {pagination && pagination.totalPages > 0
+                  ? t('common.pageOf', { page: pagination.currentPage + 1, total: pagination.totalPages })
+                  : t('marketplace.freshResults')}
               </p>
             </div>
             {isFetchingProducts && !isInitialLoading && (
               <div className="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 dark:bg-primary-500/15 dark:text-primary-200">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-primary-500" />
-                Updating results
+                {t('marketplace.updatingResults')}
               </div>
             )}
           </div>
@@ -383,10 +387,10 @@ export default function Marketplace(): JSX.Element {
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
                   <X className="h-8 w-8 text-red-400" />
                 </div>
-                <h3 className="mb-2 text-lg font-semibold text-navy-800">Couldn&apos;t load products</h3>
+                <h3 className="mb-2 text-lg font-semibold text-navy-800">{t('marketplace.loadErrorTitle')}</h3>
                 <p className="mb-4 text-navy-500">{productsError}</p>
                 <button type="button" onClick={() => setReloadNonce((value) => value + 1)} className="btn-primary">
-                  Try Again
+                  {t('marketplace.tryAgain')}
                 </button>
               </div>
             ) : products.length > 0 ? (
@@ -411,10 +415,10 @@ export default function Marketplace(): JSX.Element {
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
                   <Search className="h-8 w-8 text-navy-400" />
                 </div>
-                <h3 className="mb-2 text-lg font-semibold text-navy-800">No products found</h3>
-                <p className="mb-4 text-navy-500">Try adjusting your search or filter criteria</p>
+                <h3 className="mb-2 text-lg font-semibold text-navy-800">{t('marketplace.noProductsFound')}</h3>
+                <p className="mb-4 text-navy-500">{t('marketplace.adjustSearch')}</p>
                 <button type="button" onClick={clearFilters} className="btn-primary">
-                  Clear Filters
+                  {t('marketplace.clearFilters')}
                 </button>
               </div>
             )}
@@ -430,7 +434,7 @@ export default function Marketplace(): JSX.Element {
                   className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-navy-700 transition-all hover:border-primary-200 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-slate-950/70 dark:text-slate-200 dark:hover:border-primary-400/30 dark:hover:text-primary-200"
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  Previous
+                  {t('marketplace.previous')}
                 </button>
 
                 {paginationItems.map((item) =>
@@ -461,7 +465,7 @@ export default function Marketplace(): JSX.Element {
                   disabled={pagination.isLast || isFetchingProducts}
                   className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-navy-700 transition-all hover:border-primary-200 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-slate-950/70 dark:text-slate-200 dark:hover:border-primary-400/30 dark:hover:text-primary-200"
                 >
-                  Next
+                  {t('marketplace.next')}
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
@@ -474,7 +478,7 @@ export default function Marketplace(): JSX.Element {
         <div className="fixed inset-0 z-50 bg-black/50 lg:hidden">
           <div className="absolute right-0 top-0 h-full w-80 overflow-y-auto bg-white dark:bg-slate-900">
             <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-white/10">
-              <h3 className="font-semibold text-navy-800 dark:text-slate-100">Filters</h3>
+              <h3 className="font-semibold text-navy-800 dark:text-slate-100">{t('marketplace.filters')}</h3>
               <button type="button" onClick={() => setShowMobileFilters(false)}>
                 <X className="h-5 w-5 text-navy-600 dark:text-slate-300" />
               </button>

@@ -11,19 +11,21 @@ import {
   SendHorizontal,
   Ticket,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { supportService } from '../services/supportService';
+import { formatDateTime, supportCategoryLabel, supportStatusLabel } from '../i18n/display';
 import { type SupportTicket } from '../types';
 
 type SupportTab = 'create' | 'tickets';
 type SupportCategoryToken = 'ORDER' | 'POS' | 'PAYMENT' | 'OTHER';
 
-const categoryOptions: Array<{ value: SupportCategoryToken; label: string; hint: string }> = [
-  { value: 'ORDER', label: 'Order', hint: 'Questions about order status, delivery, or order issues.' },
-  { value: 'POS', label: 'POS', hint: 'Issues related to POS flows, terminals, or store checkout.' },
-  { value: 'PAYMENT', label: 'Payment', hint: 'Payment failures, settlement issues, or payment methods.' },
-  { value: 'OTHER', label: 'Other', hint: 'Anything else that needs the support team.' },
+const categoryOptions: Array<{ value: SupportCategoryToken; labelKey: string; hintKey: string }> = [
+  { value: 'ORDER', labelKey: 'support.categories.ORDER', hintKey: 'support.categoryHint.ORDER' },
+  { value: 'POS', labelKey: 'support.categories.POS', hintKey: 'support.categoryHint.POS' },
+  { value: 'PAYMENT', labelKey: 'support.categories.PAYMENT', hintKey: 'support.categoryHint.PAYMENT' },
+  { value: 'OTHER', labelKey: 'support.categories.OTHER', hintKey: 'support.categoryHint.OTHER' },
 ];
 
 function enumToken(value: unknown): string {
@@ -41,34 +43,6 @@ function enumToken(value: unknown): string {
   return String(value ?? '');
 }
 
-function categoryLabel(value: unknown): string {
-  const token = enumToken(value);
-  switch (token) {
-    case 'ORDER':
-      return 'Order';
-    case 'POS':
-      return 'POS';
-    case 'PAYMENT':
-      return 'Payment';
-    default:
-      return 'Other';
-  }
-}
-
-function statusLabel(value: unknown): string {
-  const token = enumToken(value);
-  switch (token) {
-    case 'OPEN':
-      return 'Open';
-    case 'IN_PROGRESS':
-      return 'In Progress';
-    case 'CLOSED':
-      return 'Closed';
-    default:
-      return token || 'Unknown';
-  }
-}
-
 function statusClassName(value: unknown): string {
   const token = enumToken(value);
   switch (token) {
@@ -83,21 +57,6 @@ function statusClassName(value: unknown): string {
   }
 }
 
-function formatDateTime(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 function isImageAttachment(url: string | null | undefined): boolean {
   if (!url) {
     return false;
@@ -108,6 +67,7 @@ function isImageAttachment(url: string | null | undefined): boolean {
 }
 
 export default function Support(): JSX.Element {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -135,7 +95,7 @@ export default function Support(): JSX.Element {
     } catch (error) {
       console.error('Failed to fetch support ticket details', error);
       setSelectedTicket(null);
-      setTicketErrorMessage('Failed to load ticket details.');
+      setTicketErrorMessage(t('support.errors.detailsFailed'));
     } finally {
       setIsLoadingDetails(false);
     }
@@ -167,7 +127,7 @@ export default function Support(): JSX.Element {
       setTickets([]);
       setSelectedTicket(null);
       setSelectedTicketId(null);
-      setTicketErrorMessage('Failed to load your support tickets.');
+      setTicketErrorMessage(t('support.errors.ticketsFailed'));
     } finally {
       setIsLoadingTickets(false);
     }
@@ -203,7 +163,7 @@ export default function Support(): JSX.Element {
     event.preventDefault();
 
     if (!subject.trim() || !description.trim()) {
-      setFormErrorMessage('Subject and description are required.');
+      setFormErrorMessage(t('support.errors.required'));
       return;
     }
 
@@ -226,12 +186,12 @@ export default function Support(): JSX.Element {
         attachmentInputRef.current.value = '';
       }
 
-      setSubmitMessage('Your request has been received and will be processed as soon as possible.');
+      setSubmitMessage(t('support.submitSuccess'));
       setActiveTab('tickets');
       await loadTickets(createdTicket.id);
     } catch (error) {
       console.error('Failed to create support ticket', error);
-      setFormErrorMessage('Failed to submit your ticket. Please try again.');
+      setFormErrorMessage(t('support.errors.submitFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -239,8 +199,8 @@ export default function Support(): JSX.Element {
 
   return (
     <PageShell
-      title="Support"
-      description="Create a support ticket, attach helpful context, and track previous requests from one place."
+      title={t('support.title')}
+      description={t('support.description')}
     >
       {submitMessage ? (
         <div className="fixed right-4 top-24 z-50 max-w-md rounded-2xl border border-emerald-200 bg-white px-4 py-3 shadow-xl dark:border-emerald-800/60 dark:bg-slate-900">
@@ -265,7 +225,7 @@ export default function Support(): JSX.Element {
                 }`}
               >
                 <SendHorizontal className="h-4 w-4" />
-                Create Ticket
+                {t('support.createTicket')}
               </button>
               <button
                 type="button"
@@ -277,7 +237,7 @@ export default function Support(): JSX.Element {
                 }`}
               >
                 <Ticket className="h-4 w-4" />
-                My Tickets
+                {t('support.myTickets')}
               </button>
             </div>
 
@@ -287,9 +247,9 @@ export default function Support(): JSX.Element {
                   <div className="flex items-start gap-3">
                     <LifeBuoy className="mt-0.5 h-5 w-5 text-primary-700 dark:text-primary-300" />
                     <div>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">Share enough detail for a faster resolution</p>
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">{t('support.detailPromptTitle')}</p>
                       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                        Include what happened, when it happened, and any order or payment context you already have.
+                        {t('support.detailPromptDescription')}
                       </p>
                     </div>
                   </div>
@@ -298,13 +258,13 @@ export default function Support(): JSX.Element {
                 <form className="space-y-5" onSubmit={(event) => void handleSubmit(event)}>
                   <div>
                     <label className="label" htmlFor="support-subject">
-                      Subject
+                      {t('common.subject')}
                     </label>
                     <input
                       id="support-subject"
                       type="text"
                       className="input"
-                      placeholder="Short summary of the issue"
+                      placeholder={t('support.subjectPlaceholder')}
                       value={subject}
                       onChange={(event) => setSubject(event.target.value)}
                     />
@@ -312,7 +272,7 @@ export default function Support(): JSX.Element {
 
                   <div>
                     <label className="label" htmlFor="support-category">
-                      Category
+                      {t('common.category')}
                     </label>
                     <select
                       id="support-category"
@@ -322,23 +282,23 @@ export default function Support(): JSX.Element {
                     >
                       {categoryOptions.map((option) => (
                         <option key={option.value} value={option.value}>
-                          {option.label}
+                          {t(option.labelKey)}
                         </option>
                       ))}
                     </select>
                     <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                      {categoryOptions.find((option) => option.value === category)?.hint}
+                      {t(categoryOptions.find((option) => option.value === category)?.hintKey ?? 'support.categoryHint.OTHER')}
                     </p>
                   </div>
 
                   <div>
                     <label className="label" htmlFor="support-description">
-                      Description
+                      {t('common.description')}
                     </label>
                     <textarea
                       id="support-description"
                       className="input min-h-36 resize-y"
-                      placeholder="Describe the issue in detail"
+                      placeholder={t('support.descriptionPlaceholder')}
                       value={description}
                       onChange={(event) => setDescription(event.target.value)}
                     />
@@ -346,7 +306,7 @@ export default function Support(): JSX.Element {
 
                   <div>
                     <label className="label" htmlFor="support-attachment">
-                      Attachment (optional)
+                      {t('support.attachmentOptional')}
                     </label>
                     <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-4 dark:border-white/15 dark:bg-slate-950/30">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -354,13 +314,13 @@ export default function Support(): JSX.Element {
                           <Paperclip className="h-5 w-5 text-slate-500 dark:text-slate-300" />
                           <div>
                             <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
-                              {attachment ? attachment.name : 'Add a screenshot, invoice, or related file'}
+                              {attachment ? attachment.name : t('support.addAttachment')}
                             </p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Maximum upload size follows the platform upload settings.</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{t('support.uploadSize')}</p>
                           </div>
                         </div>
                         <label className="btn-secondary cursor-pointer">
-                          Choose File
+                          {t('support.chooseFile')}
                           <input
                             ref={attachmentInputRef}
                             id="support-attachment"
@@ -383,12 +343,12 @@ export default function Support(): JSX.Element {
                     {isSubmitting ? (
                       <>
                         <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                        Submitting...
+                        {t('support.submitting')}
                       </>
                     ) : (
                       <>
                         <SendHorizontal className="mr-2 h-4 w-4" />
-                        Submit Ticket
+                        {t('support.submitTicket')}
                       </>
                     )}
                   </button>
@@ -398,8 +358,8 @@ export default function Support(): JSX.Element {
               <div className="space-y-4 p-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">My Tickets</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-300">Review your previous requests and open the full details of each ticket.</p>
+                    <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('support.myTickets')}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-300">{t('support.ticketListDescription')}</p>
                   </div>
                   <button
                     type="button"
@@ -408,7 +368,7 @@ export default function Support(): JSX.Element {
                     disabled={isLoadingTickets}
                   >
                     <RefreshCw className={`mr-2 h-4 w-4 ${isLoadingTickets ? 'animate-spin' : ''}`} />
-                    Refresh
+                    {t('common.refresh')}
                   </button>
                 </div>
 
@@ -425,8 +385,8 @@ export default function Support(): JSX.Element {
                 ) : tickets.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/10">
                     <Ticket className="mx-auto h-10 w-10 text-slate-400" />
-                    <p className="mt-3 text-base font-semibold text-slate-900 dark:text-slate-100">No tickets yet</p>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Create your first support request and it will appear here.</p>
+                    <p className="mt-3 text-base font-semibold text-slate-900 dark:text-slate-100">{t('support.noTickets')}</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('support.noTicketsDescription')}</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -451,14 +411,14 @@ export default function Support(): JSX.Element {
                                 {ticket.ticketNumber}
                               </span>
                               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClassName(ticket.status)}`}>
-                                {statusLabel(ticket.status)}
+                                {supportStatusLabel(t, ticket.status)}
                               </span>
                             </div>
                             <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{ticket.subject}</p>
                             <div className="flex flex-wrap gap-4 text-sm text-slate-500 dark:text-slate-300">
-                              <span>Category: {categoryLabel(ticket.category)}</span>
-                              <span>Created: {formatDateTime(ticket.createdAt)}</span>
-                              <span>Updated: {formatDateTime(ticket.updatedAt)}</span>
+                              <span>{t('support.category', { value: supportCategoryLabel(t, ticket.category) })}</span>
+                              <span>{t('support.created', { value: formatDateTime(ticket.createdAt) })}</span>
+                              <span>{t('support.updated', { value: formatDateTime(ticket.updatedAt) })}</span>
                             </div>
                           </div>
                         </div>
@@ -478,16 +438,16 @@ export default function Support(): JSX.Element {
                 <Clock3 className="h-5 w-5" />
               </div>
               <div>
-                <p className="font-semibold text-slate-900 dark:text-slate-100">Response Window</p>
-                <p className="text-sm text-slate-500 dark:text-slate-300">We aim to respond within 24 to 48 business hours.</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">{t('support.responseWindow')}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-300">{t('support.responseWindowDescription')}</p>
               </div>
             </div>
           </div>
 
           <div className="card min-h-[28rem] space-y-4">
             <div>
-              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">Ticket Details</p>
-              <p className="text-sm text-slate-500 dark:text-slate-300">Select a ticket from My Tickets to inspect the full request.</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('support.ticketDetails')}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-300">{t('support.ticketDetailsDescription')}</p>
             </div>
 
             {isLoadingDetails ? (
@@ -498,8 +458,8 @@ export default function Support(): JSX.Element {
               <div className="flex min-h-72 items-center justify-center rounded-2xl border border-dashed border-slate-300 p-6 text-center dark:border-white/10">
                 <div>
                   <Ticket className="mx-auto h-10 w-10 text-slate-400" />
-                  <p className="mt-3 font-semibold text-slate-900 dark:text-slate-100">No ticket selected</p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Open My Tickets and choose one ticket to view its description and attachment.</p>
+                  <p className="mt-3 font-semibold text-slate-900 dark:text-slate-100">{t('support.noTicketSelected')}</p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('support.noTicketSelectedDescription')}</p>
                 </div>
               </div>
             ) : (
@@ -509,36 +469,36 @@ export default function Support(): JSX.Element {
                     {selectedTicket.ticketNumber}
                   </span>
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClassName(selectedTicket.status)}`}>
-                    {statusLabel(selectedTicket.status)}
+                    {supportStatusLabel(t, selectedTicket.status)}
                   </span>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/40">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Subject</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.subject')}</p>
                     <p className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">{selectedTicket.subject}</p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/40">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Category</p>
-                    <p className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">{categoryLabel(selectedTicket.category)}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.category')}</p>
+                    <p className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">{supportCategoryLabel(t, selectedTicket.category)}</p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/40">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Created</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.created')}</p>
                     <p className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">{formatDateTime(selectedTicket.createdAt)}</p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/40">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Updated</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.updated')}</p>
                     <p className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">{formatDateTime(selectedTicket.updatedAt)}</p>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-950/30">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Description</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.description')}</p>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700 dark:text-slate-200">{selectedTicket.description}</p>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-950/30">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Attachment</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.attachment')}</p>
                   {selectedTicket.attachmentUrl ? (
                     <div className="mt-3 space-y-3">
                       <a
@@ -548,7 +508,7 @@ export default function Support(): JSX.Element {
                         className="inline-flex items-center gap-2 text-sm font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-300 dark:hover:text-primary-200"
                       >
                         <FileText className="h-4 w-4" />
-                        Open attachment
+                        {t('support.openAttachment')}
                       </a>
                       {isImageAttachment(selectedTicket.attachmentUrl) ? (
                         <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10">
@@ -561,12 +521,12 @@ export default function Support(): JSX.Element {
                       ) : (
                         <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/40">
                           <FileImage className="h-5 w-5 text-slate-400" />
-                          <p className="text-sm text-slate-600 dark:text-slate-300">Preview is unavailable for this file type, but the attachment link is ready.</p>
+                          <p className="text-sm text-slate-600 dark:text-slate-300">{t('support.previewUnavailable')}</p>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No attachment was included with this ticket.</p>
+                    <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{t('support.noAttachment')}</p>
                   )}
                 </div>
               </div>

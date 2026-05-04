@@ -46,6 +46,14 @@
       radial-gradient(circle at 95% 20%, rgba(16, 185, 129, 0.1) 0, transparent 42%);
   }
 
+  html[lang="ar"] body,
+  html[lang="ar"] button,
+  html[lang="ar"] input,
+  html[lang="ar"] select,
+  html[lang="ar"] textarea {
+    font-family: "IBM Plex Sans Arabic", Inter, "Segoe UI", sans-serif;
+  }
+
   a {
     @apply no-underline;
   }

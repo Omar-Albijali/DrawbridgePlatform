@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -18,11 +19,11 @@ import { posIntegrationService, type PosIntegrationStatus } from '../services/po
 import type { PosIntegrationApiKeyRotate, PosIntegrationConfig, PosIntegrationEventLog } from '../types';
 import { UserRole } from '../types';
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return 'Never';
+function formatDateTime(value: string | null | undefined, language: string | undefined, fallback: string): string {
+  if (!value) return fallback;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString(undefined, {
+  return parsed.toLocaleString(language === 'ar' ? 'ar-SA' : undefined, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -50,7 +51,11 @@ const emptyConfig: PosIntegrationConfig = {
 };
 
 export default function PosIntegration(): JSX.Element {
+  const { i18n, t } = useTranslation();
   const { user } = useAuth();
+  const isRtl = i18n.dir() === 'rtl';
+  const pageDirection = isRtl ? 'rtl' : 'ltr';
+  const textAlign = isRtl ? 'text-right' : 'text-left';
 
   const isRetailer = user?.role === UserRole.RETAILER;
   if (!isRetailer) {
@@ -72,13 +77,6 @@ export default function PosIntegration(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  const statusChip = useMemo(() => {
-    if (config.status === 'ACTIVE') {
-      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
-    }
-    return 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300';
-  }, [config.status]);
-
   const syncDraftFromConfig = (next: PosIntegrationConfig): void => {
     setStatusDraft(next.status);
     setWebhookEnabledDraft(next.webhookEnabled);
@@ -99,7 +97,7 @@ export default function PosIntegration(): JSX.Element {
       setEvents(nextEvents);
     } catch (reason) {
       console.error('Failed to load POS integration data', reason);
-      setError('Unable to load POS integration data');
+      setError(t('posIntegration.errors.load'));
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +114,7 @@ export default function PosIntegration(): JSX.Element {
       setEvents(nextEvents);
     } catch (reason) {
       console.error('Failed to refresh POS event logs', reason);
-      setError('Unable to refresh event logs');
+      setError(t('posIntegration.errors.refreshLogs'));
     } finally {
       setIsRefreshingEvents(false);
     }
@@ -132,10 +130,10 @@ export default function PosIntegration(): JSX.Element {
       const nextConfig = await posIntegrationService.getConfig();
       setConfig(nextConfig);
       syncDraftFromConfig(nextConfig);
-      setInfo('API key rotated. Copy it now — it is shown once.');
+      setInfo(t('posIntegration.messages.keyRotated'));
     } catch (reason) {
       console.error('Failed to rotate POS API key', reason);
-      setError('Unable to rotate API key');
+      setError(t('posIntegration.errors.rotateKey'));
     } finally {
       setIsRotating(false);
     }
@@ -143,7 +141,7 @@ export default function PosIntegration(): JSX.Element {
 
   const handleSave = async (): Promise<void> => {
     if (!config.integrationExists) {
-      setError('Generate an API key first');
+      setError(t('posIntegration.errors.generateFirst'));
       return;
     }
     setIsSaving(true);
@@ -158,10 +156,10 @@ export default function PosIntegration(): JSX.Element {
       });
       setConfig(updated);
       syncDraftFromConfig(updated);
-      setInfo('POS configuration saved');
+      setInfo(t('posIntegration.messages.saved'));
     } catch (reason) {
       console.error('Failed to save POS config', reason);
-      setError('Unable to save POS configuration');
+      setError(t('posIntegration.errors.save'));
     } finally {
       setIsSaving(false);
     }
@@ -172,9 +170,9 @@ export default function PosIntegration(): JSX.Element {
     try {
       await navigator.clipboard.writeText(generatedKey.apiKey);
       setGeneratedKey(null);
-      setInfo('API key copied to clipboard');
+      setInfo(t('posIntegration.messages.copied'));
     } catch {
-      setError('Could not copy API key');
+      setError(t('posIntegration.errors.copy'));
     }
   };
 
@@ -188,12 +186,13 @@ export default function PosIntegration(): JSX.Element {
 
   return (
     <PageShell
-      title="POS Integration"
-      description="Configure API key auth, outbound webhooks, and inspect POS sync event logs."
+      title={t('posIntegration.title')}
+      description={t('posIntegration.description')}
+      bodyClassName={textAlign}
       actions={
         <button type="button" onClick={() => void loadInitial()} className="btn-secondary gap-2">
           <RefreshCw className="h-4 w-4" />
-          Reload
+          {t('posIntegration.reload')}
         </button>
       }
     >
@@ -211,11 +210,17 @@ export default function PosIntegration(): JSX.Element {
 
 
       {/* Inbound/Outbound Contract */}
-      <div className="card space-y-4">
+      <div dir={pageDirection} className={`card space-y-4 ${textAlign}`}>
         <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Integration Contract</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('posIntegration.integrationContract')}</h2>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-            Use `X-API-Key` auth. Inbound payload `retailerId` must match this page retailer scope.
+            <Trans
+              i18nKey="posIntegration.contractDescription"
+              components={{
+                apiKey: <code dir="ltr" className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300" />,
+                retailerId: <code dir="ltr" className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300" />,
+              }}
+            />
           </p>
         </div>
 
@@ -223,62 +228,61 @@ export default function PosIntegration(): JSX.Element {
           <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-slate-800/30">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
               <ArrowDownToLine className="h-4 w-4" />
-              Inbound (POS → Platform)
+              {t('posIntegration.inboundContract')}
             </div>
-            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Endpoint</p>
-            <p className="font-mono text-xs text-slate-800 dark:text-slate-200">POST /api/pos/webhooks/inventory.changed</p>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Required headers</p>
-            <p className="font-mono text-xs text-slate-800 dark:text-slate-200">X-API-Key: pos_live_...</p>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Required body</p>
-            <p className="font-mono text-xs text-slate-800 dark:text-slate-200">eventId, retailerId, gtin, changeType + (quantityDelta or quantityAfter)</p>
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{t('posIntegration.endpoint')}</p>
+            <p dir="ltr" className="text-left font-mono text-xs text-slate-800 dark:text-slate-200">POST /api/pos/webhooks/inventory.changed</p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t('posIntegration.requiredHeaders')}</p>
+            <p dir="ltr" className="text-left font-mono text-xs text-slate-800 dark:text-slate-200">X-API-Key: pos_live_...</p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t('posIntegration.requiredBody')}</p>
+            <p dir="ltr" className="text-left font-mono text-xs text-slate-800 dark:text-slate-200">eventId, retailerId, gtin, changeType + (quantityDelta or quantityAfter)</p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-slate-800/30">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
               <ArrowUpFromLine className="h-4 w-4" />
-              Outbound (Platform → POS)
+              {t('posIntegration.outboundContract')}
             </div>
-            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Webhook event</p>
-            <p className="font-mono text-xs text-slate-800 dark:text-slate-200">inventory.changed</p>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">If webhook disabled</p>
-            <p className="font-mono text-xs text-slate-800 dark:text-slate-200">GET /api/pos/inventory/events</p>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Change coverage</p>
-            <p className="text-xs text-slate-700 dark:text-slate-300">Manual + order-complete inventory changes.</p>
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{t('posIntegration.webhookEvent')}</p>
+            <p dir="ltr" className="text-left font-mono text-xs text-slate-800 dark:text-slate-200">inventory.changed</p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t('posIntegration.ifWebhookDisabled')}</p>
+            <p dir="ltr" className="text-left font-mono text-xs text-slate-800 dark:text-slate-200">GET /api/pos/inventory/events</p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{t('posIntegration.changeCoverage')}</p>
+            <p className="text-xs text-slate-700 dark:text-slate-300">{t('posIntegration.changeCoverageDescription')}</p>
           </div>
         </div>
       </div>
 
       {/* Credentials + Webhook — single card, two columns */}
-      <div className="card">
-        <div className="grid grid-cols-1 divide-y divide-slate-100 dark:divide-white/10 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
 
           {/* Left — API Credentials */}
-          <div className="flex flex-col gap-4 pb-6 lg:pb-0 lg:pr-6">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                <KeyRound className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
-                API Credentials
-              </div>
+          <div dir={pageDirection} className={`card flex flex-col gap-4 ${textAlign}`}>
+	            <div className="flex items-center justify-between gap-3">
+	              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+	                <KeyRound className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+	                {t('posIntegration.apiCredentials')}
+	              </div>
               <button
                 type="button"
                 onClick={() => void handleRotateKey()}
                 disabled={isRotating}
                 className="btn-secondary gap-1.5 py-1.5 text-xs"
               >
-                <KeyRound className="h-3.5 w-3.5" />
-                {config.integrationExists
-                  ? isRotating ? 'Rotating...' : 'Rotate Key'
-                  : isRotating ? 'Generating...' : 'Generate Key'}
-              </button>
-            </div>
+	                <KeyRound className="h-3.5 w-3.5" />
+	                {config.integrationExists
+	                  ? isRotating ? t('posIntegration.rotating') : t('posIntegration.rotateKey')
+	                  : isRotating ? t('posIntegration.generating') : t('posIntegration.generateKey')}
+	              </button>
+	            </div>
 
             <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-3 transition hover:bg-slate-100/60 dark:border-white/10 dark:bg-slate-800/30 dark:hover:bg-slate-800/60">
-              <div>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Active</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {statusDraft === 'ACTIVE' ? 'POS requests are accepted.' : 'Integration is paused.'}
-                </p>
-              </div>
+	              <div>
+	                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('posIntegration.active')}</p>
+	                <p className="text-xs text-slate-500 dark:text-slate-400">
+	                  {statusDraft === 'ACTIVE' ? t('posIntegration.requestsAccepted') : t('posIntegration.paused')}
+	                </p>
+	              </div>
               <div className="relative shrink-0">
                 <input
                   type="checkbox"
@@ -287,13 +291,15 @@ export default function PosIntegration(): JSX.Element {
                   className="sr-only"
                 />
                 <div
-                  className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-colors duration-200 ${
+                  className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${
                     statusDraft === 'ACTIVE' ? 'bg-primary-500' : 'bg-slate-300 dark:bg-slate-600'
                   }`}
                 >
                   <div
-                    className={`h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
-                      statusDraft === 'ACTIVE' ? 'translate-x-5' : 'translate-x-0'
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[left,right] duration-200 ${
+                      statusDraft === 'ACTIVE'
+                        ? isRtl ? 'left-0.5' : 'right-0.5'
+                        : isRtl ? 'right-0.5' : 'left-0.5'
                     }`}
                   />
                 </div>
@@ -303,58 +309,58 @@ export default function PosIntegration(): JSX.Element {
             {/* Key prefix + retailer ID + timestamps */}
             <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-slate-50/50 dark:divide-white/10 dark:border-white/10 dark:bg-slate-800/30">
               <div className="flex items-center justify-between px-3.5 py-2.5">
-                <span className="text-xs text-slate-500 dark:text-slate-400">Key prefix</span>
-                <span className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-100">
-                  {config.apiKeyPrefix ?? 'Not generated'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between px-3.5 py-2.5">
-                <span className="text-xs text-slate-500 dark:text-slate-400">Retailer ID</span>
-                <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{config.retailerId || '-'}</span>
-              </div>
-              <div className="flex items-center justify-between px-3.5 py-2.5">
-                <span className="text-xs text-slate-500 dark:text-slate-400">Created</span>
-                <span className="text-xs text-slate-700 dark:text-slate-300">{formatDateTime(config.createdAt)}</span>
-              </div>
-              {config.rotatedAt && (
-                <div className="flex items-center justify-between px-3.5 py-2.5">
-                  <span className="text-xs text-slate-500 dark:text-slate-400">Last rotated</span>
-                  <span className="text-xs text-slate-700 dark:text-slate-300">{formatDateTime(config.rotatedAt)}</span>
-                </div>
-              )}
+	                <span className="text-xs text-slate-500 dark:text-slate-400">{t('posIntegration.keyPrefix')}</span>
+	                <span dir="ltr" className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-100">
+	                  {config.apiKeyPrefix ?? t('posIntegration.notGenerated')}
+	                </span>
+	              </div>
+	              <div className="flex items-center justify-between px-3.5 py-2.5">
+	                <span className="text-xs text-slate-500 dark:text-slate-400">{t('posIntegration.retailerId')}</span>
+	                <span dir="ltr" className="font-mono text-xs text-slate-700 dark:text-slate-300">{config.retailerId || '-'}</span>
+	              </div>
+	              <div className="flex items-center justify-between px-3.5 py-2.5">
+	                <span className="text-xs text-slate-500 dark:text-slate-400">{t('posIntegration.created')}</span>
+	                <span className="text-xs text-slate-700 dark:text-slate-300">{formatDateTime(config.createdAt, i18n.resolvedLanguage, t('posIntegration.never'))}</span>
+	              </div>
+	              {config.rotatedAt && (
+	                <div className="flex items-center justify-between px-3.5 py-2.5">
+	                  <span className="text-xs text-slate-500 dark:text-slate-400">{t('posIntegration.lastRotated')}</span>
+	                  <span className="text-xs text-slate-700 dark:text-slate-300">{formatDateTime(config.rotatedAt, i18n.resolvedLanguage, t('posIntegration.never'))}</span>
+	                </div>
+	              )}
             </div>
 
             {generatedKey ? (
-              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-700/50 dark:bg-amber-900/20">
-                <p className="text-xs font-semibold text-amber-900 dark:text-amber-300">
-                  Shown once — copy now
-                </p>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <p className="flex-1 break-all font-mono text-xs text-amber-800 dark:text-amber-400">
-                    {generatedKey.apiKey}
-                  </p>
-                  <button type="button" onClick={() => void handleCopyKey()} className="btn-secondary gap-1.5 py-1.5 text-xs shrink-0">
-                    <Copy className="h-3.5 w-3.5" />
-                    Copy
-                  </button>
-                </div>
-              </div>
+	              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-700/50 dark:bg-amber-900/20">
+	                <p className="text-xs font-semibold text-amber-900 dark:text-amber-300">
+	                  {t('posIntegration.shownOnce')}
+	                </p>
+	                <div className="mt-1.5 flex items-center gap-2">
+	                  <p dir="ltr" className="flex-1 break-all text-left font-mono text-xs text-amber-800 dark:text-amber-400">
+	                    {generatedKey.apiKey}
+	                  </p>
+	                  <button type="button" onClick={() => void handleCopyKey()} className="btn-secondary gap-1.5 py-1.5 text-xs shrink-0">
+	                    <Copy className="h-3.5 w-3.5" />
+	                    {t('posIntegration.copy')}
+	                  </button>
+	                </div>
+	              </div>
             ) : null}
           </div>
 
           {/* Right — Outbound Webhook */}
-          <div className="flex flex-col gap-4 pt-6 lg:pl-6 lg:pt-0">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-              <Webhook className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
-              Outbound Webhook
-            </div>
+          <div dir={pageDirection} className={`card flex flex-col gap-4 ${textAlign}`}>
+	            <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+	              <Webhook className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
+	              {t('posIntegration.outboundWebhook')}
+	            </div>
 
 
             <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-3 transition hover:bg-slate-100/60 dark:border-white/10 dark:bg-slate-800/30 dark:hover:bg-slate-800/60">
-              <div>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Enable webhooks</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">POST events to your endpoint.</p>
-              </div>
+	              <div>
+	                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t('posIntegration.enableWebhooks')}</p>
+	                <p className="text-xs text-slate-500 dark:text-slate-400">{t('posIntegration.postEvents')}</p>
+	              </div>
               <div className="relative shrink-0">
                 <input
                   type="checkbox"
@@ -363,13 +369,15 @@ export default function PosIntegration(): JSX.Element {
                   className="sr-only"
                 />
                 <div
-                  className={`flex h-6 w-11 items-center rounded-full p-0.5 transition-colors duration-200 ${
+                  className={`relative h-6 w-11 rounded-full transition-colors duration-200 ${
                     webhookEnabledDraft ? 'bg-primary-500' : 'bg-slate-300 dark:bg-slate-600'
                   }`}
                 >
                   <div
-                    className={`h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
-                      webhookEnabledDraft ? 'translate-x-5' : 'translate-x-0'
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[left,right] duration-200 ${
+                      webhookEnabledDraft
+                        ? isRtl ? 'left-0.5' : 'right-0.5'
+                        : isRtl ? 'right-0.5' : 'left-0.5'
                     }`}
                   />
                 </div>
@@ -378,65 +386,66 @@ export default function PosIntegration(): JSX.Element {
 
             {webhookEnabledDraft ? (
               <>
-                <label className="space-y-1.5 block">
-                  <span className="label mb-0 text-xs">Webhook URL</span>
-                  <input
-                    type="url"
-                    value={webhookUrlDraft}
-                    onChange={(event) => setWebhookUrlDraft(event.target.value)}
-                    className="input py-2 text-sm"
-                    placeholder="https://pos.example.com/webhooks/inventory"
-                  />
-                </label>
-                <label className="space-y-1.5 block">
-                  <span className="label mb-0 text-xs">Webhook Secret</span>
-                  <input
-                    type="text"
-                    value={webhookSecretDraft}
-                    onChange={(event) => setWebhookSecretDraft(event.target.value)}
-                    className="input py-2 text-sm"
-                    placeholder={
-                      config.webhookSecretConfigured
-                        ? 'Leave empty to keep current secret'
-                        : 'Set a signing secret'
-                    }
-                  />
+	                <label className="space-y-1.5 block">
+	                  <span className="label mb-0 text-xs">{t('posIntegration.webhookUrl')}</span>
+	                  <input
+	                    type="url"
+	                    value={webhookUrlDraft}
+	                    onChange={(event) => setWebhookUrlDraft(event.target.value)}
+	                    dir="ltr"
+	                    className="input py-2 text-left text-sm"
+	                    placeholder="https://pos.example.com/webhooks/inventory"
+	                  />
+	                </label>
+	                <label className="space-y-1.5 block">
+	                  <span className="label mb-0 text-xs">{t('posIntegration.webhookSecret')}</span>
+	                  <input
+	                    type="text"
+	                    value={webhookSecretDraft}
+	                    onChange={(event) => setWebhookSecretDraft(event.target.value)}
+	                    dir="ltr"
+	                    className="input py-2 text-left text-sm"
+	                    placeholder={
+	                      config.webhookSecretConfigured
+	                        ? t('posIntegration.keepCurrentSecret')
+	                        : t('posIntegration.setSigningSecret')
+	                    }
+	                  />
                 </label>
               </>
             ) : (
               <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 dark:border-white/10 dark:bg-slate-800/40">
                 <Webhook className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Pull updates via{' '}
-                  <code className="rounded bg-slate-200 px-1 py-0.5 font-mono dark:bg-slate-700 dark:text-slate-300">
-                    GET /api/pos/inventory/events
-                  </code>
-                </p>
+	                <p className="text-xs text-slate-500 dark:text-slate-400">
+	                  {t('posIntegration.pullUpdatesVia')}{' '}
+	                  <code dir="ltr" className="inline-block rounded bg-slate-200 px-1 py-0.5 text-left font-mono dark:bg-slate-700 dark:text-slate-300">
+	                    GET /api/pos/inventory/events
+	                  </code>
+	                </p>
               </div>
             )}
           </div>
-        </div>
 
         {/* Shared save */}
-        <div className="mt-5 flex items-center justify-end border-t border-slate-100 pt-4 dark:border-white/10">
+        <div dir={pageDirection} className="flex items-center justify-end border-t border-slate-100 pt-4 dark:border-white/10 lg:col-span-2">
           <button
             type="button"
             onClick={() => void handleSave()}
             disabled={isSaving || !config.integrationExists}
             className="btn-primary gap-2"
           >
-            <Save className="h-4 w-4" />
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </button>
+	            <Save className="h-4 w-4" />
+	            {isSaving ? t('posIntegration.saving') : t('posIntegration.saveChanges')}
+	          </button>
         </div>
       </div>
 
       {/* Event Logs Section */}
-      <div className="card space-y-4">
+      <div dir={pageDirection} className={`card space-y-4 ${textAlign}`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Event Logs</h2>
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Last 100 inbound and outbound sync events.</p>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('posIntegration.syncLogs')}</h2>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{t('posIntegration.syncLogsDescription')}</p>
           </div>
           <button
             type="button"
@@ -445,26 +454,26 @@ export default function PosIntegration(): JSX.Element {
             className="btn-secondary gap-2 shrink-0"
           >
             <RefreshCw className="h-4 w-4" />
-            {isRefreshingEvents ? 'Refreshing...' : 'Refresh'}
+            {isRefreshingEvents ? t('posIntegration.refreshing') : t('posIntegration.refresh')}
           </button>
         </div>
 
         {events.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-slate-800/40 dark:text-slate-400">
-            No POS events recorded yet.
+            {t('posIntegration.noEvents')}
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
             <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-white/10">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
                 <tr>
-                  <th className="px-3 py-2 text-left font-semibold">Time</th>
-                  <th className="px-3 py-2 text-left font-semibold">Direction</th>
-                  <th className="px-3 py-2 text-left font-semibold">Event</th>
-                  <th className="px-3 py-2 text-left font-semibold">Status</th>
-                  <th className="px-3 py-2 text-left font-semibold">GTIN</th>
-                  <th className="px-3 py-2 text-left font-semibold">Delta</th>
-                  <th className="px-3 py-2 text-left font-semibold">Error</th>
+                  <th className={`px-3 py-2 font-semibold ${textAlign}`}>{t('posIntegration.time')}</th>
+                  <th className={`px-3 py-2 font-semibold ${textAlign}`}>{t('posIntegration.direction')}</th>
+                  <th className={`px-3 py-2 font-semibold ${textAlign}`}>{t('posIntegration.event')}</th>
+                  <th className={`px-3 py-2 font-semibold ${textAlign}`}>{t('posIntegration.status')}</th>
+                  <th className={`px-3 py-2 font-semibold ${textAlign}`}>{t('posIntegration.gtin')}</th>
+                  <th className={`px-3 py-2 font-semibold ${textAlign}`}>{t('posIntegration.delta')}</th>
+                  <th className={`px-3 py-2 font-semibold ${textAlign}`}>{t('posIntegration.error')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -473,7 +482,9 @@ export default function PosIntegration(): JSX.Element {
                     key={`${event.direction}-${event.eventId}`}
                     className="bg-white transition-colors hover:bg-slate-50 dark:bg-slate-900/50 dark:hover:bg-slate-800/60"
                   >
-                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{formatDateTime(event.eventTime)}</td>
+                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
+                      {formatDateTime(event.eventTime, i18n.resolvedLanguage, t('posIntegration.never'))}
+                    </td>
                     <td className="px-3 py-2">
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -487,22 +498,22 @@ export default function PosIntegration(): JSX.Element {
                         ) : (
                           <TerminalSquare className="h-3.5 w-3.5" />
                         )}
-                        {event.direction}
+                        {t(`posIntegration.directions.${event.direction}`, { defaultValue: event.direction })}
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      <p className="font-mono text-xs text-slate-500 dark:text-slate-300">{event.eventId}</p>
-                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{event.eventType}</p>
+                      <p dir="ltr" className="text-left font-mono text-xs text-slate-500 dark:text-slate-300">{event.eventId}</p>
+                      <p dir="ltr" className="mt-0.5 text-left text-xs text-slate-500 dark:text-slate-400">{event.eventType}</p>
                     </td>
                     <td className="px-3 py-2">
                       <span className="inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-300">
                         {event.status}
                       </span>
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs text-slate-600 dark:text-slate-300">
+                    <td dir="ltr" className="px-3 py-2 text-left font-mono text-xs text-slate-600 dark:text-slate-300">
                       {event.gtin ?? '-'}
                     </td>
-                    <td className="px-3 py-2 text-slate-700 dark:text-slate-200">{formatDelta(event.changeAmount)}</td>
+                    <td dir="ltr" className="px-3 py-2 text-left text-slate-700 dark:text-slate-200">{formatDelta(event.changeAmount)}</td>
                     <td className="px-3 py-2 text-xs text-red-600 dark:text-red-400">{event.lastError ?? '-'}</td>
                   </tr>
                 ))}
@@ -513,7 +524,7 @@ export default function PosIntegration(): JSX.Element {
 
         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
           <ShieldCheck className="h-4 w-4 shrink-0" />
-          Outbound events include manual and order-triggered inventory changes. Inbound logs track POS-delivered updates.
+          {t('posIntegration.logsFootnote')}
         </div>
       </div>
     </PageShell>

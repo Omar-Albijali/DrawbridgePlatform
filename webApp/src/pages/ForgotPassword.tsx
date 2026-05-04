@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import { authService } from '../services/authService';
 
 const ForgotPassword: React.FC = () => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -18,7 +20,7 @@ const ForgotPassword: React.FC = () => {
       await authService.forgotPassword(email);
       setSubmitted(true);
     } catch {
-      setError('Something went wrong. Please try again later.');
+      setError(t('auth.errors.generic'));
     } finally {
       setIsSubmitting(false);
     }
@@ -36,7 +38,7 @@ const ForgotPassword: React.FC = () => {
             </svg>
           </div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Drawbridge</h1>
-          <p className="mt-1 text-slate-500 dark:text-slate-300">B2B Commerce Platform</p>
+          <p className="mt-1 text-slate-500 dark:text-slate-300">{t('common.tagline')}</p>
         </div>
 
         <div className="glass-panel rounded-3xl p-6 sm:p-8">
@@ -45,20 +47,20 @@ const ForgotPassword: React.FC = () => {
               <div className="flex justify-center">
                 <CheckCircle className="h-16 w-16 text-green-500" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Check your email</h2>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t('auth.forgot.checkEmailTitle')}</h2>
               <p className="text-slate-500 dark:text-slate-300">
-                If an account exists for <strong>{email}</strong>, we&apos;ve sent a password reset link to that address.
+                {t('auth.forgot.checkEmailMessage', { email })}
               </p>
               <Link to="/login" className="mt-4 inline-flex items-center gap-2 font-semibold text-primary-700 hover:text-primary-600 dark:text-primary-300">
                 <ArrowLeft className="h-4 w-4" />
-                Back to Sign In
+                {t('auth.forgot.backToSignIn')}
               </Link>
             </div>
           ) : (
             <>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Forgot your password?</h2>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t('auth.forgot.title')}</h2>
               <p className="mb-6 mt-1 text-sm text-slate-500 dark:text-slate-300">
-                Enter your email address and we&apos;ll send you a link to reset your password.
+                {t('auth.forgot.description')}
               </p>
 
               {error && (
@@ -69,7 +71,7 @@ const ForgotPassword: React.FC = () => {
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                  <label htmlFor="email" className="label">Email Address</label>
+                  <label htmlFor="email" className="label">{t('auth.emailAddress')}</label>
                   <div className="relative">
                     <Mail className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                     <input
@@ -78,7 +80,7 @@ const ForgotPassword: React.FC = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="input pl-10"
-                      placeholder="Enter your email"
+                      placeholder={t('auth.enterEmail')}
                       required
                     />
                   </div>
@@ -88,7 +90,7 @@ const ForgotPassword: React.FC = () => {
                   {isSubmitting ? (
                     <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-slate-900 border-t-transparent" />
                   ) : (
-                    'Send Reset Link'
+                    t('auth.forgot.sendResetLink')
                   )}
                 </button>
               </form>
@@ -96,7 +98,7 @@ const ForgotPassword: React.FC = () => {
               <div className="mt-6 text-center">
                 <Link to="/login" className="inline-flex items-center gap-2 text-sm font-semibold text-primary-700 hover:text-primary-600 dark:text-primary-300">
                   <ArrowLeft className="h-4 w-4" />
-                  Back to Sign In
+                  {t('auth.forgot.backToSignIn')}
                 </Link>
               </div>
             </>
@@ -108,4 +110,3 @@ const ForgotPassword: React.FC = () => {
 };
 
 export default ForgotPassword;
-

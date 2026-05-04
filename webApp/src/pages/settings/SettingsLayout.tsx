@@ -1,5 +1,6 @@
 import { Bell, CreditCard, MapPin, Shield, User } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import PageShell from '../../components/PageShell';
 
 interface NavItemProps {
@@ -27,16 +28,17 @@ function NavItem({ to, icon, label }: NavItemProps): JSX.Element {
 }
 
 export default function SettingsLayout(): JSX.Element {
+  const { t } = useTranslation();
   const navItems = [
-    { to: '/settings/profile', icon: <User className="h-5 w-5" />, label: 'My Profile' },
-    { to: '/settings/security', icon: <Shield className="h-5 w-5" />, label: 'Login & Security' },
-    { to: '/settings/payments', icon: <CreditCard className="h-5 w-5" />, label: 'Payment Methods' },
-    { to: '/settings/addresses', icon: <MapPin className="h-5 w-5" />, label: 'Address Management' },
-    { to: '/settings/notifications', icon: <Bell className="h-5 w-5" />, label: 'Notification Preferences' },
+    { to: '/settings/profile', icon: <User className="h-5 w-5" />, label: t('settings.nav.profile') },
+    { to: '/settings/security', icon: <Shield className="h-5 w-5" />, label: t('settings.nav.security') },
+    { to: '/settings/payments', icon: <CreditCard className="h-5 w-5" />, label: t('settings.nav.payments') },
+    { to: '/settings/addresses', icon: <MapPin className="h-5 w-5" />, label: t('settings.nav.addresses') },
+    { to: '/settings/notifications', icon: <Bell className="h-5 w-5" />, label: t('settings.nav.notifications') },
   ];
 
   return (
-    <PageShell title="Settings" description="Manage account, billing, addresses, and notifications">
+    <PageShell title={t('settings.title')} description={t('settings.description')}>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="card p-4">
           <nav className="space-y-1">

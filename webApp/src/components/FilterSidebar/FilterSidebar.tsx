@@ -1,4 +1,5 @@
 import { ChevronDown, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export interface FilterOption {
   label: string;
@@ -28,6 +29,7 @@ export default function FilterSidebar({
   setPriceRange,
   onClearFilters,
 }: FilterSidebarProps): JSX.Element {
+  const { t } = useTranslation();
   const hasActiveFilters =
     selectedCategories.length > 0 ||
     selectedBrands.length > 0 ||
@@ -53,7 +55,7 @@ export default function FilterSidebar({
   return (
     <div className="bg-white rounded-xl shadow-card p-6 sticky top-24">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="font-semibold text-navy-800">Filters</h3>
+        <h3 className="font-semibold text-navy-800">{t('marketplace.filters')}</h3>
         {hasActiveFilters && (
           <button
             type="button"
@@ -61,14 +63,14 @@ export default function FilterSidebar({
             className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
           >
             <X className="w-4 h-4" />
-            Clear all
+            {t('marketplace.clearAll')}
           </button>
         )}
       </div>
 
       <div className="mb-6">
         <button type="button" className="w-full flex items-center justify-between text-left mb-3">
-          <span className="font-medium text-navy-700">Categories</span>
+          <span className="font-medium text-navy-700">{t('marketplace.categories')}</span>
           <ChevronDown className="w-4 h-4 text-navy-400" />
         </button>
         <div className="space-y-2">
@@ -85,21 +87,21 @@ export default function FilterSidebar({
               </label>
             ))
           ) : (
-            <p className="text-sm text-navy-400">No categories available.</p>
+            <p className="text-sm text-navy-400">{t('marketplace.noCategories')}</p>
           )}
         </div>
       </div>
 
       <div className="mb-6">
         <button type="button" className="w-full flex items-center justify-between text-left mb-3">
-          <span className="font-medium text-navy-700">Price Range</span>
+          <span className="font-medium text-navy-700">{t('marketplace.priceRange')}</span>
           <ChevronDown className="w-4 h-4 text-navy-400" />
         </button>
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <label className="text-xs text-navy-500 mb-1 block" htmlFor="price-min">
-                Min
+                {t('marketplace.min')}
               </label>
               <input
                 id="price-min"
@@ -116,7 +118,7 @@ export default function FilterSidebar({
             <span className="text-navy-400 pt-5">-</span>
             <div className="flex-1">
               <label className="text-xs text-navy-500 mb-1 block" htmlFor="price-max">
-                Max
+                {t('marketplace.max')}
               </label>
               <input
                 id="price-max"
@@ -140,15 +142,15 @@ export default function FilterSidebar({
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
           />
           <div className="flex justify-between text-xs text-navy-500">
-            <span>SAR 0</span>
-            <span>SAR 5,000</span>
+            <span>{t('common.currency.sarAmount', { amount: '0' })}</span>
+            <span>{t('common.currency.sarAmount', { amount: '5,000' })}</span>
           </div>
         </div>
       </div>
 
       <div>
         <button type="button" className="w-full flex items-center justify-between text-left mb-3">
-          <span className="font-medium text-navy-700">Brands</span>
+          <span className="font-medium text-navy-700">{t('marketplace.brands')}</span>
           <ChevronDown className="w-4 h-4 text-navy-400" />
         </button>
         <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -165,7 +167,7 @@ export default function FilterSidebar({
               </label>
             ))
           ) : (
-            <p className="text-sm text-navy-400">No brands available.</p>
+            <p className="text-sm text-navy-400">{t('marketplace.noBrands')}</p>
           )}
         </div>
       </div>

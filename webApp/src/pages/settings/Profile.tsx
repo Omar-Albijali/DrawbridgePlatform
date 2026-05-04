@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { BadgeCheck, Building2, Camera, Check, FileText } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { userService } from '../../services/userService';
 import { UpdateUserProfileRequest, UserRole } from '../../types';
 
 export default function Profile(): JSX.Element {
+  const { t } = useTranslation();
   const { user, refreshUser } = useAuth();
   const isRetailer = user?.role === UserRole.RETAILER;
 
@@ -54,10 +56,10 @@ export default function Profile(): JSX.Element {
 
       setInitialData(formData);
       setHasChanges(false);
-      alert('Profile updated successfully');
+      alert(t('settings.profile.updated'));
     } catch (error) {
       console.error('Failed to update profile', error);
-      alert('Failed to update profile');
+      alert(t('settings.profile.updateFailed'));
     }
   };
 
@@ -77,7 +79,7 @@ export default function Profile(): JSX.Element {
       await refreshUser();
     } catch (error) {
       console.error('Failed to upload profile image', error);
-      alert('Failed to upload image');
+      alert(t('settings.profile.uploadFailed'));
     } finally {
       setIsUploading(false);
       event.target.value = '';
@@ -88,8 +90,8 @@ export default function Profile(): JSX.Element {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-navy-800">Account Settings</h1>
-          <p className="text-navy-500 mt-1">Manage organization profile and representative details</p>
+          <h1 className="text-2xl font-bold text-navy-800">{t('settings.profile.title')}</h1>
+          <p className="text-navy-500 mt-1">{t('settings.profile.description')}</p>
         </div>
         <button
           onClick={handleSave}
@@ -99,7 +101,7 @@ export default function Profile(): JSX.Element {
           }`}
         >
           <Check className="w-4 h-4" />
-          Save Changes
+          {t('settings.profile.saveChanges')}
         </button>
       </div>
 
@@ -118,7 +120,7 @@ export default function Profile(): JSX.Element {
               onClick={triggerAvatarUpload}
               disabled={isUploading}
               className="absolute -bottom-1 -right-1 w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-primary-700 transition-colors disabled:opacity-60"
-              title="Upload avatar"
+              title={t('settings.profile.uploadAvatar')}
             >
               <Camera className="w-4 h-4" />
             </button>
@@ -131,58 +133,60 @@ export default function Profile(): JSX.Element {
             />
           </div>
           <div>
-            <h3 className="font-semibold text-navy-800">{formData.businessName || 'Organization Name'}</h3>
-            <p className="text-sm text-navy-500 capitalize">{String(user?.role)} Account</p>
-            <p className="text-sm text-navy-400 mt-1">Rep: {formData.repName}</p>
+            <h3 className="font-semibold text-navy-800">{formData.businessName || t('settings.profile.organizationName')}</h3>
+            <p className="text-sm text-navy-500 capitalize">
+              {t('settings.profile.accountType', { role: isRetailer ? t('auth.register.retailer') : t('auth.register.wholesaler') })}
+            </p>
+            <p className="text-sm text-navy-400 mt-1">{t('settings.profile.representative', { name: formData.repName })}</p>
           </div>
         </div>
       </div>
 
       <div className="card">
-        <h3 className="text-lg font-semibold text-navy-800 mb-6">Representative Information</h3>
+        <h3 className="text-lg font-semibold text-navy-800 mb-6">{t('settings.profile.representativeInfo')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="label">Representative Name</label>
+            <label className="label">{t('settings.profile.representativeName')}</label>
             <input
               type="text"
               name="repName"
               value={formData.repName}
               onChange={handleInputChange}
               className="input"
-              placeholder="Full Name"
+              placeholder={t('settings.profile.placeholders.fullName')}
             />
           </div>
           <div>
-            <label className="label">Job Title</label>
+            <label className="label">{t('settings.profile.jobTitle')}</label>
             <input
               type="text"
               name="repJobTitle"
               value={formData.repJobTitle}
               onChange={handleInputChange}
               className="input"
-              placeholder="e.g. Manager"
+              placeholder={t('settings.profile.placeholders.manager')}
             />
           </div>
           <div>
-            <label className="label">Work Email (Personal)</label>
+            <label className="label">{t('settings.profile.workEmail')}</label>
             <input
               type="email"
               name="repEmail"
               value={formData.repEmail}
               onChange={handleInputChange}
               className="input"
-              placeholder="name@company.com"
+              placeholder={t('settings.profile.placeholders.email')}
             />
           </div>
           <div>
-            <label className="label">Mobile Number</label>
+            <label className="label">{t('settings.profile.mobileNumber')}</label>
             <input
               type="tel"
               name="repPhone"
               value={formData.repPhone}
               onChange={handleInputChange}
               className="input"
-              placeholder="+966 5XX XXX XXXX"
+              placeholder={t('settings.profile.placeholders.phone')}
             />
           </div>
         </div>
@@ -191,22 +195,22 @@ export default function Profile(): JSX.Element {
       <div className="card">
         <div className="flex items-center gap-2 mb-6">
           <Building2 className="w-5 h-5 text-primary-600" />
-          <h3 className="text-lg font-semibold text-navy-800">Organization Details</h3>
+          <h3 className="text-lg font-semibold text-navy-800">{t('settings.profile.organizationDetails')}</h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="md:col-span-2">
-            <label className="label">Business / Company Name</label>
+            <label className="label">{t('settings.profile.businessName')}</label>
             <input
               type="text"
               name="businessName"
               value={formData.businessName}
               onChange={handleInputChange}
               className="input"
-              placeholder="Organization Name"
+              placeholder={t('settings.profile.placeholders.organizationName')}
             />
           </div>
           <div>
-            <label className="label">Account Email (Login)</label>
+            <label className="label">{t('settings.profile.accountEmail')}</label>
             <input
               type="email"
               value={user?.email || ''}
@@ -214,23 +218,23 @@ export default function Profile(): JSX.Element {
               disabled
               readOnly
             />
-            <p className="text-xs text-navy-400 mt-1">Login email cannot be changed</p>
+            <p className="text-xs text-navy-400 mt-1">{t('settings.profile.emailCannotChange')}</p>
           </div>
           <div>
-            <label className="label">Business Phone</label>
+            <label className="label">{t('settings.profile.businessPhone')}</label>
             <input
               type="tel"
               name="businessPhone"
               value={formData.businessPhone}
               onChange={handleInputChange}
               className="input"
-              placeholder="General contact number"
+              placeholder={t('settings.profile.placeholders.contactNumber')}
             />
           </div>
           <div>
             <label className="label flex items-center gap-1">
               <FileText className="w-4 h-4" />
-              CR Number
+              {t('settings.profile.crNumber')}
             </label>
             <input
               type="text"
@@ -238,7 +242,7 @@ export default function Profile(): JSX.Element {
               value={formData.crNumber}
               onChange={handleInputChange}
               className="input"
-              placeholder="Commercial Registration Number"
+              placeholder={t('settings.profile.placeholders.commercialRegistration')}
             />
           </div>
         </div>
@@ -248,7 +252,7 @@ export default function Profile(): JSX.Element {
         <div className="card">
           <div className="flex items-center gap-2 mb-4">
             <BadgeCheck className="w-5 h-5 text-primary-600" />
-            <h3 className="text-lg font-semibold text-navy-800">Company Verification</h3>
+            <h3 className="text-lg font-semibold text-navy-800">{t('settings.profile.companyVerification')}</h3>
           </div>
           <div className="flex items-center gap-4 p-4 bg-green-50 rounded-xl border border-green-200">
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -256,11 +260,11 @@ export default function Profile(): JSX.Element {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-green-700">Verified Supplier</span>
-                <span className="badge badge-success">Active</span>
+                <span className="font-semibold text-green-700">{t('settings.profile.verifiedSupplier')}</span>
+                <span className="badge badge-success">{t('common.active')}</span>
               </div>
               <p className="text-sm text-green-600 mt-1">
-                Your company has been verified and approved to sell on Drawbridge.
+                {t('settings.profile.verifiedDescription')}
               </p>
             </div>
           </div>

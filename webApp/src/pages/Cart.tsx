@@ -1,26 +1,28 @@
 import { ArrowLeft, ArrowRight, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import PageShell from '../components/PageShell';
 import { useCart } from '../contexts/CartContext';
+import { formatCurrency } from '../i18n/display';
 
 export default function Cart(): JSX.Element {
+  const { t } = useTranslation();
   const { items, itemCount, subtotal, tax, total, updateQuantity, removeFromCart, clearCart } = useCart();
 
   if (itemCount === 0) {
     return (
-      <PageShell title="Shopping Cart" description="Your cart is currently empty." className="buyer-cart">
+      <PageShell title={t('cart.title')} description={t('cart.emptyDescription')} className="buyer-cart">
         <div className="buyer-cart__empty text-center py-16">
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <ShoppingBag className="w-12 h-12 text-navy-400" />
           </div>
-          <h2 className="text-2xl font-bold text-navy-800 mb-3">Your cart is empty</h2>
+          <h2 className="text-2xl font-bold text-navy-800 mb-3">{t('cart.emptyTitle')}</h2>
           <p className="text-navy-500 mb-6 max-w-md mx-auto">
-            Looks like you haven&apos;t added anything to your cart yet. Browse our marketplace to find products for your
-            business.
+            {t('cart.emptyText')}
           </p>
           <Link to="/marketplace" className="btn-primary inline-flex items-center gap-2">
             <ShoppingBag className="w-4 h-4" />
-            Browse Marketplace
+            {t('cart.browseMarketplace')}
           </Link>
         </div>
       </PageShell>
@@ -29,8 +31,8 @@ export default function Cart(): JSX.Element {
 
   return (
     <PageShell
-      title="Shopping Cart"
-      description={`${itemCount} items in your cart`}
+      title={t('cart.title')}
+      description={t('cart.description', { count: itemCount })}
       className="buyer-cart"
       actions={
         <button
@@ -39,7 +41,7 @@ export default function Cart(): JSX.Element {
           className="text-red-600 hover:text-red-700 text-sm font-medium flex items-center gap-1"
         >
           <Trash2 className="w-4 h-4" />
-          Clear Cart
+          {t('cart.clear')}
         </button>
       }
     >
@@ -47,7 +49,7 @@ export default function Cart(): JSX.Element {
       <div className="buyer-cart__layout grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           {itemCount > 0 && items.length === 0 && (
-            <div className="bg-white rounded-xl shadow-card p-6 text-sm text-navy-500">Loading latest product details...</div>
+            <div className="bg-white rounded-xl shadow-card p-6 text-sm text-navy-500">{t('cart.loadingProducts')}</div>
           )}
           {items.map((item) => (
             <div key={item.product.id} className="buyer-cart__item bg-white rounded-xl shadow-card p-4 flex gap-4">
@@ -55,7 +57,7 @@ export default function Cart(): JSX.Element {
                 {item.product.image ? (
                   <img src={item.product.image} alt={item.product.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs text-navy-400">No image</div>
+                  <div className="w-full h-full flex items-center justify-center text-xs text-navy-400">{t('cart.noImage')}</div>
                 )}
               </div>
 
@@ -64,7 +66,7 @@ export default function Cart(): JSX.Element {
                   <div>
                     <h3 className="font-semibold text-navy-800">{item.product.name}</h3>
                     <p className="text-sm text-navy-500">{item.product.brand}</p>
-                    <p className="text-sm text-navy-400 mt-1">Supplier: {item.product.supplier}</p>
+                    <p className="text-sm text-navy-400 mt-1">{t('cart.supplier', { supplier: item.product.supplier })}</p>
                   </div>
                   <button
                     type="button"
@@ -95,8 +97,8 @@ export default function Cart(): JSX.Element {
                   </div>
 
                   <div className="buyer-cart__price text-right">
-                    <p className="text-sm text-navy-500">SAR {item.product.price.toFixed(2)} each</p>
-                    <p className="font-bold text-navy-800">SAR {(item.product.price * item.quantity).toFixed(2)}</p>
+                    <p className="text-sm text-navy-500">{t('cart.each', { amount: formatCurrency(item.product.price) })}</p>
+                    <p className="font-bold text-navy-800">{formatCurrency(item.product.price * item.quantity)}</p>
                   </div>
                 </div>
               </div>
@@ -106,46 +108,46 @@ export default function Cart(): JSX.Element {
 
         <div className="lg:col-span-1">
           <div className="buyer-cart__summary bg-white rounded-xl shadow-card p-6 sticky top-24">
-            <h3 className="text-lg font-semibold text-navy-800 mb-4">Order Summary</h3>
+            <h3 className="text-lg font-semibold text-navy-800 mb-4">{t('cart.summary')}</h3>
 
             <div className="space-y-3 mb-6">
               <div className="flex items-center justify-between text-navy-600">
-                <span>Subtotal ({itemCount} items)</span>
-                <span>SAR {subtotal.toFixed(2)}</span>
+                <span>{t('cart.subtotalItems', { count: itemCount })}</span>
+                <span>{formatCurrency(subtotal)}</span>
               </div>
               <div className="flex items-center justify-between text-navy-600">
-                <span>VAT (15%)</span>
-                <span>SAR {tax.toFixed(2)}</span>
+                <span>{t('common.vat')}</span>
+                <span>{formatCurrency(tax)}</span>
               </div>
               <div className="flex items-center justify-between text-navy-600">
-                <span>Shipping</span>
-                <span className="text-green-600 font-medium">Free</span>
+                <span>{t('common.shipping')}</span>
+                <span className="text-green-600 font-medium">{t('common.free')}</span>
               </div>
               <hr className="border-gray-200" />
               <div className="flex items-center justify-between text-lg font-bold text-navy-800">
-                <span>Total</span>
-                <span>SAR {total.toFixed(2)}</span>
+                <span>{t('common.total')}</span>
+                <span>{formatCurrency(total)}</span>
               </div>
             </div>
 
             <Link to="/checkout" className="w-full btn-primary flex items-center justify-center gap-2 py-3">
-              Proceed to Checkout
+              {t('cart.proceed')}
               <ArrowRight className="w-4 h-4" />
             </Link>
 
             <Link to="/marketplace" className="w-full btn-secondary flex items-center justify-center gap-2 py-3 mt-3">
               <ArrowLeft className="w-4 h-4" />
-              Continue Shopping
+              {t('cart.continueShopping')}
             </Link>
 
             <div className="mt-6 pt-6 border-t border-gray-200">
               <label htmlFor="promo-code" className="label">
-                Promo Code
+                {t('cart.promoCode')}
               </label>
               <div className="flex gap-2">
-                <input id="promo-code" type="text" placeholder="Enter code" className="input flex-1" />
+                <input id="promo-code" type="text" placeholder={t('cart.enterCode')} className="input flex-1" />
                 <button type="button" className="btn-secondary">
-                  Apply
+                  {t('common.apply')}
                 </button>
               </div>
             </div>

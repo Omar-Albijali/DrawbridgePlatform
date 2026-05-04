@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Calendar, RefreshCw, Settings, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { dayOfWeekLabel } from '../../i18n/display';
 import type { AutoOrderConfigDTO, InventoryItem } from '../../types';
 import { ScheduleType } from '../../types';
 
@@ -16,6 +18,7 @@ export default function AutoRestockModal({
   onClose,
   onSave,
 }: AutoRestockModalProps): JSX.Element | null {
+  const { t } = useTranslation();
   const [threshold, setThreshold] = useState(10);
   const [reorderQuantity, setReorderQuantity] = useState(25);
   const [scheduleType, setScheduleType] = useState<ScheduleType>(ScheduleType.THRESHOLD_BASED);
@@ -66,7 +69,7 @@ export default function AutoRestockModal({
                 <Settings className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold">Auto-Restock Configuration</h2>
+                <h2 className="text-lg font-semibold">{t('inventory.restock.title')}</h2>
                 <p className="text-primary-100 text-sm">{item.name}</p>
               </div>
             </div>
@@ -82,7 +85,7 @@ export default function AutoRestockModal({
 
         <div className="p-6 space-y-6 overflow-y-auto text-slate-800 dark:text-slate-100">
           <div>
-            <label className="label">Restock Strategy</label>
+            <label className="label">{t('inventory.restock.strategy')}</label>
             <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
@@ -94,9 +97,9 @@ export default function AutoRestockModal({
               >
                 <div className="font-medium flex items-center gap-2">
                   <Settings className="w-4 h-4" />
-                  Threshold Based
+                  {t('inventory.restock.thresholdBased')}
                 </div>
-                <p className="text-xs opacity-80 mt-1">Reorder when stock falls below a specific level</p>
+                <p className="text-xs opacity-80 mt-1">{t('inventory.restock.thresholdHint')}</p>
               </button>
 
               <button
@@ -109,9 +112,9 @@ export default function AutoRestockModal({
               >
                 <div className="font-medium flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  Weekly Schedule
+                  {t('inventory.restock.weekly')}
                 </div>
-                <p className="text-xs opacity-80 mt-1">Reorder on a specific day every week</p>
+                <p className="text-xs opacity-80 mt-1">{t('inventory.restock.weeklyHint')}</p>
               </button>
 
               <button
@@ -124,9 +127,9 @@ export default function AutoRestockModal({
               >
                 <div className="font-medium flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  Monthly Schedule
+                  {t('inventory.restock.monthly')}
                 </div>
-                <p className="text-xs opacity-80 mt-1">Reorder on a specific day every month</p>
+                <p className="text-xs opacity-80 mt-1">{t('inventory.restock.monthlyHint')}</p>
               </button>
 
               <button
@@ -139,19 +142,19 @@ export default function AutoRestockModal({
               >
                 <div className="font-medium flex items-center gap-2">
                   <RefreshCw className="w-4 h-4" />
-                  Fixed Interval
+                  {t('inventory.restock.interval')}
                 </div>
-                <p className="text-xs opacity-80 mt-1">Reorder every X days</p>
+                <p className="text-xs opacity-80 mt-1">{t('inventory.restock.intervalHint')}</p>
               </button>
             </div>
           </div>
 
           <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700/70">
-            <h3 className="font-medium text-slate-900 dark:text-slate-100">Configuration Details</h3>
+            <h3 className="font-medium text-slate-900 dark:text-slate-100">{t('inventory.restock.configurationDetails')}</h3>
 
             {scheduleType == ScheduleType.THRESHOLD_BASED && (
               <div>
-                <label className="label">Minimum Threshold</label>
+                <label className="label">{t('inventory.restock.minimumThreshold')}</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -160,19 +163,19 @@ export default function AutoRestockModal({
                     className="input pr-16"
                     min="1"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-sm">units</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-sm">{t('inventory.restock.units')}</span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Trigger reorder when stock is less than this</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('inventory.restock.triggerHint')}</p>
               </div>
             )}
 
             {scheduleType == ScheduleType.WEEKLY && (
               <div>
-                <label className="label">Day of Week</label>
+                <label className="label">{t('inventory.restock.dayOfWeek')}</label>
                 <select className="input" value={dayOfWeek} onChange={(event) => setDayOfWeek(event.target.value)}>
                   {daysOfWeek.map((day) => (
                     <option key={day} value={day}>
-                      {day}
+                      {dayOfWeekLabel(t, day)}
                     </option>
                   ))}
                 </select>
@@ -181,12 +184,11 @@ export default function AutoRestockModal({
 
             {scheduleType == ScheduleType.MONTHLY && (
               <div>
-                <label className="label">Day of Month</label>
+                <label className="label">{t('inventory.restock.dayOfMonth')}</label>
                 <select className="input" value={dayOfMonth} onChange={(event) => setDayOfMonth(event.target.value)}>
                   {Array.from({ length: 28 }, (_, index) => index + 1).map((day) => (
                     <option key={day} value={day.toString()}>
-                      {day}
-                      {[1, 21, 31].includes(day) ? 'st' : [2, 22].includes(day) ? 'nd' : [3, 23].includes(day) ? 'rd' : 'th'}
+                      {t('inventory.restock.ordinal', { day })}
                     </option>
                   ))}
                 </select>
@@ -195,7 +197,7 @@ export default function AutoRestockModal({
 
             {scheduleType == ScheduleType.INTERVAL_DAYS && (
               <div>
-                <label className="label">Interval (Days)</label>
+                <label className="label">{t('inventory.restock.intervalDays')}</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -204,13 +206,13 @@ export default function AutoRestockModal({
                     className="input pr-16"
                     min="1"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-sm">days</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-sm">{t('inventory.restock.days')}</span>
                 </div>
               </div>
             )}
 
             <div>
-              <label className="label">Reorder Quantity</label>
+              <label className="label">{t('inventory.restock.reorderQuantity')}</label>
               <div className="relative">
                 <input
                   type="number"
@@ -219,19 +221,19 @@ export default function AutoRestockModal({
                   className="input pr-16"
                   min="1"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-sm">units</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-sm">{t('inventory.restock.units')}</span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Amount to order when triggered</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('inventory.restock.amountHint')}</p>
             </div>
           </div>
         </div>
 
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 dark:bg-slate-900/60 dark:border-slate-700/70 flex gap-3 shrink-0">
           <button type="button" onClick={onClose} className="flex-1 btn-secondary">
-            Cancel
+            {t('common.cancel')}
           </button>
           <button type="button" onClick={handleSave} className="flex-1 btn-primary">
-            Save Configuration
+            {t('inventory.restock.saveConfiguration')}
           </button>
         </div>
       </div>

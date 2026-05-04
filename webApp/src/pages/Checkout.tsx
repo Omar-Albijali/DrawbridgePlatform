@@ -1,16 +1,19 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CheckCircle2, CreditCard, Lock, MapPin, Package } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { addressService } from '../services/addressService';
 import { paymentService } from '../services/paymentService';
+import { formatCurrency } from '../i18n/display';
 import type { Address, CreateAddressRequest, CreatePaymentMethodRequest, PaymentMethodDTO } from '../types';
 
 type CheckoutStep = 'shipping' | 'payment' | 'confirmation';
 
 export default function Checkout(): JSX.Element {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { items, subtotal, tax, total, checkout } = useCart();
@@ -31,7 +34,7 @@ export default function Checkout(): JSX.Element {
     city: '',
     state: '',
     zipCode: '',
-    country: 'Saudi Arabia',
+    country: t('auth.register.defaultCountry'),
   });
 
   const [paymentForm, setPaymentForm] = useState({
@@ -90,7 +93,7 @@ export default function Checkout(): JSX.Element {
       setShowAddressForm(false);
     } catch (error) {
       console.error('Failed to add address', error);
-      alert('Failed to add address');
+      alert(t('checkout.alerts.addAddressFailed'));
     } finally {
       setIsProcessing(false);
     }
@@ -122,7 +125,7 @@ export default function Checkout(): JSX.Element {
       setShowPaymentForm(false);
     } catch (error) {
       console.error('Failed to add payment method', error);
-      alert('Failed to add payment method');
+      alert(t('checkout.alerts.addPaymentFailed'));
     } finally {
       setIsProcessing(false);
     }
@@ -130,7 +133,7 @@ export default function Checkout(): JSX.Element {
 
   const handlePlaceOrder = async (): Promise<void> => {
     if (!selectedAddressId || !selectedPaymentMethodId) {
-      alert('Please select shipping address and payment method');
+      alert(t('checkout.alerts.selectAddressPayment'));
       return;
     }
 
@@ -143,7 +146,7 @@ export default function Checkout(): JSX.Element {
       return;
     }
 
-    alert(result.message ?? 'Failed to place order. Please try again.');
+    alert(result.message ?? t('checkout.alerts.placeOrderFailed'));
   };
 
   const formatCardNumber = (value: string): string => {
@@ -169,16 +172,18 @@ export default function Checkout(): JSX.Element {
   const selectedAddress = addresses.find((address) => address.id === selectedAddressId);
   const selectedPaymentMethod = paymentMethods.find((method) => method.id === selectedPaymentMethodId);
 
+  const checkoutSteps = [
+    { id: 'shipping', label: t('checkout.steps.shipping'), icon: MapPin },
+    { id: 'payment', label: t('checkout.steps.payment'), icon: CreditCard },
+    { id: 'confirmation', label: t('checkout.steps.confirmation'), icon: CheckCircle2 },
+  ] as const;
+
   return (
-    <PageShell title="Checkout" description="Complete your order" className="page-shell--narrow buyer-checkout">
+    <PageShell title={t('checkout.title')} description={t('checkout.description')} className="page-shell--narrow buyer-checkout">
 
       <div className="buyer-checkout__stepper bg-white rounded-xl shadow-card p-6">
         <div className="flex items-center justify-between">
-          {[
-            { id: 'shipping', label: 'Shipping', icon: MapPin },
-            { id: 'payment', label: 'Payment', icon: CreditCard },
-            { id: 'confirmation', label: 'Confirmation', icon: CheckCircle2 },
-          ].map((step, index) => (
+          {checkoutSteps.map((step, index) => (
             <div key={step.id} className="contents">
               <div className="flex items-center gap-3">
                 <div
@@ -212,12 +217,12 @@ export default function Checkout(): JSX.Element {
             <div className="buyer-checkout__panel bg-white rounded-xl shadow-card p-6">
               <h2 className="text-lg font-semibold text-navy-800 mb-6 flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-primary-600" />
-                Shipping Address
+                {t('checkout.shippingAddress')}
               </h2>
 
               {!showAddressForm ? (
                 <div className="space-y-4">
-                  {addresses.length === 0 && <p className="text-gray-500 text-center py-4">No saved addresses found.</p>}
+                  {addresses.length === 0 && <p className="text-gray-500 text-center py-4">{t('checkout.noAddresses')}</p>}
                   <div className="buyer-checkout__option-grid grid grid-cols-1 gap-4">
                     {addresses.map((address) => (
                       <button
@@ -246,13 +251,13 @@ export default function Checkout(): JSX.Element {
                       className="p-4 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-primary-500 hover:text-primary-600 transition-colors flex items-center justify-center gap-2"
                     >
                       <MapPin className="w-5 h-5" />
-                      Add New Address
+                      {t('checkout.addNewAddress')}
                     </button>
                   </div>
                   <div className="flex gap-4 mt-6">
                     <button type="button" onClick={() => navigate('/cart')} className="btn-secondary flex items-center gap-2">
                       <ArrowLeft className="w-4 h-4" />
-                      Back to Cart
+                      {t('checkout.backToCart')}
                     </button>
                     <button
                       type="button"
@@ -260,12 +265,12 @@ export default function Checkout(): JSX.Element {
                         if (selectedAddressId) {
                           setCurrentStep('payment');
                         } else {
-                          alert('Please select an address');
+                          alert(t('checkout.alerts.selectAddress'));
                         }
                       }}
                       className="btn-primary flex-1 flex items-center justify-center gap-2"
                     >
-                      Continue to Payment
+                      {t('checkout.continuePayment')}
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -275,7 +280,7 @@ export default function Checkout(): JSX.Element {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                       <label htmlFor="street" className="label">
-                        Street Address
+                        {t('checkout.streetAddress')}
                       </label>
                       <input
                         id="street"
@@ -283,13 +288,13 @@ export default function Checkout(): JSX.Element {
                         value={shippingForm.street}
                         onChange={(event) => setShippingForm({ ...shippingForm, street: event.target.value })}
                         className="input"
-                        placeholder="Street address..."
+                        placeholder={t('checkout.streetPlaceholder')}
                         required
                       />
                     </div>
                     <div>
                       <label htmlFor="city" className="label">
-                        City
+                        {t('checkout.city')}
                       </label>
                       <input
                         id="city"
@@ -302,7 +307,7 @@ export default function Checkout(): JSX.Element {
                     </div>
                     <div>
                       <label htmlFor="state" className="label">
-                        State/Region
+                        {t('checkout.state')}
                       </label>
                       <input
                         id="state"
@@ -315,7 +320,7 @@ export default function Checkout(): JSX.Element {
                     </div>
                     <div>
                       <label htmlFor="zipCode" className="label">
-                        Postal Code
+                        {t('checkout.postalCode')}
                       </label>
                       <input
                         id="zipCode"
@@ -328,7 +333,7 @@ export default function Checkout(): JSX.Element {
                     </div>
                     <div>
                       <label htmlFor="country" className="label">
-                        Country
+                        {t('checkout.country')}
                       </label>
                       <input
                         id="country"
@@ -342,10 +347,10 @@ export default function Checkout(): JSX.Element {
                   </div>
                   <div className="flex gap-4 mt-6">
                     <button type="button" onClick={() => setShowAddressForm(false)} className="btn-secondary">
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                     <button type="submit" className="btn-primary" disabled={isProcessing}>
-                      {isProcessing ? 'Saving...' : 'Save Address'}
+                      {isProcessing ? t('common.saving') : t('checkout.saveAddress')}
                     </button>
                   </div>
                 </form>
@@ -357,13 +362,13 @@ export default function Checkout(): JSX.Element {
             <div className="buyer-checkout__panel bg-white rounded-xl shadow-card p-6">
               <h2 className="text-lg font-semibold text-navy-800 mb-6 flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-primary-600" />
-                Payment Method
+                {t('checkout.paymentMethod')}
               </h2>
 
               {!showPaymentForm ? (
                 <div className="space-y-4">
                   {paymentMethods.length === 0 && (
-                    <p className="text-gray-500 text-center py-4">No saved payment methods found.</p>
+                    <p className="text-gray-500 text-center py-4">{t('checkout.noPaymentMethods')}</p>
                   )}
                   <div className="buyer-checkout__option-grid grid grid-cols-1 gap-4">
                     {paymentMethods.map((method) => (
@@ -377,7 +382,7 @@ export default function Checkout(): JSX.Element {
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium text-navy-800">{method.maskedDetails.split(' ')[0]} Card</p>
+                            <p className="font-medium text-navy-800">{t('checkout.card', { brand: method.maskedDetails.split(' ')[0] })}</p>
                             <p className="text-sm text-navy-500">{method.maskedDetails}</p>
                           </div>
                           {selectedPaymentMethodId === method.id && <CheckCircle2 className="w-5 h-5 text-primary-600" />}
@@ -390,13 +395,13 @@ export default function Checkout(): JSX.Element {
                       className="p-4 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-primary-500 hover:text-primary-600 transition-colors flex items-center justify-center gap-2"
                     >
                       <CreditCard className="w-5 h-5" />
-                      Add New Payment Method
+                      {t('checkout.addNewPayment')}
                     </button>
                   </div>
                   <div className="flex gap-4 mt-6">
                     <button type="button" onClick={() => setCurrentStep('shipping')} className="btn-secondary flex items-center gap-2">
                       <ArrowLeft className="w-4 h-4" />
-                      Back
+                      {t('common.back')}
                     </button>
                     <button
                       type="button"
@@ -404,12 +409,12 @@ export default function Checkout(): JSX.Element {
                         if (selectedPaymentMethodId) {
                           setCurrentStep('confirmation');
                         } else {
-                          alert('Please select a payment method');
+                          alert(t('checkout.alerts.selectPayment'));
                         }
                       }}
                       className="btn-primary flex-1 flex items-center justify-center gap-2"
                     >
-                      Review Order
+                      {t('checkout.reviewOrder')}
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -418,7 +423,7 @@ export default function Checkout(): JSX.Element {
                 <form onSubmit={(event) => void handlePaymentSubmit(event)} className="space-y-4">
                   <div>
                     <label htmlFor="cardholderName" className="label">
-                      Cardholder Name
+                      {t('checkout.cardholderName')}
                     </label>
                     <input
                       id="cardholderName"
@@ -426,13 +431,13 @@ export default function Checkout(): JSX.Element {
                       value={paymentForm.cardholderName}
                       onChange={(event) => setPaymentForm({ ...paymentForm, cardholderName: event.target.value })}
                       className="input"
-                      placeholder="Name as it appears on card"
+                      placeholder={t('checkout.cardNamePlaceholder')}
                       required
                     />
                   </div>
                   <div>
                     <label htmlFor="cardNumber" className="label">
-                      Card Number
+                      {t('checkout.cardNumber')}
                     </label>
                     <input
                       id="cardNumber"
@@ -448,7 +453,7 @@ export default function Checkout(): JSX.Element {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label htmlFor="expiryDate" className="label">
-                        Expiry Date
+                        {t('checkout.expiryDate')}
                       </label>
                       <input
                         id="expiryDate"
@@ -456,14 +461,14 @@ export default function Checkout(): JSX.Element {
                         value={paymentForm.expiryDate}
                         onChange={(event) => setPaymentForm({ ...paymentForm, expiryDate: formatExpiry(event.target.value) })}
                         className="input"
-                        placeholder="MM/YY"
+                        placeholder={t('checkout.expiryPlaceholder')}
                         maxLength={5}
                         required
                       />
                     </div>
                     <div>
                       <label htmlFor="cvv" className="label">
-                        CVV
+                        {t('checkout.cvv')}
                       </label>
                       <input
                         id="cvv"
@@ -484,15 +489,15 @@ export default function Checkout(): JSX.Element {
                   </div>
                   <div className="buyer-checkout__secure-note mt-6 p-4 bg-gray-50 rounded-lg flex items-center gap-3">
                     <Lock className="w-5 h-5 text-green-600" />
-                    <p className="text-sm text-navy-600">Your payment is secure. We use 256-bit SSL encryption.</p>
+                    <p className="text-sm text-navy-600">{t('checkout.secureNote')}</p>
                   </div>
 
                   <div className="flex gap-4 mt-6">
                     <button type="button" onClick={() => setShowPaymentForm(false)} className="btn-secondary">
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                     <button type="submit" className="btn-primary" disabled={isProcessing}>
-                      {isProcessing ? 'Saving...' : 'Save Card'}
+                      {isProcessing ? t('common.saving') : t('checkout.saveCard')}
                     </button>
                   </div>
                 </form>
@@ -506,14 +511,14 @@ export default function Checkout(): JSX.Element {
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 className="w-8 h-8 text-green-600" />
                 </div>
-                <h2 className="text-2xl font-bold text-navy-800 mb-2">Order Review</h2>
-                <p className="text-navy-500">Please review your order before placing it</p>
+                <h2 className="text-2xl font-bold text-navy-800 mb-2">{t('checkout.orderReview')}</h2>
+                <p className="text-navy-500">{t('checkout.reviewDescription')}</p>
               </div>
 
               <div className="buyer-checkout__review-card border border-gray-200 rounded-lg p-4 mb-4">
                 <h3 className="font-semibold text-navy-800 mb-2 flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-primary-600" />
-                  Shipping Address
+                  {t('checkout.shippingAddress')}
                 </h3>
                 {selectedAddress && (
                   <>
@@ -529,7 +534,7 @@ export default function Checkout(): JSX.Element {
               <div className="buyer-checkout__review-card border border-gray-200 rounded-lg p-4 mb-4">
                 <h3 className="font-semibold text-navy-800 mb-2 flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-primary-600" />
-                  Payment Method
+                  {t('checkout.paymentMethod')}
                 </h3>
                 {selectedPaymentMethod && <p className="text-navy-600">{selectedPaymentMethod.maskedDetails}</p>}
               </div>
@@ -537,7 +542,7 @@ export default function Checkout(): JSX.Element {
               <div className="buyer-checkout__review-card border border-gray-200 rounded-lg p-4">
                 <h3 className="font-semibold text-navy-800 mb-4 flex items-center gap-2">
                   <Package className="w-4 h-4 text-primary-600" />
-                  Order Items ({items.length})
+                  {t('checkout.orderItems', { count: items.length })}
                 </h3>
                 <div className="space-y-3 max-h-48 overflow-y-auto">
                   {items.map((item) => (
@@ -545,9 +550,9 @@ export default function Checkout(): JSX.Element {
                       <img src={item.product.image} alt={item.product.name} className="w-12 h-12 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-navy-800 truncate">{item.product.name}</p>
-                        <p className="text-sm text-navy-500">Qty: {item.quantity}</p>
+                        <p className="text-sm text-navy-500">{t('checkout.qty', { count: item.quantity })}</p>
                       </div>
-                      <p className="font-medium text-navy-800">SAR {(item.product.price * item.quantity).toFixed(2)}</p>
+                      <p className="font-medium text-navy-800">{formatCurrency(item.product.price * item.quantity)}</p>
                     </div>
                   ))}
                 </div>
@@ -560,7 +565,7 @@ export default function Checkout(): JSX.Element {
                 disabled={isProcessing}
               >
                 <CheckCircle2 className="w-5 h-5" />
-                {isProcessing ? 'Processing Order...' : `Place Order - SAR ${total.toFixed(2)}`}
+                {isProcessing ? t('checkout.processingOrder') : t('checkout.placeOrder', { amount: formatCurrency(total) })}
               </button>
             </div>
           )}
@@ -568,7 +573,7 @@ export default function Checkout(): JSX.Element {
 
         <div className="lg:col-span-1">
           <div className="buyer-checkout__summary bg-white rounded-xl shadow-card p-6 sticky top-24">
-            <h3 className="text-lg font-semibold text-navy-800 mb-4">Order Summary</h3>
+            <h3 className="text-lg font-semibold text-navy-800 mb-4">{t('cart.summary')}</h3>
 
             <div className="space-y-3 mb-6">
               {items.slice(0, 3).map((item) => (
@@ -576,36 +581,36 @@ export default function Checkout(): JSX.Element {
                   <img src={item.product.image} alt={item.product.name} className="w-12 h-12 rounded-lg object-cover" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-navy-800 truncate">{item.product.name}</p>
-                    <p className="text-xs text-navy-500">x{item.quantity}</p>
-                  </div>
-                  <p className="text-sm font-medium text-navy-800">SAR {(item.product.price * item.quantity).toFixed(2)}</p>
+                  <p className="text-xs text-navy-500">x{item.quantity}</p>
+                </div>
+                  <p className="text-sm font-medium text-navy-800">{formatCurrency(item.product.price * item.quantity)}</p>
                 </div>
               ))}
-              {items.length > 3 && <p className="text-sm text-navy-500 text-center">+ {items.length - 3} more items</p>}
+              {items.length > 3 && <p className="text-sm text-navy-500 text-center">{t('checkout.moreItems', { count: items.length - 3 })}</p>}
             </div>
 
             <hr className="border-gray-200 my-4" />
 
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between text-navy-600">
-                <span>Subtotal</span>
-                <span>SAR {subtotal.toFixed(2)}</span>
+                <span>{t('common.subtotal')}</span>
+                <span>{formatCurrency(subtotal)}</span>
               </div>
               <div className="flex items-center justify-between text-navy-600">
-                <span>VAT (15%)</span>
-                <span>SAR {tax.toFixed(2)}</span>
+                <span>{t('common.vat')}</span>
+                <span>{formatCurrency(tax)}</span>
               </div>
               <div className="flex items-center justify-between text-navy-600">
-                <span>Shipping</span>
-                <span className="text-green-600 font-medium">Free</span>
+                <span>{t('common.shipping')}</span>
+                <span className="text-green-600 font-medium">{t('common.free')}</span>
               </div>
             </div>
 
             <hr className="border-gray-200 my-4" />
 
             <div className="flex items-center justify-between text-lg font-bold text-navy-800">
-              <span>Total</span>
-              <span>SAR {total.toFixed(2)}</span>
+              <span>{t('common.total')}</span>
+              <span>{formatCurrency(total)}</span>
             </div>
           </div>
         </div>
