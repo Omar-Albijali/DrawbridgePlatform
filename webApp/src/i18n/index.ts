@@ -101,8 +101,11 @@ const resources = {
         language: {
           label: 'Language',
           english: 'English',
+          englishShort: 'EN',
           arabic: 'العربية',
-          switchTo: 'Switch language to {{language}}',
+          arabicShort: 'AR',
+          switchToArabic: 'Switch to Arabic',
+          switchToEnglish: 'Switch to English',
         },
         theme: {
           light: 'Light mode',
@@ -1065,8 +1068,11 @@ const resources = {
         language: {
           label: 'اللغة',
           english: 'English',
+          englishShort: 'EN',
           arabic: 'العربية',
-          switchTo: 'تغيير اللغة إلى {{language}}',
+          arabicShort: 'AR',
+          switchToArabic: 'التبديل إلى العربية',
+          switchToEnglish: 'التبديل إلى الإنجليزية',
         },
         theme: {
           light: 'الوضع الفاتح',

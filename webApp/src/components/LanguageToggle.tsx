@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next';
 import type { SupportedLanguage } from '../i18n';
 
 export default function LanguageToggle(): JSX.Element {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const currentLanguage: SupportedLanguage = i18n.resolvedLanguage === 'ar' ? 'ar' : 'en';
   const nextLanguage: SupportedLanguage = currentLanguage === 'ar' ? 'en' : 'ar';
-  const visibleLabel = nextLanguage === 'ar' ? 'AR' : 'EN';
-  const accessibleLabel = nextLanguage === 'ar' ? 'Switch to Arabic' : 'Switch to English';
+  const visibleLabel = t(nextLanguage === 'ar' ? 'common.language.arabicShort' : 'common.language.englishShort');
+  const accessibleLabel = t(
+    nextLanguage === 'ar' ? 'common.language.switchToArabic' : 'common.language.switchToEnglish',
+  );
 
   const handleToggle = (): void => {
     void i18n.changeLanguage(nextLanguage);
