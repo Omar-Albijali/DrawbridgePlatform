@@ -36,6 +36,7 @@ data class InventoryItemDTO(
     val supplier: String,
     val lastRestocked: String?, // LocalDateTime -> String (ISO 8601)
     val reorderQuantity: Int?,
+    val minimumOrderQuantity: Int = 1,
     val imageUrl: String?
 )
 

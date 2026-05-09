@@ -9,7 +9,7 @@ interface AutoRestockModalProps {
   item: InventoryItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (config: Partial<AutoOrderConfigDTO>) => void;
+  onSave: (config: Partial<AutoOrderConfigDTO>) => void | Promise<void>;
 }
 
 export default function AutoRestockModal({
@@ -25,25 +25,35 @@ export default function AutoRestockModal({
   const [intervalDays, setIntervalDays] = useState(7);
   const [dayOfWeek, setDayOfWeek] = useState('MONDAY');
   const [dayOfMonth, setDayOfMonth] = useState('1');
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!item?.autoOrderConfig) {
+    if (!item) {
       return;
     }
 
-    setThreshold(item.autoOrderConfig.minThreshold ?? 10);
-    setReorderQuantity(item.autoOrderConfig.reorderQuantity ?? 25);
-    setScheduleType(item.autoOrderConfig.scheduleType ?? ScheduleType.THRESHOLD_BASED);
-    setIntervalDays(item.autoOrderConfig.intervalDays ?? 7);
-    setDayOfWeek(item.autoOrderConfig.dayOfWeek ?? 'MONDAY');
-    setDayOfMonth(item.autoOrderConfig.dayOfMonth ?? '1');
+    const minimumOrderQuantity = Math.max(1, item.minimumOrderQuantity ?? 1);
+    setThreshold(item.autoOrderConfig?.minThreshold ?? 10);
+    setReorderQuantity(Math.max(item.autoOrderConfig?.reorderQuantity ?? minimumOrderQuantity, minimumOrderQuantity));
+    setScheduleType(item.autoOrderConfig?.scheduleType ?? ScheduleType.THRESHOLD_BASED);
+    setIntervalDays(item.autoOrderConfig?.intervalDays ?? 7);
+    setDayOfWeek(item.autoOrderConfig?.dayOfWeek ?? 'MONDAY');
+    setDayOfMonth(item.autoOrderConfig?.dayOfMonth ?? '1');
+    setValidationError(null);
   }, [item]);
 
   if (!isOpen || !item) {
     return null;
   }
 
-  const handleSave = (): void => {
+  const minimumOrderQuantity = Math.max(1, item.minimumOrderQuantity ?? 1);
+
+  const handleSave = async (): Promise<void> => {
+    if (!Number.isInteger(reorderQuantity) || reorderQuantity < minimumOrderQuantity) {
+      setValidationError(t('inventory.restock.minimumOrderError', { count: minimumOrderQuantity }));
+      return;
+    }
+
     const config: Partial<AutoOrderConfigDTO> = {
       minThreshold: threshold,
       reorderQuantity,
@@ -53,8 +63,13 @@ export default function AutoRestockModal({
       dayOfMonth: scheduleType == ScheduleType.MONTHLY ? dayOfMonth : null,
       enabled: true,
     };
-    onSave(config);
-    onClose();
+
+    try {
+      await onSave(config);
+      onClose();
+    } catch (error) {
+      setValidationError(error instanceof Error ? error.message : t('inventory.restock.saveFailed'));
+    }
   };
 
   const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
@@ -151,6 +166,9 @@ export default function AutoRestockModal({
 
           <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700/70">
             <h3 className="font-medium text-slate-900 dark:text-slate-100">{t('inventory.restock.configurationDetails')}</h3>
+            <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {t('inventory.restock.minimumOrderQuantity', { count: minimumOrderQuantity })}
+            </p>
 
             {scheduleType == ScheduleType.THRESHOLD_BASED && (
               <div>
@@ -219,11 +237,13 @@ export default function AutoRestockModal({
                   value={reorderQuantity}
                   onChange={(event) => setReorderQuantity(Number(event.target.value))}
                   className="input pr-16"
-                  min="1"
+                  min={minimumOrderQuantity}
+                  step="1"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-sm">{t('inventory.restock.units')}</span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('inventory.restock.amountHint')}</p>
+              {validationError && <p className="text-xs font-medium text-red-600 mt-2">{validationError}</p>}
             </div>
           </div>
         </div>
@@ -232,7 +252,7 @@ export default function AutoRestockModal({
           <button type="button" onClick={onClose} className="flex-1 btn-secondary">
             {t('common.cancel')}
           </button>
-          <button type="button" onClick={handleSave} className="flex-1 btn-primary">
+          <button type="button" onClick={() => void handleSave()} className="flex-1 btn-primary">
             {t('inventory.restock.saveConfiguration')}
           </button>
         </div>

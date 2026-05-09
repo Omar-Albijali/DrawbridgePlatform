@@ -82,12 +82,14 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
 
 
   const addToCart = useCallback(
-    async (product: Product, quantity = 1): Promise<void> => {
+    async (product: Product, quantity?: number): Promise<void> => {
       if (!isAuthenticated || isWholesaler || !user?.id) {
         return;
       }
       try {
-        await cartService.addItem(user.id, product.id, quantity);
+        const minimumOrderQuantity = Math.max(1, product.minimumOrderQuantity ?? 1);
+        const requestedQuantity = Math.max(quantity ?? minimumOrderQuantity, minimumOrderQuantity);
+        await cartService.addItem(user.id, product.id, requestedQuantity);
         await refreshCartFromServer();
       } catch (error) {
         console.error('Failed to add item to cart', error);
@@ -124,13 +126,19 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
       }
 
       try {
-        await cartService.updateQuantity(user.id, productId, quantity);
+        const cartItem = cartItems.find((item) => item.product.id === productId);
+        const minimumOrderQuantity = Math.max(1, cartItem?.product.minimumOrderQuantity ?? 1);
+        const stock = cartItem?.product.stock ?? Number.MAX_SAFE_INTEGER;
+        const nextQuantity = stock >= minimumOrderQuantity
+          ? Math.min(Math.max(quantity, minimumOrderQuantity), stock)
+          : Math.max(quantity, minimumOrderQuantity);
+        await cartService.updateQuantity(user.id, productId, nextQuantity);
         await refreshCartFromServer();
       } catch (error) {
         console.error('Failed to update item quantity', error);
       }
     },
-    [isAuthenticated, isWholesaler, refreshCartFromServer, removeFromCart, user?.id],
+    [cartItems, isAuthenticated, isWholesaler, refreshCartFromServer, removeFromCart, user?.id],
   );
 
   const clearCart = useCallback(async (): Promise<void> => {
@@ -163,6 +171,28 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
 
     if (items.length === 0) {
       return { success: false, message: i18n.t('cart.checkoutErrors.emptyCart') };
+    }
+
+    const minimumOrderInvalidItem = items.find((item) => item.quantity < Math.max(1, item.product.minimumOrderQuantity ?? 1));
+    if (minimumOrderInvalidItem) {
+      return {
+        success: false,
+        message: i18n.t('cart.checkoutErrors.minimumOrder', {
+          name: minimumOrderInvalidItem.product.name,
+          count: Math.max(1, minimumOrderInvalidItem.product.minimumOrderQuantity ?? 1),
+        }),
+      };
+    }
+
+    const stockInvalidItem = items.find((item) => item.quantity > (item.product.stock ?? 0));
+    if (stockInvalidItem) {
+      return {
+        success: false,
+        message: i18n.t('cart.checkoutErrors.stock', {
+          name: stockInvalidItem.product.name,
+          count: stockInvalidItem.product.stock ?? 0,
+        }),
+      };
     }
 
     try {

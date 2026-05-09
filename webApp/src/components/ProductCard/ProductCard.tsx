@@ -29,6 +29,9 @@ export default function ProductCard({
   const isRetailer = user?.role === UserRole.RETAILER;
   const [added, setAdded] = useState(false);
   const inWishlist = isInWishlist(product.id);
+  const minimumOrderQuantity = Math.max(1, product.minimumOrderQuantity ?? 1);
+  const stock = product.stock ?? 0;
+  const isBelowMinimumStock = stock < minimumOrderQuantity;
 
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>): void => {
     if ((e.target as HTMLElement).closest('button')) return;
@@ -41,7 +44,8 @@ export default function ProductCard({
       onAuthRequired?.('/marketplace');
       return;
     }
-    void addToCart(product, 1);
+    if (isBelowMinimumStock) return;
+    void addToCart(product, minimumOrderQuantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 1000);
   };
@@ -109,16 +113,21 @@ export default function ProductCard({
           </span>
           </div>
 
-          <p className="text-xs text-navy-500 mb-4">{t('marketplace.card.suppliedBy', { supplier: product.supplier })}</p>
+          <div className="space-y-1 mb-4">
+            <p className="text-xs text-navy-500">{t('marketplace.card.suppliedBy', { supplier: product.supplier })}</p>
+            <p className="text-xs font-semibold text-navy-700">{t('marketplace.card.minimumOrderQuantity', { count: minimumOrderQuantity })}</p>
+          </div>
 
           {canAddToCart ? (
               <button
                   type="button"
                   onClick={handleAddToCart}
-                  disabled={added}
+                  disabled={added || (isAuthenticated && isBelowMinimumStock)}
                   className={`buyer-product-card__cta w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold transition-all duration-300 ${
                       added
                           ? 'cursor-default bg-green-500 text-white'
+                          : isAuthenticated && isBelowMinimumStock
+                            ? 'cursor-not-allowed bg-gray-200 text-gray-500'
                           : 'bg-primary-600 text-white hover:bg-primary-500 hover:shadow-md active:bg-primary-700'
                   }`}
               >
@@ -130,7 +139,11 @@ export default function ProductCard({
                 ) : (
                     <>
                       <ShoppingCart className="w-4 h-4" />
-                      {isAuthenticated ? t('marketplace.card.addToCart') : t('marketplace.card.signInToAdd')}
+                      {isAuthenticated
+                        ? isBelowMinimumStock
+                          ? t('marketplace.card.unavailable')
+                          : t('marketplace.card.addToCart')
+                        : t('marketplace.card.signInToAdd')}
                     </>
                 )}
               </button>

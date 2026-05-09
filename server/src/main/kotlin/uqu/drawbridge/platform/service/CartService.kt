@@ -50,15 +50,18 @@ class CartService(
     @Transactional
     fun addToCart(retailerId: String, productId: String, quantity: Int): CartItem? {
         val product = productRepository.findById(productId).orElse(null) ?: return null
+        validateMinimumOrderQuantity(product, quantity)
         
         val cart = getOrCreateCart(retailerId)
         
         // Check if item already exists in cart
         val existingItem = cartItemRepository.findByCartIdAndProductId(cart.id!!, productId)
+        val finalQuantity = (existingItem?.quantity ?: 0) + quantity
+        validateCartQuantity(product, finalQuantity)
         
         return if (existingItem != null) {
             // Update quantity
-            existingItem.quantity += quantity
+            existingItem.quantity = finalQuantity
             cart.updatedAt = LocalDateTime.now()
             shoppingCartRepository.save(cart)
             existingItem
@@ -89,6 +92,9 @@ class CartService(
             removeFromCart(retailerId, productId)
             return null
         }
+
+        val product = productRepository.findById(productId).orElse(null) ?: return null
+        validateCartQuantity(product, quantity)
         
         item.quantity = quantity
         cart.updatedAt = LocalDateTime.now()
@@ -151,6 +157,8 @@ class CartService(
         val items = cartItemRepository.findByCartId(cart.id!!)
         
         if (items.isEmpty()) return null
+
+        validateCartItemsForCheckout(items)
         
         // Group items by wholesaler
         val itemsByWholesaler = items.groupBy { it.wholesalerId }
@@ -226,6 +234,27 @@ class CartService(
         updatedAt = this.updatedAt.toString(),
         items = this.items.map { it.toDTO() }.toTypedArray()
     )
+
+    private fun validateCartItemsForCheckout(items: List<CartItem>) {
+        items.forEach { item ->
+            val product = productRepository.findById(item.productId).orElse(null)
+                ?: throw IllegalArgumentException("Product not found for cart item ${item.productId}.")
+            validateCartQuantity(product, item.quantity)
+        }
+    }
+
+    private fun validateCartQuantity(product: Product, quantity: Int) {
+        validateMinimumOrderQuantity(product, quantity)
+        if (quantity > product.stockQuantity) {
+            throw IllegalArgumentException("Only ${product.stockQuantity} units available for ${product.name}.")
+        }
+    }
+
+    private fun validateMinimumOrderQuantity(product: Product, quantity: Int) {
+        if (quantity < product.minimumOrderQuantity) {
+            throw IllegalArgumentException("Minimum order quantity for ${product.name} is ${product.minimumOrderQuantity} units.")
+        }
+    }
 
     // ==================== DTO-RETURNING METHODS ====================
 

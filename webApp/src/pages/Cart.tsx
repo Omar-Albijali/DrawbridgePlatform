@@ -8,6 +8,11 @@ import { formatCurrency } from '../i18n/display';
 export default function Cart(): JSX.Element {
   const { t } = useTranslation();
   const { items, itemCount, subtotal, tax, total, updateQuantity, removeFromCart, clearCart } = useCart();
+  const invalidCartItems = items.filter((item) => {
+    const minimumOrderQuantity = Math.max(1, item.product.minimumOrderQuantity ?? 1);
+    const stock = item.product.stock ?? 0;
+    return item.quantity < minimumOrderQuantity || item.quantity > stock;
+  });
 
   if (itemCount === 0) {
     return (
@@ -48,10 +53,21 @@ export default function Cart(): JSX.Element {
 
       <div className="buyer-cart__layout grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
+          {invalidCartItems.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800">
+              {t('cart.checkoutBlocked')}
+            </div>
+          )}
           {itemCount > 0 && items.length === 0 && (
             <div className="bg-white rounded-xl shadow-card p-6 text-sm text-navy-500">{t('cart.loadingProducts')}</div>
           )}
-          {items.map((item) => (
+          {items.map((item) => {
+            const minimumOrderQuantity = Math.max(1, item.product.minimumOrderQuantity ?? 1);
+            const stock = item.product.stock ?? 0;
+            const isBelowMinimumOrder = item.quantity < minimumOrderQuantity;
+            const isAboveStock = item.quantity > stock;
+
+            return (
             <div key={item.product.id} className="buyer-cart__item bg-white rounded-xl shadow-card p-4 flex gap-4">
               <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                 {item.product.image ? (
@@ -67,6 +83,9 @@ export default function Cart(): JSX.Element {
                     <h3 className="font-semibold text-navy-800">{item.product.name}</h3>
                     <p className="text-sm text-navy-500">{item.product.brand}</p>
                     <p className="text-sm text-navy-400 mt-1">{t('cart.supplier', { supplier: item.product.supplier })}</p>
+                    <p className="text-sm font-medium text-navy-600 mt-1">
+                      {t('cart.minimumOrder', { count: minimumOrderQuantity })}
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -81,8 +100,9 @@ export default function Cart(): JSX.Element {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => void updateQuantity(item.product.id, item.quantity - 1)}
-                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                      onClick={() => void updateQuantity(item.product.id, Math.max(minimumOrderQuantity, item.quantity - 1))}
+                      disabled={item.quantity <= minimumOrderQuantity}
+                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Minus className="w-4 h-4" />
                     </button>
@@ -90,7 +110,8 @@ export default function Cart(): JSX.Element {
                     <button
                       type="button"
                       onClick={() => void updateQuantity(item.product.id, item.quantity + 1)}
-                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                      disabled={item.quantity >= stock}
+                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -101,9 +122,17 @@ export default function Cart(): JSX.Element {
                     <p className="font-bold text-navy-800">{formatCurrency(item.product.price * item.quantity)}</p>
                   </div>
                 </div>
+                {(isBelowMinimumOrder || isAboveStock) && (
+                  <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+                    {isBelowMinimumOrder
+                      ? t('cart.minimumOrderLineError', { count: minimumOrderQuantity })
+                      : t('cart.stockLineError', { count: stock })}
+                  </p>
+                )}
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
 
         <div className="lg:col-span-1">
@@ -130,10 +159,17 @@ export default function Cart(): JSX.Element {
               </div>
             </div>
 
-            <Link to="/checkout" className="w-full btn-primary flex items-center justify-center gap-2 py-3">
-              {t('cart.proceed')}
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            {invalidCartItems.length > 0 ? (
+              <button type="button" disabled className="w-full btn-primary flex items-center justify-center gap-2 py-3 opacity-50 cursor-not-allowed">
+                {t('cart.proceed')}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <Link to="/checkout" className="w-full btn-primary flex items-center justify-center gap-2 py-3">
+                {t('cart.proceed')}
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            )}
 
             <Link to="/marketplace" className="w-full btn-secondary flex items-center justify-center gap-2 py-3 mt-3">
               <ArrowLeft className="w-4 h-4" />

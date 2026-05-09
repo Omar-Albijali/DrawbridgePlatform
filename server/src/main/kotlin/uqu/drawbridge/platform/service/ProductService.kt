@@ -111,6 +111,7 @@ class ProductService(
 
     @Transactional
     fun createProduct(product: Product): Product {
+        RequestValidation.requirePositive(product.minimumOrderQuantity, "minimumOrderQuantity")
         val savedProduct = productRepository.save(product)
         logProductStockChange(savedProduct, 0, savedProduct.stockQuantity, "Product created")
         return savedProduct
@@ -118,6 +119,7 @@ class ProductService(
 
     @Transactional
     fun updateProduct(id: String, product: Product): Product? {
+        RequestValidation.requirePositive(product.minimumOrderQuantity, "minimumOrderQuantity")
         val existingProduct = productRepository.findById(id).orElse(null)
         return if (existingProduct != null) {
             val previousStockQuantity = existingProduct.stockQuantity
@@ -201,6 +203,7 @@ class ProductService(
             category = categoryName ?: "",
             brand = product.wholesaler.businessName,
             stock = product.stockQuantity,
+            minimumOrderQuantity = product.minimumOrderQuantity,
             rating = product.averageRating.toDouble(),
             reviews = product.ratingCount,
             supplier = product.wholesaler.businessName,
@@ -313,6 +316,7 @@ class ProductService(
         RequestValidation.requireNotBlank(request.description, "description")
         RequestValidation.requireNotBlank(request.categoryId, "categoryId")
         RequestValidation.requirePositive(request.stock, "stock")
+        RequestValidation.requirePositive(request.minimumOrderQuantity, "minimumOrderQuantity")
         val parsedPrice = RequestValidation.parsePositiveBigDecimal(request.price.toString(), "price")
         val wholesaler = userRepository.findById(request.wholesalerId).orElseThrow {
             NoSuchElementException("Wholesaler not found: ${request.wholesalerId}")
@@ -324,6 +328,7 @@ class ProductService(
             categoryId = request.categoryId,
             price = parsedPrice,
             stockQuantity = request.stock,
+            minimumOrderQuantity = request.minimumOrderQuantity,
             gtin = request.gtin,
             published = true
         )
@@ -337,6 +342,7 @@ class ProductService(
         RequestValidation.requireNotBlank(request.description, "description")
         RequestValidation.requireNotBlank(request.categoryId, "categoryId")
         RequestValidation.requirePositive(request.stock, "stock")
+        RequestValidation.requirePositive(request.minimumOrderQuantity, "minimumOrderQuantity")
         val parsedPrice = RequestValidation.parsePositiveBigDecimal(request.price.toString(), "price")
         val existing = getProductById(id) ?: return null
         val previousStockQuantity = existing.stockQuantity
@@ -345,6 +351,7 @@ class ProductService(
         existing.categoryId = request.categoryId
         existing.price = parsedPrice
         existing.stockQuantity = request.stock
+        existing.minimumOrderQuantity = request.minimumOrderQuantity
         existing.gtin = request.gtin
         val savedProduct = productRepository.save(existing)
         logProductStockChange(savedProduct, previousStockQuantity, savedProduct.stockQuantity, "Product stock updated")
