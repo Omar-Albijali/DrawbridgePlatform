@@ -3,6 +3,7 @@ package uqu.drawbridge.platform.exception
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.slf4j.LoggerFactory
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.annotation.ControllerAdvice
 import org.springframework.web.bind.annotation.ExceptionHandler
 import uqu.drawbridge.platform.ErrorResponse
@@ -34,6 +35,12 @@ class GlobalExceptionHandler {
     fun handleInvalidCredentialsException(e: InvalidCredentialsException): ResponseEntity<ErrorResponse> {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
             .body(ErrorResponse(e.message ?: "Authentication failed", 401))
+    }
+
+    @ExceptionHandler(AccessDeniedException::class)
+    fun handleAccessDeniedException(e: AccessDeniedException): ResponseEntity<ErrorResponse> {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(ErrorResponse(e.message ?: "Access denied", 403))
     }
 
     @ExceptionHandler(Exception::class)
