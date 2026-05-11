@@ -2,6 +2,7 @@ package uqu.drawbridge.platform.controller
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import uqu.drawbridge.platform.OrderDTO
 import uqu.drawbridge.platform.OrderGroupDTO
@@ -61,6 +62,14 @@ class OrderController(
         } else {
             ResponseEntity.notFound().build()
         }
+    }
+
+    @PatchMapping("/{id}/confirm-delivery")
+    fun confirmDelivery(
+        @PathVariable id: String,
+        authentication: Authentication
+    ): ResponseEntity<OrderDTO> {
+        return ResponseEntity.ok(orderService.confirmDeliveryForRetailer(id, authentication.name))
     }
 
     @PatchMapping("/{id}/tracking")

@@ -18,6 +18,10 @@ export const orderService = {
         });
     },
 
+    confirmDelivery: (id: string) => fetchApi<Order>(`/orders/${id}/confirm-delivery`, {
+        method: 'PATCH'
+    }),
+
     updateTracking: (id: string, request: UpdateOrderTrackingRequest) => fetchApi<Order>(`/orders/${id}/tracking`, {
         method: 'PATCH',
         body: JSON.stringify(request as unknown as UpdateOrderTrackingRequest)
