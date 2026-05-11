@@ -45,6 +45,9 @@ class Product(
     @Column(nullable = false)
     var stockQuantity: Int,
 
+    @Column(name = "minimum_order_quantity", nullable = false, columnDefinition = "integer default 1")
+    var minimumOrderQuantity: Int = 1,
+
     @Column(nullable = false)
     open var gtin: String = "",
 

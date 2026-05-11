@@ -241,6 +241,7 @@ class InventoryService(
             supplier = supplierName,
             lastRestocked = this.lastUpdated.toString(),
             reorderQuantity = this.autoOrderConfig.reorderQuantity,
+            minimumOrderQuantity = product?.minimumOrderQuantity ?: 1,
             imageUrl = product?.images?.sortedBy { it.sortIndex }?.firstOrNull()?.url
         )
     }
@@ -371,6 +372,7 @@ class InventoryService(
         RequestValidation.requireNonNegative(request.minThreshold, "minThreshold")
         RequestValidation.requirePositive(request.reorderQuantity, "reorderQuantity")
         val item = inventoryItemRepository.findById(inventoryItemId).orElse(null) ?: return null
+        validateAutoOrderReorderQuantity(item, request.reorderQuantity)
         val config = item.autoOrderConfig
         
         updateConfigFromRequest(config, request)
@@ -385,6 +387,7 @@ class InventoryService(
         RequestValidation.requireNonNegative(request.minThreshold, "minThreshold")
         RequestValidation.requirePositive(request.reorderQuantity, "reorderQuantity")
         val item = inventoryItemRepository.findById(inventoryItemId).orElse(null) ?: return null
+        validateAutoOrderReorderQuantity(item, request.reorderQuantity)
         val config = item.autoOrderConfig
         
         updateConfigFromRequest(config, request)
@@ -435,6 +438,19 @@ class InventoryService(
         config.dayOfWeek = request.dayOfWeek
         config.dayOfMonth = request.dayOfMonth
         calculateNextScheduledAt(config)
+    }
+
+    private fun validateAutoOrderReorderQuantity(item: InventoryItem, reorderQuantity: Int) {
+        val product = productRepository.findById(item.productId).orElse(null)
+            ?: throw IllegalArgumentException("Product not found for inventory item ${item.id ?: item.productId}.")
+
+        if (reorderQuantity < product.minimumOrderQuantity) {
+            throw IllegalArgumentException("Minimum order quantity for ${product.name} is ${product.minimumOrderQuantity} units.")
+        }
+
+        if (reorderQuantity > product.stockQuantity) {
+            throw IllegalArgumentException("Only ${product.stockQuantity} units available for ${product.name}.")
+        }
     }
 
     private fun calculateNextScheduledAt(config: AutoOrderConfig) {
@@ -538,6 +554,7 @@ class InventoryService(
                 supplier = supplierName,
                 lastRestocked = item.lastUpdated.toString(),
                 reorderQuantity = item.autoOrderConfig.reorderQuantity,
+                minimumOrderQuantity = product?.minimumOrderQuantity ?: 1,
                 imageUrl = product?.images?.sortedBy { it.sortIndex }?.firstOrNull()?.url
             )
         }
@@ -578,6 +595,7 @@ class InventoryService(
         if (!config.enabled || reorderQuantity <= 0) return false
 
         val product = productRepository.findById(item.productId).orElse(null) ?: return false
+        if (reorderQuantity < product.minimumOrderQuantity || reorderQuantity > product.stockQuantity) return false
         val wholesalerId = product.wholesaler.id ?: return false
         val createdOrder = orderService.createAutoRestockOrder(
             retailerId = item.retailerId,

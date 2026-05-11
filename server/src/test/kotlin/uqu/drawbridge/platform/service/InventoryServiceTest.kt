@@ -2,6 +2,7 @@ package uqu.drawbridge.platform.service
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.any
@@ -140,6 +141,31 @@ class InventoryServiceTest {
     }
 
     @Test
+    fun `auto order reorder quantity below product MOQ fails`() {
+        val item = inventoryWithConfig("inv-moq", ScheduleType.THRESHOLD_BASED)
+        stubInventoryFindAndSave(item)
+        val product = product(minimumOrderQuantity = 12, stockQuantity = 100)
+        `when`(productRepository.findById("prod-1")).thenReturn(Optional.of(product))
+
+        val exception = assertThrows(IllegalArgumentException::class.java) {
+            service.updateAutoOrderConfigFromRequest(
+                item.id!!,
+                UpdateAutoOrderConfigRequest(
+                    enabled = true,
+                    minThreshold = 5,
+                    reorderQuantity = 10,
+                    scheduleType = ScheduleType.DAILY,
+                    intervalDays = null,
+                    dayOfWeek = null,
+                    dayOfMonth = null
+                )
+            )
+        }
+
+        assertEquals("Minimum order quantity for Beans is 12 units.", exception.message)
+    }
+
+    @Test
     fun `processDueAutoOrders ignores threshold and processes non-threshold`() {
         val serviceSpy = spy(service)
         val dueDaily = inventoryWithConfig("inv-due-daily", ScheduleType.DAILY).apply {
@@ -157,17 +183,7 @@ class InventoryServiceTest {
         `when`(inventoryItemRepository.findById("inv-due-daily")).thenReturn(Optional.of(dueDaily))
         `when`(inventoryItemRepository.save(any(InventoryItem::class.java))).thenAnswer { it.arguments[0] as InventoryItem }
 
-        val wholesaler = wholesalerUser()
-        val product = Product(
-            id = "prod-1",
-            wholesaler = wholesaler,
-            name = "Beans",
-            description = "Desc",
-            categoryId = "cat-1",
-            price = BigDecimal("20.00"),
-            stockQuantity = 10,
-            published = true
-        )
+        val product = product(stockQuantity = 10)
         `when`(productRepository.findById("prod-1")).thenReturn(Optional.of(product))
         `when`(
             orderService.createAutoRestockOrder(
@@ -218,6 +234,21 @@ class InventoryServiceTest {
     private fun stubInventoryFindAndSave(item: InventoryItem) {
         `when`(inventoryItemRepository.findById(item.id!!)).thenReturn(Optional.of(item))
         `when`(inventoryItemRepository.save(any(InventoryItem::class.java))).thenAnswer { it.arguments[0] as InventoryItem }
+        `when`(productRepository.findById(item.productId)).thenReturn(Optional.of(product()))
+    }
+
+    private fun product(minimumOrderQuantity: Int = 1, stockQuantity: Int = 100): Product {
+        return Product(
+            id = "prod-1",
+            wholesaler = wholesalerUser(),
+            name = "Beans",
+            description = "Desc",
+            categoryId = "cat-1",
+            price = BigDecimal("20.00"),
+            stockQuantity = stockQuantity,
+            minimumOrderQuantity = minimumOrderQuantity,
+            published = true
+        )
     }
 
     private fun wholesalerUser(): User {

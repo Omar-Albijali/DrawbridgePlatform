@@ -26,6 +26,7 @@ export default function ProductForm(): JSX.Element {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
+  const [minimumOrderQuantity, setMinimumOrderQuantity] = useState('1');
   const [gtin, setGtin] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
@@ -57,6 +58,7 @@ export default function ProductForm(): JSX.Element {
         setDescription(product.description);
         setPrice(String(product.price));
         setStock(String(product.stock));
+        setMinimumOrderQuantity(String(product.minimumOrderQuantity ?? 1));
         setGtin(String(product.gtin ?? ''));
         const category = categories.find((item) => item.name === product.category);
         setCategoryId(category?.id ?? '');
@@ -173,6 +175,16 @@ export default function ProductForm(): JSX.Element {
       setError(t('products.form.errors.validStock'));
       return;
     }
+    const parsedStock = Number(stock);
+    const parsedMinimumOrderQuantity = Number(minimumOrderQuantity);
+    if (!minimumOrderQuantity || !Number.isInteger(parsedMinimumOrderQuantity) || parsedMinimumOrderQuantity < 1) {
+      setError(t('products.form.errors.validMinimumOrderQuantity'));
+      return;
+    }
+    if (parsedMinimumOrderQuantity > parsedStock) {
+      setError(t('products.form.errors.minimumOrderExceedsStock'));
+      return;
+    }
     if (!gtin || !Number.isInteger(Number(gtin)) || Number(gtin) < 0) {
       setError('Valid GTIN is required');
       return;
@@ -203,7 +215,8 @@ export default function ProductForm(): JSX.Element {
           categoryId,
           wholesalerId: user.id,
           brand: '',
-          stock: Number(stock),
+          stock: parsedStock,
+          minimumOrderQuantity: parsedMinimumOrderQuantity,
           gtin: gtin,
         };
 
@@ -225,7 +238,8 @@ export default function ProductForm(): JSX.Element {
           categoryId,
           wholesalerId: user.id,
           brand: '',
-          stock: Number(stock),
+          stock: parsedStock,
+          minimumOrderQuantity: parsedMinimumOrderQuantity,
           gtin: gtin,
         } as unknown as CreateProductRequest;
 
@@ -377,6 +391,20 @@ export default function ProductForm(): JSX.Element {
                   onChange={(event) => setStock(event.target.value)}
                   placeholder="0"
                   min="0"
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">
+                  {t('products.form.minimumOrderQuantity')} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={minimumOrderQuantity}
+                  onChange={(event) => setMinimumOrderQuantity(event.target.value)}
+                  placeholder="1"
+                  min="1"
+                  step="1"
                   className="input"
                 />
               </div>

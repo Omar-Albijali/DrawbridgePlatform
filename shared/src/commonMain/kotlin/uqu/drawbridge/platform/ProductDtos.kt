@@ -18,6 +18,7 @@ data class ProductDTO(
     val category: String,
     val brand: String,
     val stock: Int,
+    val minimumOrderQuantity: Int = 1,
     val gtin: String,
     val rating: Double,
     val reviews: Int,
@@ -45,6 +46,7 @@ data class CreateProductRequest(
     val wholesalerId: String, // Long -> String
     val brand: String,
     val stock: Int,
+    val minimumOrderQuantity: Int = 1,
     val gtin: String
 )
 

@@ -165,6 +165,7 @@ export default function Inventory(): JSX.Element {
       setInventory((prev) => prev.map((item) => (item.id === selectedItem.id ? updatedItem : item)));
     } catch (error) {
       console.error('Failed to save auto-order config', error);
+      throw error;
     }
   };
 
