@@ -2,8 +2,144 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ===================================================
+   Thmanyah Font Family — @font-face
+   الخطوط في: public/fonts/
+=================================================== */
+
+/* ThmanyahSans */
+@font-face {
+  font-family: "ThmanyahSans";
+  src: url("/fonts/thmanyahsans/woff2/thmanyahsans-Light.woff2") format("woff2"),
+  url("/fonts/thmanyahsans/otf/thmanyahsans-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSans";
+  src: url("/fonts/thmanyahsans/woff2/thmanyahsans-Regular.woff2") format("woff2"),
+  url("/fonts/thmanyahsans/otf/thmanyahsans-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSans";
+  src: url("/fonts/thmanyahsans/woff2/thmanyahsans-Medium.woff2") format("woff2"),
+  url("/fonts/thmanyahsans/otf/thmanyahsans-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSans";
+  src: url("/fonts/thmanyahsans/woff2/thmanyahsans-Bold.woff2") format("woff2"),
+  url("/fonts/thmanyahsans/otf/thmanyahsans-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSans";
+  src: url("/fonts/thmanyahsans/woff2/thmanyahsans-Black.woff2") format("woff2"),
+  url("/fonts/thmanyahsans/otf/thmanyahsans-Black.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ThmanyahSerifDisplay */
+@font-face {
+  font-family: "ThmanyahSerifDisplay";
+  src: url("/fonts/thmanyahserifdisplay/woff2/thmanyahserifdisplay-Light.woff2") format("woff2"),
+  url("/fonts/thmanyahserifdisplay/otf/thmanyahserifdisplay-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSerifDisplay";
+  src: url("/fonts/thmanyahserifdisplay/woff2/thmanyahserifdisplay-Regular.woff2") format("woff2"),
+  url("/fonts/thmanyahserifdisplay/otf/thmanyahserifdisplay-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSerifDisplay";
+  src: url("/fonts/thmanyahserifdisplay/woff2/thmanyahserifdisplay-Medium.woff2") format("woff2"),
+  url("/fonts/thmanyahserifdisplay/otf/thmanyahserifdisplay-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSerifDisplay";
+  src: url("/fonts/thmanyahserifdisplay/woff2/thmanyahserifdisplay-Bold.woff2") format("woff2"),
+  url("/fonts/thmanyahserifdisplay/otf/thmanyahserifdisplay-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSerifDisplay";
+  src: url("/fonts/thmanyahserifdisplay/woff2/thmanyahserifdisplay-Black.woff2") format("woff2"),
+  url("/fonts/thmanyahserifdisplay/otf/thmanyahserifdisplay-Black.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ThmanyahSerifText */
+@font-face {
+  font-family: "ThmanyahSerifText";
+  src: url("/fonts/thmanyahseriftext/woff2/thmanyahseriftext-Light.woff2") format("woff2"),
+  url("/fonts/thmanyahseriftext/otf/thmanyahseriftext-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSerifText";
+  src: url("/fonts/thmanyahseriftext/woff2/thmanyahseriftext-Regular.woff2") format("woff2"),
+  url("/fonts/thmanyahseriftext/otf/thmanyahseriftext-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSerifText";
+  src: url("/fonts/thmanyahseriftext/woff2/thmanyahseriftext-Medium.woff2") format("woff2"),
+  url("/fonts/thmanyahseriftext/otf/thmanyahseriftext-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSerifText";
+  src: url("/fonts/thmanyahseriftext/woff2/thmanyahseriftext-Bold.woff2") format("woff2"),
+  url("/fonts/thmanyahseriftext/otf/thmanyahseriftext-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "ThmanyahSerifText";
+  src: url("/fonts/thmanyahseriftext/woff2/thmanyahseriftext-Black.woff2") format("woff2"),
+  url("/fonts/thmanyahseriftext/otf/thmanyahseriftext-Black.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ================================================= */
+
 @theme {
   --font-sans: Inter, "Segoe UI", sans-serif;
+  --font-thmanyah-sans: "ThmanyahSans", sans-serif;
+  --font-thmanyah-display: "ThmanyahSerifDisplay", serif;
+  --font-thmanyah-text: "ThmanyahSerifText", serif;
 
   --color-primary-50: #ecfdf5;
   --color-primary-100: #d1fae5;
@@ -42,16 +178,26 @@
   body {
     @apply m-0 bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
     background-image:
-      radial-gradient(circle at 5% 10%, rgba(14, 165, 233, 0.08) 0, transparent 35%),
-      radial-gradient(circle at 95% 20%, rgba(16, 185, 129, 0.1) 0, transparent 42%);
+            radial-gradient(circle at 5% 10%, rgba(14, 165, 233, 0.08) 0, transparent 35%),
+            radial-gradient(circle at 95% 20%, rgba(16, 185, 129, 0.1) 0, transparent 42%);
   }
 
+  /* اللغة الإنجليزية: Inter */
+  html[lang="en"] body,
+  html[lang="en"] button,
+  html[lang="en"] input,
+  html[lang="en"] select,
+  html[lang="en"] textarea {
+    font-family: Inter, "Segoe UI", sans-serif;
+  }
+
+  /* اللغة العربية: ThmanyahSans */
   html[lang="ar"] body,
   html[lang="ar"] button,
   html[lang="ar"] input,
   html[lang="ar"] select,
   html[lang="ar"] textarea {
-    font-family: "IBM Plex Sans Arabic", Inter, "Segoe UI", sans-serif;
+    font-family: "ThmanyahSans", Inter, "Segoe UI", sans-serif;
   }
 
   a {
@@ -97,13 +243,10 @@
   from {
     transform: translate3d(0, 0, 0) scale(1);
   }
-
   to {
     transform: translate3d(-3.5%, 2.5%, 0) scale(1.03);
   }
 }
-
-
 
 .dark .theme-surface-scope .bg-white {
   @apply bg-slate-900;
