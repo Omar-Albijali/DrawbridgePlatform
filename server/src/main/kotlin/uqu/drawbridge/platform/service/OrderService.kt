@@ -2,6 +2,7 @@ package uqu.drawbridge.platform.service
 
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.security.access.AccessDeniedException
 import uqu.drawbridge.platform.model.*
 import uqu.drawbridge.platform.NotificationEntityType
 import uqu.drawbridge.platform.NotificationEventKey
@@ -10,6 +11,7 @@ import uqu.drawbridge.platform.NotificationType
 import uqu.drawbridge.platform.OrderStatus
 import uqu.drawbridge.platform.ShippingMethod
 import uqu.drawbridge.platform.PaymentStatus
+import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.repository.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -120,6 +122,8 @@ class OrderService(
         val savedOrder = orderRepository.save(order)
         savedOrder.orderItems = items.toMutableList()
         val persisted = orderRepository.save(savedOrder)
+        val orderId = persisted.id ?: ""
+        val shortOrderId = shortOrderId(orderId)
 
         notificationService.sendEventNotification(
             recipientId = persisted.retailerId,
@@ -128,9 +132,9 @@ class OrderService(
             entityType = NotificationEntityType.ORDER,
             entityId = persisted.id,
             preferenceKey = NotificationPreferenceKey.ORDER_CONFIRMATION,
-            title = "Order confirmed",
-            message = "Order ${persisted.id ?: ""} was created successfully.",
-            deepLink = "/orders/${persisted.id ?: ""}"
+            title = "Order placed",
+            message = "Your order $shortOrderId was placed and is waiting for approval.",
+            deepLink = "/orders/$orderId"
         )
 
         notificationService.sendEventNotification(
@@ -141,8 +145,8 @@ class OrderService(
             entityId = persisted.id,
             preferenceKey = NotificationPreferenceKey.ORDER_CONFIRMATION,
             title = "New order received",
-            message = "A new order ${persisted.id ?: ""} was placed in your store.",
-            deepLink = "/orders/${persisted.id ?: ""}"
+            message = "A new order $shortOrderId is waiting for your approval.",
+            deepLink = "/orders/$orderId"
         )
 
         return persisted
@@ -187,7 +191,9 @@ class OrderService(
     @Transactional
     fun updateOrderStatus(id: String, status: OrderStatus): Order? {
         val order = orderRepository.findById(id).orElse(null) ?: return null
-        val isFirstDelivery = status == OrderStatus.DELIVERED && order.deliveredAt == null
+        val isFirstDelivery = status == OrderStatus.DELIVERED &&
+            order.status != OrderStatus.DELIVERED &&
+            order.deliveredAt == null
         order.status = status
         
         // Update timestamps based on status
@@ -204,31 +210,46 @@ class OrderService(
         
         val savedOrder = orderRepository.save(order)
 
-        notificationService.sendEventNotification(
-            recipientId = savedOrder.retailerId,
-            type = NotificationType.ORDER,
-            eventKey = NotificationEventKey.ORDER_STATUS_UPDATED,
-            entityType = NotificationEntityType.ORDER,
-            entityId = savedOrder.id,
-            preferenceKey = NotificationPreferenceKey.SHIPPING_STATUS,
-            title = "Order status updated",
-            message = "Order ${savedOrder.id ?: ""} is now ${savedOrder.status.name}.",
-            deepLink = "/orders/${savedOrder.id ?: ""}"
-        )
-
-        notificationService.sendEventNotification(
-            recipientId = savedOrder.wholesalerId,
-            type = NotificationType.ORDER,
-            eventKey = NotificationEventKey.ORDER_STATUS_UPDATED,
-            entityType = NotificationEntityType.ORDER,
-            entityId = savedOrder.id,
-            preferenceKey = NotificationPreferenceKey.SHIPPING_STATUS,
-            title = "Order status updated",
-            message = "Order ${savedOrder.id ?: ""} is now ${savedOrder.status.name}.",
-            deepLink = "/orders/${savedOrder.id ?: ""}"
-        )
+        sendOrderStatusNotifications(savedOrder)
 
         return savedOrder
+    }
+
+    @Transactional
+    fun confirmDeliveryForRetailer(orderId: String, retailerEmail: String): uqu.drawbridge.platform.OrderDTO {
+        val retailer = userRepository.findByEmail(retailerEmail.trim().lowercase())
+            ?: throw NoSuchElementException("User not found")
+        val retailerId = retailer.id ?: throw IllegalStateException("User id missing")
+
+        if (retailer.role != UserRole.RETAILER) {
+            throw AccessDeniedException("Only retailers can confirm delivery")
+        }
+
+        val order = orderRepository.findByIdForUpdate(orderId)
+            ?: throw NoSuchElementException("Order not found")
+
+        if (order.retailerId != retailerId) {
+            throw AccessDeniedException("Order does not belong to authenticated retailer")
+        }
+
+        if (order.status == OrderStatus.DELIVERED) {
+            return order.toDTO()
+        }
+
+        if (order.status != OrderStatus.SHIPPED) {
+            throw IllegalArgumentException("Only shipped orders can be confirmed as delivered")
+        }
+
+        order.status = OrderStatus.DELIVERED
+        if (order.deliveredAt == null) {
+            order.deliveredAt = LocalDateTime.now()
+        }
+        addDeliveredItemsToRetailInventory(order)
+
+        val savedOrder = orderRepository.save(order)
+        sendOrderStatusNotifications(savedOrder)
+
+        return savedOrder.toDTO()
     }
 
     @Transactional
@@ -433,6 +454,121 @@ class OrderService(
         }
         orderGroup.groupTotal = total
         orderGroupRepository.save(orderGroup)
+    }
+
+    private enum class OrderNotificationRecipient {
+        RETAILER,
+        WHOLESALER
+    }
+
+    private data class OrderStatusNotification(
+        val title: String,
+        val message: String
+    )
+
+    private fun sendOrderStatusNotifications(order: Order) {
+        val orderId = order.id ?: ""
+
+        listOf(
+            order.retailerId to OrderNotificationRecipient.RETAILER,
+            order.wholesalerId to OrderNotificationRecipient.WHOLESALER
+        ).forEach { (recipientId, recipient) ->
+            val notification = orderStatusNotification(order, recipient)
+            notificationService.sendEventNotification(
+                recipientId = recipientId,
+                type = NotificationType.ORDER,
+                eventKey = NotificationEventKey.ORDER_STATUS_UPDATED,
+                entityType = NotificationEntityType.ORDER,
+                entityId = order.id,
+                preferenceKey = NotificationPreferenceKey.SHIPPING_STATUS,
+                title = notification.title,
+                message = notification.message,
+                deepLink = "/orders/$orderId"
+            )
+        }
+    }
+
+    private fun orderStatusNotification(
+        order: Order,
+        recipient: OrderNotificationRecipient
+    ): OrderStatusNotification {
+        val orderId = shortOrderId(order.id)
+        return when (order.status) {
+            OrderStatus.PENDING -> when (recipient) {
+                OrderNotificationRecipient.RETAILER -> OrderStatusNotification(
+                    title = "Order placed",
+                    message = "Your order $orderId was placed and is waiting for approval."
+                )
+                OrderNotificationRecipient.WHOLESALER -> OrderStatusNotification(
+                    title = "New order received",
+                    message = "A new order $orderId is waiting for your approval."
+                )
+            }
+            OrderStatus.CONFIRMED -> when (recipient) {
+                OrderNotificationRecipient.RETAILER -> OrderStatusNotification(
+                    title = "Order confirmed",
+                    message = "The wholesaler confirmed your order $orderId."
+                )
+                OrderNotificationRecipient.WHOLESALER -> OrderStatusNotification(
+                    title = "Order confirmed",
+                    message = "You confirmed order $orderId."
+                )
+            }
+            OrderStatus.PROCESSING -> when (recipient) {
+                OrderNotificationRecipient.RETAILER -> OrderStatusNotification(
+                    title = "Order processing",
+                    message = "Your order $orderId is being processed."
+                )
+                OrderNotificationRecipient.WHOLESALER -> OrderStatusNotification(
+                    title = "Order processing",
+                    message = "Order $orderId is being processed."
+                )
+            }
+            OrderStatus.SHIPPED -> when (recipient) {
+                OrderNotificationRecipient.RETAILER -> OrderStatusNotification(
+                    title = "Order shipped",
+                    message = "Your order $orderId has been shipped. Confirm receipt when it arrives."
+                )
+                OrderNotificationRecipient.WHOLESALER -> OrderStatusNotification(
+                    title = "Order shipped",
+                    message = "You marked order $orderId as shipped."
+                )
+            }
+            OrderStatus.DELIVERED -> when (recipient) {
+                OrderNotificationRecipient.RETAILER -> OrderStatusNotification(
+                    title = "Delivery confirmed",
+                    message = "You confirmed receipt and inventory was updated."
+                )
+                OrderNotificationRecipient.WHOLESALER -> OrderStatusNotification(
+                    title = "Delivery confirmed",
+                    message = "The retailer confirmed receipt of order $orderId."
+                )
+            }
+            OrderStatus.CANCELLED -> when (recipient) {
+                OrderNotificationRecipient.RETAILER -> OrderStatusNotification(
+                    title = "Order cancelled",
+                    message = "Your order $orderId was cancelled."
+                )
+                OrderNotificationRecipient.WHOLESALER -> OrderStatusNotification(
+                    title = "Order cancelled",
+                    message = "Order $orderId was cancelled."
+                )
+            }
+            OrderStatus.RETURNED -> when (recipient) {
+                OrderNotificationRecipient.RETAILER -> OrderStatusNotification(
+                    title = "Order returned",
+                    message = "Your order $orderId was returned."
+                )
+                OrderNotificationRecipient.WHOLESALER -> OrderStatusNotification(
+                    title = "Order returned",
+                    message = "Order $orderId was returned."
+                )
+            }
+        }
+    }
+
+    private fun shortOrderId(orderId: String?): String {
+        return orderId.orEmpty().take(8)
     }
 
     private fun mapOrderGroupsToDTOs(orderGroups: List<OrderGroup>): List<uqu.drawbridge.platform.OrderGroupDTO> {
