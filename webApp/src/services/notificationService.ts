@@ -78,7 +78,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-function normalizePublicKey(value?: string): string | null {
+function normalizePublicKey(value: string | undefined): string | null {
   const trimmed = (value ?? '').trim();
   if (!trimmed) {
     return null;
@@ -150,7 +150,9 @@ export const notificationService = {
 
     const vapidPublicKey = normalizePublicKey(ENV_VAPID_PUBLIC_KEY);
     if (!vapidPublicKey) {
-      console.warn('VITE_VAPID_PUBLIC_KEY is not configured; browser push subscription is disabled.');
+      console.warn(
+        'VITE_VAPID_PUBLIC_KEY is not configured; set it in your environment configuration to enable browser push subscription.',
+      );
       return false;
     }
 
