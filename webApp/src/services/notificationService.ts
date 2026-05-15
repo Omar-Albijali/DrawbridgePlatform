@@ -79,7 +79,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 function normalizePublicKey(value: string | undefined): string | null {
-  const trimmed = (value ?? '').trim();
+  const trimmed = value?.trim() ?? '';
   if (!trimmed) {
     return null;
   }
@@ -87,8 +87,7 @@ function normalizePublicKey(value: string | undefined): string | null {
     (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
     (trimmed.startsWith("'") && trimmed.endsWith("'"))
   ) {
-    const unwrapped = trimmed.slice(1, -1).trim();
-    return unwrapped || null;
+    return trimmed.slice(1, -1).trim() || null;
   }
   return trimmed;
 }
