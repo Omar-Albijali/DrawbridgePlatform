@@ -6,7 +6,7 @@ import {
 } from '../types';
 import { fetchApi } from './api';
 
-const ENV_VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BO_OP0i0U-MHFThcTT8_yJWg9CxHbZgaeVPwmy9iOb1al_GaaUbaQ0bYnDWjBvsB4_hBc-Y9_cuHSrJYOF-hpao';
+const ENV_VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
 export type NotificationChannelValue = 'SYSTEM' | 'SMS' | 'EMAIL' | 'PUSH';
 export type NotificationPreferenceKeyValue =
@@ -78,8 +78,8 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-function normalizePublicKey(value: string): string {
-  const trimmed = value.trim();
+function normalizePublicKey(value?: string): string {
+  const trimmed = (value ?? "").trim();
   if (
     (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
     (trimmed.startsWith("'") && trimmed.endsWith("'"))
