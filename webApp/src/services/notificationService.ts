@@ -78,13 +78,17 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-function normalizePublicKey(value?: string): string {
-  const trimmed = (value ?? "").trim();
+function normalizePublicKey(value?: string): string | null {
+  const trimmed = (value ?? '').trim();
+  if (!trimmed) {
+    return null;
+  }
   if (
     (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
     (trimmed.startsWith("'") && trimmed.endsWith("'"))
   ) {
-    return trimmed.slice(1, -1).trim();
+    const unwrapped = trimmed.slice(1, -1).trim();
+    return unwrapped || null;
   }
   return trimmed;
 }
@@ -146,6 +150,7 @@ export const notificationService = {
 
     const vapidPublicKey = normalizePublicKey(ENV_VAPID_PUBLIC_KEY);
     if (!vapidPublicKey) {
+      console.warn('VITE_VAPID_PUBLIC_KEY is not configured; browser push subscription is disabled.');
       return false;
     }
 
