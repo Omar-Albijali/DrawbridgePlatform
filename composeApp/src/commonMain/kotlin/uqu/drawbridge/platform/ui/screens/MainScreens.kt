@@ -197,7 +197,11 @@ internal fun MoreMainScreen(
                         Icon(destination.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     },
                     trailingContent = {
-                        StatusChip(text = if (destination.destination == AppDestination.POS) "Ready" else "Queued", tone = if (destination.destination == AppDestination.POS) StatusTone.Success else StatusTone.Warning)
+                        val isReady = destination.destination == AppDestination.POS || destination.destination == AppDestination.Wishlist
+                        StatusChip(
+                            text = if (isReady) "Ready" else "Queued",
+                            tone = if (isReady) StatusTone.Success else StatusTone.Warning,
+                        )
                     },
                 )
                 SecondaryButton(text = "Open", onClick = { onOpenDestination(destination.destination) })
@@ -213,9 +217,16 @@ internal fun MoreDestinationScreen(
     destination: AppDestination,
     onBack: () -> Unit,
     onLogout: () -> Unit,
+    wishlistContent: @Composable () -> Unit,
     posContent: @Composable () -> Unit,
 ) {
     when (destination) {
+        AppDestination.Wishlist -> {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SecondaryButton(text = "Back to More", onClick = onBack)
+                wishlistContent()
+            }
+        }
         AppDestination.POS -> {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SecondaryButton(text = "Back to More", onClick = onBack)

@@ -51,16 +51,22 @@ import uqu.drawbridge.platform.ui.model.AuthScreen
 import uqu.drawbridge.platform.ui.model.SessionState
 import uqu.drawbridge.platform.ui.model.moreDestinationsFor
 import uqu.drawbridge.platform.ui.model.primaryTabsFor
+import uqu.drawbridge.platform.ui.marketplace.MarketplaceStateHolder
+import uqu.drawbridge.platform.ui.marketplace.ProductDetailStateHolder
+import uqu.drawbridge.platform.ui.marketplace.WishlistStateHolder
 import uqu.drawbridge.platform.ui.platform.rememberPlatformServices
 import uqu.drawbridge.platform.ui.screens.AccountMainScreen
 import uqu.drawbridge.platform.ui.screens.DashboardMainScreen
 import uqu.drawbridge.platform.ui.screens.FeaturePlaceholderMainScreen
 import uqu.drawbridge.platform.ui.screens.LoginAuthScreen
+import uqu.drawbridge.platform.ui.screens.MarketplaceMainScreen
 import uqu.drawbridge.platform.ui.screens.MoreDestinationScreen
 import uqu.drawbridge.platform.ui.screens.MoreMainScreen
 import uqu.drawbridge.platform.ui.screens.PosMainScreen
+import uqu.drawbridge.platform.ui.screens.ProductDetailMainScreen
 import uqu.drawbridge.platform.ui.screens.SignupAuthScreen
 import uqu.drawbridge.platform.ui.screens.WelcomeAuthScreen
+import uqu.drawbridge.platform.ui.screens.WishlistMainScreen
 import uqu.drawbridge.platform.ui.theme.AppBackground
 import uqu.drawbridge.platform.ui.theme.DrawbridgeTheme
 
@@ -76,6 +82,7 @@ fun App() {
 
     var authScreen by remember { mutableStateOf(AuthScreen.Welcome) }
     var activeMoreDestination by remember { mutableStateOf<AppDestination?>(null) }
+    var selectedProductId by remember { mutableStateOf<String?>(null) }
     var isBusy by remember { mutableStateOf(false) }
     var darkTheme by remember { mutableStateOf(true) }
 
@@ -94,6 +101,7 @@ fun App() {
 
     LaunchedEffect(currentSession?.user?.role) {
         activeMoreDestination = null
+        selectedProductId = null
         if (currentSession != null && pagerState.currentPage >= tabs.size) {
             pagerState.scrollToPage(0)
         }
@@ -114,11 +122,15 @@ fun App() {
             authScreen = AuthScreen.Welcome
         }
 
-        BackHandler(enabled = currentSession != null && activeMoreDestination != null) {
+        BackHandler(enabled = currentSession != null && selectedProductId != null) {
+            selectedProductId = null
+        }
+
+        BackHandler(enabled = currentSession != null && selectedProductId == null && activeMoreDestination != null) {
             activeMoreDestination = null
         }
 
-        BackHandler(enabled = currentSession != null && activeMoreDestination == null && pagerState.currentPage != 0) {
+        BackHandler(enabled = currentSession != null && selectedProductId == null && activeMoreDestination == null && pagerState.currentPage != 0) {
             coroutineScope.launch {
                 pagerState.animateScrollToPage(0)
             }
@@ -135,6 +147,7 @@ fun App() {
                         currentTab = currentTab,
                         onSelectTab = { tab ->
                             activeMoreDestination = null
+                            selectedProductId = null
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(tabs.indexOf(tab))
                             }
@@ -166,14 +179,22 @@ fun App() {
                         pagerState = pagerState,
                         dashboardSummary = dashboardSummary,
                         activeMoreDestination = activeMoreDestination,
-                        onActiveMoreDestinationChange = { activeMoreDestination = it },
+                        selectedProductId = selectedProductId,
+                        onActiveMoreDestinationChange = {
+                            selectedProductId = null
+                            activeMoreDestination = it
+                        },
+                        onOpenProduct = { productId -> selectedProductId = productId },
+                        onCloseProduct = { selectedProductId = null },
                         sessionManager = sessionManager,
+                        snackbarHostState = snackbarHostState,
                         onBusyChange = { isBusy = it },
                         onLogout = {
                             coroutineScope.launch {
                                 sessionManager.logout()
                             }
                             activeMoreDestination = null
+                            selectedProductId = null
                             authScreen = AuthScreen.Welcome
                         },
                     )
@@ -341,21 +362,50 @@ private fun MainHost(
     pagerState: androidx.compose.foundation.pager.PagerState,
     dashboardSummary: DashboardSummary?,
     activeMoreDestination: AppDestination?,
+    selectedProductId: String?,
     onActiveMoreDestinationChange: (AppDestination?) -> Unit,
+    onOpenProduct: (String) -> Unit,
+    onCloseProduct: () -> Unit,
     sessionManager: AuthSessionManager,
+    snackbarHostState: SnackbarHostState,
     onBusyChange: (Boolean) -> Unit,
     onLogout: () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val marketplaceStateHolder = remember(session.user.id) {
+        MarketplaceStateHolder(sessionManager.api)
+    }
+    val wishlistStateHolder = remember(session.user.id, session.user.role) {
+        WishlistStateHolder(sessionManager.api, session)
+    }
+    val productDetailStateHolder = remember(selectedProductId) {
+        ProductDetailStateHolder(sessionManager.api)
+    }
+    val showMessage: (String) -> Unit = { message ->
+        coroutineScope.launch {
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     HorizontalPager(
         state = pagerState,
         modifier = Modifier.fillMaxSize(),
         verticalAlignment = Alignment.Top,
-        userScrollEnabled = activeMoreDestination == null,
+        userScrollEnabled = activeMoreDestination == null && selectedProductId == null,
     ) { page ->
         val currentTab = tabs.getOrElse(page) { tabs.first() }
         MobileScrollColumn {
+            if (selectedProductId != null) {
+                ProductDetailMainScreen(
+                    productId = selectedProductId,
+                    detailStateHolder = productDetailStateHolder,
+                    wishlistStateHolder = wishlistStateHolder,
+                    onBack = onCloseProduct,
+                    onShowMessage = showMessage,
+                )
+                return@MobileScrollColumn
+            }
+
             when (currentTab.destination) {
                 AppDestination.Home -> {
                     DashboardMainScreen(
@@ -367,6 +417,15 @@ private fun MainHost(
                                 onBusyChange(false)
                             }
                         },
+                    )
+                }
+
+                AppDestination.Marketplace -> {
+                    MarketplaceMainScreen(
+                        marketplaceStateHolder = marketplaceStateHolder,
+                        wishlistStateHolder = wishlistStateHolder,
+                        onOpenProduct = onOpenProduct,
+                        onShowMessage = showMessage,
                     )
                 }
 
@@ -383,6 +442,13 @@ private fun MainHost(
                             destination = selectedDestination,
                             onBack = { onActiveMoreDestinationChange(null) },
                             onLogout = onLogout,
+                            wishlistContent = {
+                                WishlistMainScreen(
+                                    wishlistStateHolder = wishlistStateHolder,
+                                    onOpenProduct = onOpenProduct,
+                                    onShowMessage = showMessage,
+                                )
+                            },
                             posContent = {
                                 PosMainScreen(
                                     onScan = { gtin, onResult ->

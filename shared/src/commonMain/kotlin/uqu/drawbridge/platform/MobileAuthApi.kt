@@ -4,8 +4,10 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
@@ -157,6 +159,77 @@ class MobileAuthApi(
             newStock = parsed["newStock"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
             message = parsed.stringValue("message"),
         )
+    }
+
+    suspend fun fetchMarketplaceProducts(query: MarketplaceProductQuery = MarketplaceProductQuery()): PaginatedProductResponse {
+        val response = client.get(buildUrl("/products")) {
+            accept(ContentType.Application.Json)
+            parameter("page", query.page.coerceAtLeast(0))
+            parameter("size", query.size.coerceIn(1, 100))
+            query.search?.trim()?.takeIf { it.isNotEmpty() }?.let { parameter("search", it) }
+            query.categoryIds.filter { it.isNotBlank() }.forEach { parameter("category", it.trim()) }
+            query.brands.filter { it.isNotBlank() }.forEach { parameter("brand", it.trim()) }
+            query.minPrice?.takeIf { it >= 0.0 }?.let { parameter("minPrice", it) }
+            query.maxPrice?.takeIf { it >= 0.0 }?.let { parameter("maxPrice", it) }
+            query.sort.trim().takeIf { it.isNotEmpty() }?.let { parameter("sort", it) }
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body, notifyUnauthorized = false)
+        return json.decodeFromString(PaginatedProductResponse.serializer(), body)
+    }
+
+    suspend fun fetchProductById(productId: String): ProductDTO {
+        val response = client.get(buildUrl("/products/$productId")) {
+            accept(ContentType.Application.Json)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body, notifyUnauthorized = false)
+        return json.decodeFromString(ProductDTO.serializer(), body)
+    }
+
+    suspend fun fetchProductCategories(): List<CategoryDTO> {
+        val response = client.get(buildUrl("/products/categories")) {
+            accept(ContentType.Application.Json)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body, notifyUnauthorized = false)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchProductBrands(): List<String> {
+        val response = client.get(buildUrl("/products/brands")) {
+            accept(ContentType.Application.Json)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body, notifyUnauthorized = false)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchWishlist(userId: String): List<WishlistDTO> {
+        val response = authorizedGet("/wishlist/$userId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun addToWishlist(userId: String, productId: String): WishlistDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/wishlist/$userId/$productId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(WishlistDTO.serializer(), body)
+    }
+
+    suspend fun removeFromWishlist(userId: String, productId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/wishlist/$userId/$productId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
     }
 
     suspend fun forgotPassword(email: String) {
