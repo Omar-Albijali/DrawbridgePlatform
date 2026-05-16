@@ -84,7 +84,6 @@ internal fun moreDestinationsFor(role: UserRole): List<MoreDestination> {
 }
 
 internal data class SessionState(
-    val token: String,
     val user: UserDTO,
 )
 

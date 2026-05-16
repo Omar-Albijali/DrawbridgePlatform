@@ -1,7 +1,6 @@
 package uqu.drawbridge.platform
 
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
@@ -9,6 +8,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -27,6 +27,7 @@ import kotlinx.serialization.json.jsonPrimitive
 class MobileApiException(
     message: String,
     val statusCode: Int? = null,
+    val isUnauthorized: Boolean = false,
 ) : Exception(message)
 
 data class MobileSession(
@@ -43,6 +44,8 @@ data class DashboardSummary(
 
 class MobileAuthApi(
     private val client: HttpClient = createMobileHttpClient(),
+    private val tokenProvider: suspend () -> String? = { null },
+    private val onUnauthorized: suspend () -> Unit = {},
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -55,10 +58,10 @@ class MobileAuthApi(
             accept(ContentType.Application.Json)
             setBody(LoginRequest(email = email, password = password, rememberMe = rememberMe))
         }
-        ensureSuccess(response.status, response.bodyAsText())
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
 
         val authResponse = json.decodeFromString(AuthResponsePayload.serializer(), response.bodyAsText()).toAuthResponse()
-        val user = fetchUserById(authResponse.userId, authResponse.token)
+        val user = fetchUserById(authResponse.userId, tokenOverride = authResponse.token, notifyUnauthorized = false)
         return MobileSession(token = authResponse.token, user = user)
     }
 
@@ -68,24 +71,32 @@ class MobileAuthApi(
             accept(ContentType.Application.Json)
             setBody(request.toPayload())
         }
-        ensureSuccess(response.status, response.bodyAsText())
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
 
         val authResponse = json.decodeFromString(AuthResponsePayload.serializer(), response.bodyAsText()).toAuthResponse()
-        val user = fetchUserById(authResponse.userId, authResponse.token)
+        val user = fetchUserById(authResponse.userId, tokenOverride = authResponse.token, notifyUnauthorized = false)
         return MobileSession(token = authResponse.token, user = user)
     }
 
-    suspend fun fetchDashboardSummary(userId: String, role: UserRole, token: String): DashboardSummary {
+    suspend fun logout() {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/auth/logout")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(LogoutRequest(token = token))
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun fetchDashboardSummary(userId: String, role: UserRole): DashboardSummary {
         val endpoint = if (role == UserRole.WHOLESALER) {
             "/orders/wholesaler/$userId"
         } else {
             "/orders/retailer/$userId"
         }
 
-        val response = client.get(buildUrl(endpoint)) {
-            accept(ContentType.Application.Json)
-            bearerAuth(token)
-        }
+        val response = authorizedGet(endpoint)
         ensureSuccess(response.status, response.bodyAsText())
 
         val items = json.parseToJsonElement(response.bodyAsText()).jsonArray
@@ -114,17 +125,23 @@ class MobileAuthApi(
         )
     }
 
-    suspend fun fetchUserById(userId: String, token: String): UserDTO {
-        val response = client.get(buildUrl("/users/$userId")) {
-            accept(ContentType.Application.Json)
-            bearerAuth(token)
-        }
-        ensureSuccess(response.status, response.bodyAsText())
+    suspend fun fetchUserById(userId: String): UserDTO {
+        return fetchUserById(userId, tokenOverride = null, notifyUnauthorized = true)
+    }
+
+    private suspend fun fetchUserById(
+        userId: String,
+        tokenOverride: String?,
+        notifyUnauthorized: Boolean,
+    ): UserDTO {
+        val response = authorizedGet("/users/$userId", tokenOverride)
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = notifyUnauthorized)
         val payload = json.decodeFromString(UserPayload.serializer(), response.bodyAsText())
         return payload.toUserDto()
     }
 
-    suspend fun scanBarcode(retailerId: String, gtin: String, token: String): PosScanResponse {
+    suspend fun scanBarcode(retailerId: String, gtin: String): PosScanResponse {
+        val token = requireBearerToken()
         val response = client.post(buildUrl("/inventory/scan")) {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             accept(ContentType.Application.Json)
@@ -133,6 +150,7 @@ class MobileAuthApi(
         }
 
         val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
         val parsed = json.parseToJsonElement(body).jsonObject
         return PosScanResponse(
             productName = parsed.stringValue("productName"),
@@ -141,11 +159,78 @@ class MobileAuthApi(
         )
     }
 
+    suspend fun forgotPassword(email: String) {
+        val response = client.post(buildUrl("/auth/forgot-password")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            setBody(ForgotPasswordRequest(email = email))
+        }
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
+    }
+
+    suspend fun resetPassword(token: String, newPassword: String) {
+        val response = client.post(buildUrl("/auth/reset-password")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            setBody(ResetPasswordRequest(token = token, newPassword = newPassword))
+        }
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
+    }
+
+    suspend fun verifyEmail(token: String) {
+        val response = client.post(buildUrl("/auth/verify-email")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            setBody(VerifyEmailRequest(token = token))
+        }
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
+    }
+
+    suspend fun resendVerification(email: String) {
+        val response = client.post(buildUrl("/auth/resend-verification")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            setBody(ResendVerificationRequest(email = email))
+        }
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
+    }
+
     private fun buildUrl(path: String): String = "${MobileApiConfig.baseUrl}${path}"
 
-    private fun ensureSuccess(status: HttpStatusCode, body: String) {
+    private suspend fun authorizedGet(path: String, tokenOverride: String? = null): HttpResponse {
+        val token = requireBearerToken(tokenOverride)
+        return client.get(buildUrl(path)) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+    }
+
+    private suspend fun requireBearerToken(tokenOverride: String? = null): String {
+        val token = tokenOverride ?: tokenProvider()
+        if (!token.isNullOrBlank()) {
+            return token
+        }
+
+        onUnauthorized()
+        throw MobileApiException(
+            message = "Your session expired. Please sign in again.",
+            statusCode = HttpStatusCode.Unauthorized.value,
+            isUnauthorized = true,
+        )
+    }
+
+    private suspend fun ensureSuccess(
+        status: HttpStatusCode,
+        body: String,
+        notifyUnauthorized: Boolean = true,
+    ) {
         if (status.isSuccess()) {
             return
+        }
+
+        val isUnauthorized = status == HttpStatusCode.Unauthorized
+        if (isUnauthorized && notifyUnauthorized) {
+            onUnauthorized()
         }
 
         val message = runCatching {
@@ -156,8 +241,13 @@ class MobileAuthApi(
         }.getOrNull()
 
         throw MobileApiException(
-            message = message ?: "Request failed with status ${status.value}",
+            message = if (isUnauthorized && notifyUnauthorized) {
+                "Your session expired. Please sign in again."
+            } else {
+                message ?: "Request failed with status ${status.value}"
+            },
             statusCode = status.value,
+            isUnauthorized = isUnauthorized,
         )
     }
 

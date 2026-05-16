@@ -40,7 +40,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import uqu.drawbridge.platform.ui.auth.AuthSessionManager
+import uqu.drawbridge.platform.ui.auth.AuthSessionState
 import uqu.drawbridge.platform.ui.components.BackHandler
+import uqu.drawbridge.platform.ui.components.ErrorStateCard
+import uqu.drawbridge.platform.ui.components.LoadingStateCard
 import uqu.drawbridge.platform.ui.components.MainBottomBar
 import uqu.drawbridge.platform.ui.model.AppDestination
 import uqu.drawbridge.platform.ui.model.AuthScreen
@@ -63,28 +67,43 @@ import uqu.drawbridge.platform.ui.theme.DrawbridgeTheme
 @Composable
 @Preview
 fun App() {
-    val api = remember { MobileAuthApi() }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val platformServices = rememberPlatformServices()
+    val sessionManager = remember(platformServices.secureTokenStorage) {
+        AuthSessionManager(platformServices.secureTokenStorage)
+    }
 
     var authScreen by remember { mutableStateOf(AuthScreen.Welcome) }
-    var session by remember { mutableStateOf<SessionState?>(null) }
-    var dashboardSummary by remember { mutableStateOf<DashboardSummary?>(null) }
     var activeMoreDestination by remember { mutableStateOf<AppDestination?>(null) }
     var isBusy by remember { mutableStateOf(false) }
     var darkTheme by remember { mutableStateOf(true) }
 
-    val currentSession = session
+    val authState = sessionManager.state
+    val authenticatedState = authState as? AuthSessionState.Authenticated
+    val currentSession = authenticatedState?.session
+    val dashboardSummary = authenticatedState?.dashboardSummary
     val tabs = remember(currentSession?.user?.role) {
         currentSession?.user?.role?.let(::primaryTabsFor).orEmpty()
     }
     val pagerState = rememberPagerState(pageCount = { tabs.size.coerceAtLeast(1) })
 
+    LaunchedEffect(Unit) {
+        sessionManager.restoreSession()
+    }
+
     LaunchedEffect(currentSession?.user?.role) {
         activeMoreDestination = null
         if (currentSession != null && pagerState.currentPage >= tabs.size) {
             pagerState.scrollToPage(0)
+        }
+    }
+
+    LaunchedEffect(currentSession?.user?.id) {
+        if (currentSession != null && dashboardSummary == null) {
+            isBusy = true
+            sessionManager.setDashboardSummary(fetchDashboardSummary(sessionManager.api, currentSession))
+            isBusy = false
         }
     }
 
@@ -131,19 +150,14 @@ fun App() {
             ) {
                 if (currentSession == null) {
                     AuthHost(
+                        authState = authState,
                         authScreen = authScreen,
-                        onAuthScreenChange = { authScreen = it },
-                        api = api,
-                        snackbarHostState = snackbarHostState,
-                        onBusyChange = { isBusy = it },
-                        onAuthenticated = { newSession, summary ->
-                            session = newSession
-                            dashboardSummary = summary
-                            activeMoreDestination = null
-                            coroutineScope.launch {
-                                pagerState.scrollToPage(0)
-                            }
+                        onAuthScreenChange = {
+                            sessionManager.clearAuthMessage()
+                            authScreen = it
                         },
+                        sessionManager = sessionManager,
+                        snackbarHostState = snackbarHostState,
                     )
                 } else {
                     MainHost(
@@ -153,15 +167,12 @@ fun App() {
                         dashboardSummary = dashboardSummary,
                         activeMoreDestination = activeMoreDestination,
                         onActiveMoreDestinationChange = { activeMoreDestination = it },
-                        onDashboardSummaryChange = { dashboardSummary = it },
-                        api = api,
+                        sessionManager = sessionManager,
                         onBusyChange = { isBusy = it },
                         onLogout = {
                             coroutineScope.launch {
-                                platformServices.secureTokenStorage.clearToken()
+                                sessionManager.logout()
                             }
-                            session = null
-                            dashboardSummary = null
                             activeMoreDestination = null
                             authScreen = AuthScreen.Welcome
                         },
@@ -169,7 +180,7 @@ fun App() {
                 }
 
                 AnimatedVisibility(
-                    visible = isBusy,
+                    visible = isBusy || authState is AuthSessionState.Loading || authState is AuthSessionState.RestoringSession,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically(),
                     modifier = Modifier.align(Alignment.TopCenter),
@@ -183,14 +194,23 @@ fun App() {
 
 @Composable
 private fun AuthHost(
+    authState: AuthSessionState,
     authScreen: AuthScreen,
     onAuthScreenChange: (AuthScreen) -> Unit,
-    api: MobileAuthApi,
+    sessionManager: AuthSessionManager,
     snackbarHostState: SnackbarHostState,
-    onBusyChange: (Boolean) -> Unit,
-    onAuthenticated: (SessionState, DashboardSummary?) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
+
+    if (authState is AuthSessionState.RestoringSession) {
+        MobileScrollColumn {
+            LoadingStateCard(
+                title = "Restoring session",
+                message = "Checking your secure Drawbridge session.",
+            )
+        }
+        return
+    }
 
     AnimatedContent(
         targetState = authScreen,
@@ -202,6 +222,16 @@ private fun AuthHost(
         modifier = Modifier.fillMaxSize(),
     ) { targetAuthScreen ->
         MobileScrollColumn {
+            AuthStateMessage(
+                authState = authState,
+                onDismiss = { sessionManager.clearAuthMessage() },
+                onRetryRestore = {
+                    coroutineScope.launch {
+                        sessionManager.restoreSession()
+                    }
+                },
+            )
+
             when (targetAuthScreen) {
                 AuthScreen.Welcome -> {
                     WelcomeAuthScreen(
@@ -214,17 +244,10 @@ private fun AuthHost(
                     LoginAuthScreen(
                         onSubmit = { email, password, rememberMe ->
                             coroutineScope.launch {
-                                onBusyChange(true)
-                                runCatching { api.login(email, password, rememberMe) }
-                                    .onSuccess { mobileSession ->
-                                        val newSession = SessionState(mobileSession.token, mobileSession.user)
-                                        val summary = fetchDashboardSummary(api, newSession)
-                                        onAuthenticated(newSession, summary)
-                                    }
-                                    .onFailure { err ->
-                                        snackbarHostState.showSnackbar(err.message ?: "Login failed")
-                                    }
-                                onBusyChange(false)
+                                val result = sessionManager.login(email, password, rememberMe)
+                                if (!result.success) {
+                                    snackbarHostState.showSnackbar(result.message ?: "Login failed")
+                                }
                             }
                         },
                         onGoToSignup = { onAuthScreenChange(AuthScreen.Signup) },
@@ -243,7 +266,6 @@ private fun AuthHost(
                             }
 
                             coroutineScope.launch {
-                                onBusyChange(true)
                                 val request = RegisterRequest(
                                     email = form.businessEmail,
                                     password = form.password,
@@ -267,16 +289,10 @@ private fun AuthHost(
                                     ),
                                 )
 
-                                runCatching { api.register(request) }
-                                    .onSuccess { mobileSession ->
-                                        val newSession = SessionState(mobileSession.token, mobileSession.user)
-                                        val summary = fetchDashboardSummary(api, newSession)
-                                        onAuthenticated(newSession, summary)
-                                    }
-                                    .onFailure { err ->
-                                        snackbarHostState.showSnackbar(err.message ?: "Registration failed")
-                                    }
-                                onBusyChange(false)
+                                val result = sessionManager.register(request)
+                                if (!result.success) {
+                                    snackbarHostState.showSnackbar(result.message ?: "Registration failed")
+                                }
                             }
                         },
                         onGoToLogin = { onAuthScreenChange(AuthScreen.Login) },
@@ -289,6 +305,36 @@ private fun AuthHost(
 }
 
 @Composable
+private fun AuthStateMessage(
+    authState: AuthSessionState,
+    onDismiss: () -> Unit,
+    onRetryRestore: () -> Unit,
+) {
+    when (authState) {
+        is AuthSessionState.Loading -> LoadingStateCard(
+            title = authState.message,
+            message = "This will only take a moment.",
+        )
+
+        is AuthSessionState.SessionExpired -> ErrorStateCard(
+            title = "Session expired",
+            message = authState.message,
+            actionText = "Dismiss",
+            onAction = onDismiss,
+        )
+
+        is AuthSessionState.Error -> ErrorStateCard(
+            title = "We could not continue",
+            message = authState.message,
+            actionText = if (authState.canRetryRestore) "Try again" else "Dismiss",
+            onAction = if (authState.canRetryRestore) onRetryRestore else onDismiss,
+        )
+
+        else -> Unit
+    }
+}
+
+@Composable
 private fun MainHost(
     session: SessionState,
     tabs: List<uqu.drawbridge.platform.ui.model.MainTab>,
@@ -296,8 +342,7 @@ private fun MainHost(
     dashboardSummary: DashboardSummary?,
     activeMoreDestination: AppDestination?,
     onActiveMoreDestinationChange: (AppDestination?) -> Unit,
-    onDashboardSummaryChange: (DashboardSummary?) -> Unit,
-    api: MobileAuthApi,
+    sessionManager: AuthSessionManager,
     onBusyChange: (Boolean) -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -318,7 +363,7 @@ private fun MainHost(
                         onRefresh = {
                             coroutineScope.launch {
                                 onBusyChange(true)
-                                onDashboardSummaryChange(fetchDashboardSummary(api, session))
+                                sessionManager.setDashboardSummary(fetchDashboardSummary(sessionManager.api, session))
                                 onBusyChange(false)
                             }
                         },
@@ -344,10 +389,9 @@ private fun MainHost(
                                         coroutineScope.launch {
                                             onBusyChange(true)
                                             val result = runCatching {
-                                                api.scanBarcode(
+                                                sessionManager.api.scanBarcode(
                                                     retailerId = session.user.id,
                                                     gtin = gtin,
-                                                    token = session.token,
                                                 )
                                             }.getOrElse { err ->
                                                 PosScanResponse(
@@ -403,7 +447,6 @@ private suspend fun fetchDashboardSummary(
         api.fetchDashboardSummary(
             userId = session.user.id,
             role = session.user.role,
-            token = session.token,
         )
     }.getOrNull()
 }
