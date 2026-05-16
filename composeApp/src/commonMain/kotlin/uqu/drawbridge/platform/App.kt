@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import uqu.drawbridge.platform.ui.auth.AuthSessionManager
 import uqu.drawbridge.platform.ui.auth.AuthSessionState
+import uqu.drawbridge.platform.ui.commerce.CartStateHolder
+import uqu.drawbridge.platform.ui.commerce.OrdersStateHolder
 import uqu.drawbridge.platform.ui.components.BackHandler
 import uqu.drawbridge.platform.ui.components.ErrorStateCard
 import uqu.drawbridge.platform.ui.components.LoadingStateCard
@@ -56,12 +58,16 @@ import uqu.drawbridge.platform.ui.marketplace.ProductDetailStateHolder
 import uqu.drawbridge.platform.ui.marketplace.WishlistStateHolder
 import uqu.drawbridge.platform.ui.platform.rememberPlatformServices
 import uqu.drawbridge.platform.ui.screens.AccountMainScreen
+import uqu.drawbridge.platform.ui.screens.CartMainScreen
+import uqu.drawbridge.platform.ui.screens.CheckoutMainScreen
 import uqu.drawbridge.platform.ui.screens.DashboardMainScreen
 import uqu.drawbridge.platform.ui.screens.FeaturePlaceholderMainScreen
 import uqu.drawbridge.platform.ui.screens.LoginAuthScreen
 import uqu.drawbridge.platform.ui.screens.MarketplaceMainScreen
 import uqu.drawbridge.platform.ui.screens.MoreDestinationScreen
 import uqu.drawbridge.platform.ui.screens.MoreMainScreen
+import uqu.drawbridge.platform.ui.screens.OrderDetailMainScreen
+import uqu.drawbridge.platform.ui.screens.OrdersMainScreen
 import uqu.drawbridge.platform.ui.screens.PosMainScreen
 import uqu.drawbridge.platform.ui.screens.ProductDetailMainScreen
 import uqu.drawbridge.platform.ui.screens.SignupAuthScreen
@@ -83,6 +89,8 @@ fun App() {
     var authScreen by remember { mutableStateOf(AuthScreen.Welcome) }
     var activeMoreDestination by remember { mutableStateOf<AppDestination?>(null) }
     var selectedProductId by remember { mutableStateOf<String?>(null) }
+    var selectedOrderId by remember { mutableStateOf<String?>(null) }
+    var isCheckoutOpen by remember { mutableStateOf(false) }
     var isBusy by remember { mutableStateOf(false) }
     var darkTheme by remember { mutableStateOf(true) }
 
@@ -102,6 +110,8 @@ fun App() {
     LaunchedEffect(currentSession?.user?.role) {
         activeMoreDestination = null
         selectedProductId = null
+        selectedOrderId = null
+        isCheckoutOpen = false
         if (currentSession != null && pagerState.currentPage >= tabs.size) {
             pagerState.scrollToPage(0)
         }
@@ -126,11 +136,19 @@ fun App() {
             selectedProductId = null
         }
 
-        BackHandler(enabled = currentSession != null && selectedProductId == null && activeMoreDestination != null) {
+        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId != null) {
+            selectedOrderId = null
+        }
+
+        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId == null && isCheckoutOpen) {
+            isCheckoutOpen = false
+        }
+
+        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId == null && !isCheckoutOpen && activeMoreDestination != null) {
             activeMoreDestination = null
         }
 
-        BackHandler(enabled = currentSession != null && selectedProductId == null && activeMoreDestination == null && pagerState.currentPage != 0) {
+        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId == null && !isCheckoutOpen && activeMoreDestination == null && pagerState.currentPage != 0) {
             coroutineScope.launch {
                 pagerState.animateScrollToPage(0)
             }
@@ -148,6 +166,8 @@ fun App() {
                         onSelectTab = { tab ->
                             activeMoreDestination = null
                             selectedProductId = null
+                            selectedOrderId = null
+                            isCheckoutOpen = false
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(tabs.indexOf(tab))
                             }
@@ -180,12 +200,27 @@ fun App() {
                         dashboardSummary = dashboardSummary,
                         activeMoreDestination = activeMoreDestination,
                         selectedProductId = selectedProductId,
+                        selectedOrderId = selectedOrderId,
+                        isCheckoutOpen = isCheckoutOpen,
                         onActiveMoreDestinationChange = {
                             selectedProductId = null
+                            selectedOrderId = null
+                            isCheckoutOpen = false
                             activeMoreDestination = it
                         },
-                        onOpenProduct = { productId -> selectedProductId = productId },
+                        onOpenProduct = { productId ->
+                            selectedOrderId = null
+                            isCheckoutOpen = false
+                            selectedProductId = productId
+                        },
                         onCloseProduct = { selectedProductId = null },
+                        onOpenOrder = { orderId ->
+                            selectedProductId = null
+                            isCheckoutOpen = false
+                            selectedOrderId = orderId
+                        },
+                        onCloseOrder = { selectedOrderId = null },
+                        onCheckoutOpenChange = { isCheckoutOpen = it },
                         sessionManager = sessionManager,
                         snackbarHostState = snackbarHostState,
                         onBusyChange = { isBusy = it },
@@ -195,6 +230,8 @@ fun App() {
                             }
                             activeMoreDestination = null
                             selectedProductId = null
+                            selectedOrderId = null
+                            isCheckoutOpen = false
                             authScreen = AuthScreen.Welcome
                         },
                     )
@@ -363,9 +400,14 @@ private fun MainHost(
     dashboardSummary: DashboardSummary?,
     activeMoreDestination: AppDestination?,
     selectedProductId: String?,
+    selectedOrderId: String?,
+    isCheckoutOpen: Boolean,
     onActiveMoreDestinationChange: (AppDestination?) -> Unit,
     onOpenProduct: (String) -> Unit,
     onCloseProduct: () -> Unit,
+    onOpenOrder: (String) -> Unit,
+    onCloseOrder: () -> Unit,
+    onCheckoutOpenChange: (Boolean) -> Unit,
     sessionManager: AuthSessionManager,
     snackbarHostState: SnackbarHostState,
     onBusyChange: (Boolean) -> Unit,
@@ -378,6 +420,12 @@ private fun MainHost(
     val wishlistStateHolder = remember(session.user.id, session.user.role) {
         WishlistStateHolder(sessionManager.api, session)
     }
+    val cartStateHolder = remember(session.user.id, session.user.role) {
+        CartStateHolder(sessionManager.api, session)
+    }
+    val ordersStateHolder = remember(session.user.id, session.user.role) {
+        OrdersStateHolder(sessionManager.api, session)
+    }
     val productDetailStateHolder = remember(selectedProductId) {
         ProductDetailStateHolder(sessionManager.api)
     }
@@ -386,12 +434,20 @@ private fun MainHost(
             snackbarHostState.showSnackbar(message)
         }
     }
+    val openTab: (AppDestination) -> Unit = { destination ->
+        val index = tabs.indexOfFirst { it.destination == destination }
+        if (index >= 0) {
+            coroutineScope.launch {
+                pagerState.animateScrollToPage(index)
+            }
+        }
+    }
 
     HorizontalPager(
         state = pagerState,
         modifier = Modifier.fillMaxSize(),
         verticalAlignment = Alignment.Top,
-        userScrollEnabled = activeMoreDestination == null && selectedProductId == null,
+        userScrollEnabled = activeMoreDestination == null && selectedProductId == null && selectedOrderId == null && !isCheckoutOpen,
     ) { page ->
         val currentTab = tabs.getOrElse(page) { tabs.first() }
         MobileScrollColumn {
@@ -400,8 +456,19 @@ private fun MainHost(
                     productId = selectedProductId,
                     detailStateHolder = productDetailStateHolder,
                     wishlistStateHolder = wishlistStateHolder,
+                    cartStateHolder = cartStateHolder,
                     onBack = onCloseProduct,
                     onShowMessage = showMessage,
+                )
+                return@MobileScrollColumn
+            }
+
+            if (selectedOrderId != null) {
+                OrderDetailMainScreen(
+                    orderId = selectedOrderId,
+                    ordersStateHolder = ordersStateHolder,
+                    session = session,
+                    onBack = onCloseOrder,
                 )
                 return@MobileScrollColumn
             }
@@ -426,6 +493,41 @@ private fun MainHost(
                         wishlistStateHolder = wishlistStateHolder,
                         onOpenProduct = onOpenProduct,
                         onShowMessage = showMessage,
+                    )
+                }
+
+                AppDestination.Cart -> {
+                    if (isCheckoutOpen) {
+                        CheckoutMainScreen(
+                            cartStateHolder = cartStateHolder,
+                            onBackToCart = { onCheckoutOpenChange(false) },
+                            onViewOrders = {
+                                onCheckoutOpenChange(false)
+                                coroutineScope.launch {
+                                    ordersStateHolder.refresh()
+                                }
+                                openTab(AppDestination.Orders)
+                            },
+                            onShowMessage = showMessage,
+                        )
+                    } else {
+                        CartMainScreen(
+                            cartStateHolder = cartStateHolder,
+                            onOpenMarketplace = { openTab(AppDestination.Marketplace) },
+                            onOpenCheckout = {
+                                cartStateHolder.clearCheckoutResult()
+                                onCheckoutOpenChange(true)
+                            },
+                            onShowMessage = showMessage,
+                        )
+                    }
+                }
+
+                AppDestination.Orders -> {
+                    OrdersMainScreen(
+                        ordersStateHolder = ordersStateHolder,
+                        session = session,
+                        onOpenOrder = onOpenOrder,
                     )
                 }
 

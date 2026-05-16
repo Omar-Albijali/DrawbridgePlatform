@@ -9,6 +9,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -230,6 +231,88 @@ class MobileAuthApi(
             bearerAuth(token)
         }
         ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun fetchCartItems(retailerId: String): List<CartItemDTO> {
+        val response = authorizedGet("/cart/$retailerId/items")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun addCartItem(retailerId: String, productId: String, quantity: Int): CartItemDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/cart/$retailerId/items")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(AddToCartRequest(productId = productId, quantity = quantity))
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(CartItemDTO.serializer(), body)
+    }
+
+    suspend fun updateCartItemQuantity(retailerId: String, productId: String, quantity: Int): CartItemDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/cart/$retailerId/items/$productId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("quantity", quantity)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(CartItemDTO.serializer(), body)
+    }
+
+    suspend fun removeCartItem(retailerId: String, productId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/cart/$retailerId/items/$productId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun clearCart(retailerId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/cart/$retailerId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun checkoutCart(retailerId: String): OrderGroupDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/cart/$retailerId/checkout")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(OrderGroupDTO.serializer(), body)
+    }
+
+    suspend fun fetchOrdersByRetailer(retailerId: String): List<OrderDTO> {
+        val response = authorizedGet("/orders/retailer/$retailerId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchOrdersByWholesaler(wholesalerId: String): List<OrderDTO> {
+        val response = authorizedGet("/orders/wholesaler/$wholesalerId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchOrderById(orderId: String): OrderDTO {
+        val response = authorizedGet("/orders/$orderId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(OrderDTO.serializer(), body)
     }
 
     suspend fun forgotPassword(email: String) {

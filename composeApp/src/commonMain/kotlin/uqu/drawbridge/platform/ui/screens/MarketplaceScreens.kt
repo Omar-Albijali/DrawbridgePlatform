@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -52,6 +54,7 @@ import uqu.drawbridge.platform.ui.components.ScreenSection
 import uqu.drawbridge.platform.ui.components.SecondaryButton
 import uqu.drawbridge.platform.ui.components.StatusChip
 import uqu.drawbridge.platform.ui.components.StatusTone
+import uqu.drawbridge.platform.ui.commerce.CartStateHolder
 import uqu.drawbridge.platform.ui.marketplace.MarketplaceSortOption
 import uqu.drawbridge.platform.ui.marketplace.MarketplaceStateHolder
 import uqu.drawbridge.platform.ui.marketplace.ProductDetailStateHolder
@@ -505,6 +508,7 @@ internal fun ProductDetailMainScreen(
     productId: String,
     detailStateHolder: ProductDetailStateHolder,
     wishlistStateHolder: WishlistStateHolder,
+    cartStateHolder: CartStateHolder,
     onBack: () -> Unit,
     onShowMessage: (String) -> Unit,
 ) {
@@ -534,6 +538,7 @@ internal fun ProductDetailMainScreen(
             state.product != null -> ProductDetailContent(
                 product = state.product,
                 wishlistStateHolder = wishlistStateHolder,
+                cartStateHolder = cartStateHolder,
                 onShowMessage = onShowMessage,
             )
         }
@@ -544,12 +549,17 @@ internal fun ProductDetailMainScreen(
 private fun ProductDetailContent(
     product: ProductDTO,
     wishlistStateHolder: WishlistStateHolder,
+    cartStateHolder: CartStateHolder,
     onShowMessage: (String) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val isWishlisted = wishlistStateHolder.isInWishlist(product.id)
     val isWishlistBusy = product.id in wishlistStateHolder.state.busyProductIds
+    val isCartBusy = product.id in cartStateHolder.state.busyProductIds
     val imageCount = product.images.count { it.isNotBlank() } + if (product.image.isNotBlank() && product.image !in product.images) 1 else 0
+    val minimumOrderQuantity = product.minimumOrderQuantity.coerceAtLeast(1)
+    var quantity by remember(product.id) { mutableStateOf(minimumOrderQuantity) }
+    val canAddToCart = cartStateHolder.isEnabled && product.stock >= minimumOrderQuantity
 
     ScreenSection(
         title = product.name,
@@ -631,11 +641,64 @@ private fun ProductDetailContent(
             )
         }
 
-        SecondaryButton(
-            text = "Add to cart starts in Phase 4",
-            onClick = {},
-            enabled = false,
-        )
+        AppCard {
+            if (cartStateHolder.isEnabled) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text("Quantity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Starts at MOQ $minimumOrderQuantity",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { quantity = (quantity - 1).coerceAtLeast(minimumOrderQuantity) },
+                            enabled = quantity > minimumOrderQuantity && !isCartBusy,
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(Icons.Default.Remove, contentDescription = "Decrease quantity")
+                        }
+                        Text(quantity.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+                        IconButton(
+                            onClick = { quantity = (quantity + 1).coerceAtMost(product.stock) },
+                            enabled = quantity < product.stock && !isCartBusy,
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Increase quantity")
+                        }
+                    }
+                }
+
+                PrimaryButton(
+                    text = when {
+                        isCartBusy -> "Adding..."
+                        product.stock <= 0 -> "Out of stock"
+                        product.stock < minimumOrderQuantity -> "Below MOQ"
+                        else -> "Add to cart"
+                    },
+                    onClick = {
+                        coroutineScope.launch {
+                            val result = cartStateHolder.addProduct(product, quantity)
+                            result.message?.let(onShowMessage)
+                        }
+                    },
+                    enabled = canAddToCart && !isCartBusy,
+                )
+            } else {
+                StatusChip(text = "Cart unavailable for this role", tone = StatusTone.Neutral)
+                Text(
+                    "Wholesaler accounts can browse product details, but cart checkout is available for retailers.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
