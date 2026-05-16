@@ -3,6 +3,7 @@ package uqu.drawbridge.platform.ui.components
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -17,10 +18,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
+import uqu.drawbridge.platform.ui.model.AppDestination
 import uqu.drawbridge.platform.ui.model.MainTab
+import uqu.drawbridge.platform.ui.theme.SuccessColor
+import uqu.drawbridge.platform.ui.theme.WarningColor
 
 @Composable
 internal fun MainBottomBar(
+    tabs: List<MainTab>,
     currentTab: MainTab,
     onSelectTab: (MainTab) -> Unit,
 ) {
@@ -29,7 +34,7 @@ internal fun MainBottomBar(
         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
         tonalElevation = 8.dp,
     ) {
-        MainTab.entries.forEach { tab ->
+        tabs.forEach { tab ->
             NavigationBarItem(
                 selected = tab == currentTab,
                 onClick = { onSelectTab(tab) },
@@ -80,7 +85,7 @@ internal fun AppCard(
     val isDark = MaterialTheme.colorScheme.surface.red < 0.2f
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(26.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isDark) {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
@@ -96,7 +101,7 @@ internal fun AppCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
-            modifier = Modifier.padding(26.dp),
+            modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             content = content,
         )
@@ -112,7 +117,7 @@ internal fun StatCard(
     val isDark = MaterialTheme.colorScheme.surface.red < 0.2f
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isDark) {
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
@@ -163,7 +168,7 @@ internal fun AppTextField(
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
         label = { Text(label, fontWeight = FontWeight.Medium) },
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(8.dp),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
         supportingText = supportingText?.let { { Text(it) } },
@@ -200,7 +205,7 @@ internal fun PrimaryButton(
             .graphicsLayer(scaleX = scale, scaleY = scale),
         enabled = enabled,
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -232,7 +237,7 @@ internal fun SecondaryButton(
             .graphicsLayer(scaleX = scale, scaleY = scale),
         enabled = enabled,
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (isDark) 0.3f else 0.8f)),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else Color.Transparent,
@@ -240,5 +245,125 @@ internal fun SecondaryButton(
         )
     ) {
         Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+internal fun StatusChip(
+    text: String,
+    tone: StatusTone,
+    modifier: Modifier = Modifier,
+) {
+    val color = when (tone) {
+        StatusTone.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
+        StatusTone.Success -> SuccessColor
+        StatusTone.Warning -> WarningColor
+        StatusTone.Error -> MaterialTheme.colorScheme.error
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = color.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.24f)),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+internal enum class StatusTone {
+    Neutral,
+    Success,
+    Warning,
+    Error,
+}
+
+@Composable
+internal fun LoadingStateCard(
+    title: String = "Loading",
+    message: String = "Preparing the latest workspace data.",
+) {
+    AppCard {
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+internal fun EmptyStateCard(
+    title: String,
+    message: String,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    AppCard {
+        StatusChip(text = "Empty", tone = StatusTone.Neutral)
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (actionText != null && onAction != null) {
+            SecondaryButton(text = actionText, onClick = onAction)
+        }
+    }
+}
+
+@Composable
+internal fun ErrorStateCard(
+    title: String,
+    message: String,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    AppCard {
+        StatusChip(text = "Needs attention", tone = StatusTone.Error)
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (actionText != null && onAction != null) {
+            SecondaryButton(text = actionText, onClick = onAction)
+        }
+    }
+}
+
+@Composable
+internal fun DeferredFeatureCard(
+    destination: AppDestination,
+    title: String,
+    message: String,
+) {
+    AppCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            StatusChip(text = "Phase 2+", tone = StatusTone.Warning)
+        }
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = destination.name.lowercase().replaceFirstChar { it.uppercase() },
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
