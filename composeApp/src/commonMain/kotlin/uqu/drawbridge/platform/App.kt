@@ -10,13 +10,17 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -36,9 +40,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import uqu.drawbridge.platform.ui.auth.AuthSessionManager
 import uqu.drawbridge.platform.ui.auth.AuthSessionState
@@ -84,6 +90,7 @@ import uqu.drawbridge.platform.ui.screens.ProductDetailMainScreen
 import uqu.drawbridge.platform.ui.screens.ReportsMainScreen
 import uqu.drawbridge.platform.ui.screens.SettingsMainScreen
 import uqu.drawbridge.platform.ui.screens.SignupAuthScreen
+import uqu.drawbridge.platform.ui.screens.SplashAuthScreen
 import uqu.drawbridge.platform.ui.screens.SupportMainScreen
 import uqu.drawbridge.platform.ui.screens.WelcomeAuthScreen
 import uqu.drawbridge.platform.ui.screens.WishlistMainScreen
@@ -182,7 +189,14 @@ fun App() {
 
         Scaffold(
             containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
+            snackbarHost = {
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .imePadding(),
+                )
+            },
             bottomBar = {
                 if (currentSession != null && tabs.isNotEmpty()) {
                     val currentTab = tabs.getOrElse(pagerState.currentPage) { tabs.first() }
@@ -207,7 +221,13 @@ fun App() {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
+                    .then(
+                        if (currentSession == null) {
+                            Modifier
+                        } else {
+                            Modifier.padding(innerPadding)
+                        },
+                    ),
             ) {
                 if (currentSession == null) {
                     AuthHost(
@@ -306,103 +326,143 @@ private fun AuthHost(
     snackbarHostState: SnackbarHostState,
 ) {
     val coroutineScope = rememberCoroutineScope()
+    var showSplash by remember { mutableStateOf(true) }
 
-    if (authState is AuthSessionState.RestoringSession) {
-        MobileScrollColumn {
-            LoadingStateCard(
-                title = "Restoring session",
-                message = "Checking your secure Drawbridge session.",
-            )
-        }
-        return
+    LaunchedEffect(Unit) {
+        delay(1500)
+        showSplash = false
     }
 
     AnimatedContent(
-        targetState = authScreen,
+        targetState = showSplash,
         transitionSpec = {
-            val enter = if (targetState.ordinal > initialState.ordinal) slideInHorizontally { it } else slideInHorizontally { -it }
-            val exit = if (targetState.ordinal > initialState.ordinal) slideOutHorizontally { -it } else slideOutHorizontally { it }
-            (enter + fadeIn()).togetherWith(exit + fadeOut()).using(SizeTransform(clip = false))
+            fadeIn().togetherWith(fadeOut()).using(SizeTransform(clip = false))
         },
         modifier = Modifier.fillMaxSize(),
-    ) { targetAuthScreen ->
-        MobileScrollColumn {
-            AuthStateMessage(
-                authState = authState,
-                onDismiss = { sessionManager.clearAuthMessage() },
-                onRetryRestore = {
-                    coroutineScope.launch {
-                        sessionManager.restoreSession()
+    ) { splashVisible ->
+        if (splashVisible) {
+            SplashAuthScreen(restoringSession = authState is AuthSessionState.RestoringSession)
+        } else if (authState is AuthSessionState.RestoringSession) {
+            PreAuthScrollColumn {
+                LoadingStateCard(
+                    title = "Restoring session",
+                    message = "Checking your secure Drawbridge session.",
+                )
+            }
+        } else {
+            AnimatedContent(
+                targetState = authScreen,
+                transitionSpec = {
+                    if (initialState != AuthScreen.Welcome && targetState != AuthScreen.Welcome) {
+                        fadeIn().togetherWith(fadeOut()).using(SizeTransform(clip = false))
+                    } else {
+                        val enter = if (targetState.ordinal > initialState.ordinal) slideInHorizontally { it } else slideInHorizontally { -it }
+                        val exit = if (targetState.ordinal > initialState.ordinal) slideOutHorizontally { -it } else slideOutHorizontally { it }
+                        (enter + fadeIn()).togetherWith(exit + fadeOut()).using(SizeTransform(clip = false))
                     }
                 },
-            )
-
-            when (targetAuthScreen) {
-                AuthScreen.Welcome -> {
-                    WelcomeAuthScreen(
-                        onGoToLogin = { onAuthScreenChange(AuthScreen.Login) },
-                        onGoToSignup = { onAuthScreenChange(AuthScreen.Signup) },
-                    )
+                modifier = Modifier.fillMaxSize(),
+            ) { targetAuthScreen ->
+                val inlineAuthMessage = when (authState) {
+                    is AuthSessionState.Error -> authState.message
+                    is AuthSessionState.SessionExpired -> authState.message
+                    else -> null
                 }
 
-                AuthScreen.Login -> {
-                    LoginAuthScreen(
-                        onSubmit = { email, password, rememberMe ->
-                            coroutineScope.launch {
-                                val result = sessionManager.login(email, password, rememberMe)
-                                if (!result.success) {
-                                    snackbarHostState.showSnackbar(result.message ?: "Login failed")
-                                }
-                            }
-                        },
-                        onGoToSignup = { onAuthScreenChange(AuthScreen.Signup) },
-                        onBack = { onAuthScreenChange(AuthScreen.Welcome) },
-                    )
-                }
-
-                AuthScreen.Signup -> {
-                    SignupAuthScreen(
-                        onSubmit = { form ->
-                            if (form.password != form.confirmPassword) {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Passwords do not match")
-                                }
-                                return@SignupAuthScreen
-                            }
-
-                            coroutineScope.launch {
-                                val request = RegisterRequest(
-                                    email = form.businessEmail,
-                                    password = form.password,
-                                    phoneNumber = form.phoneNumber,
-                                    role = form.role,
-                                    businessName = form.companyName,
-                                    commercialRegistrationNumber = form.commercialRegistration,
-                                    repName = form.repName,
-                                    repJobTitle = form.repJobTitle,
-                                    repPhoneNumber = form.repPhone,
-                                    repEmail = form.repEmail,
-                                    addresses = arrayOf(
-                                        AddressDto(
-                                            id = null,
-                                            street = form.street,
-                                            city = form.city,
-                                            state = form.state,
-                                            zipCode = form.zipCode,
-                                            country = form.country,
-                                        ),
-                                    ),
+                when (targetAuthScreen) {
+                    AuthScreen.Welcome -> {
+                        PreAuthScreenBox {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                WelcomeAuthScreen(
+                                    onGoToLogin = { onAuthScreenChange(AuthScreen.Login) },
+                                    onGoToSignup = { onAuthScreenChange(AuthScreen.Signup) },
                                 )
-
-                                val result = sessionManager.register(request)
-                                if (!result.success) {
-                                    snackbarHostState.showSnackbar(result.message ?: "Registration failed")
+                                AnimatedVisibility(
+                                    visible = authState is AuthSessionState.SessionExpired ||
+                                        authState is AuthSessionState.Error,
+                                    enter = fadeIn() + expandVertically(),
+                                    exit = fadeOut() + shrinkVertically(),
+                                    modifier = Modifier.align(Alignment.TopCenter),
+                                ) {
+                                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                        AuthStateMessage(
+                                            authState = authState,
+                                            onDismiss = { sessionManager.clearAuthMessage() },
+                                            onRetryRestore = {
+                                                coroutineScope.launch {
+                                                    sessionManager.restoreSession()
+                                                }
+                                            },
+                                        )
+                                    }
                                 }
                             }
-                        },
-                        onGoToLogin = { onAuthScreenChange(AuthScreen.Login) },
-                        onBack = { onAuthScreenChange(AuthScreen.Welcome) },
-                    )
+                        }
+                    }
+
+                    AuthScreen.Login -> {
+                        LoginAuthScreen(
+                            onSubmit = { email, password, rememberMe ->
+                                coroutineScope.launch {
+                                    val result = sessionManager.login(email, password, rememberMe)
+                                    if (!result.success) {
+                                        snackbarHostState.showSnackbar(result.message ?: "Login failed")
+                                    }
+                                }
+                            },
+                            onGoToSignup = { onAuthScreenChange(AuthScreen.Signup) },
+                            onBack = { onAuthScreenChange(AuthScreen.Welcome) },
+                            isLoading = authState is AuthSessionState.Loading,
+                            authMessage = inlineAuthMessage,
+                        )
+                    }
+
+                    AuthScreen.Signup -> {
+                        SignupAuthScreen(
+                            onSubmit = { form ->
+                                if (form.password != form.confirmPassword) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("Passwords do not match")
+                                    }
+                                    return@SignupAuthScreen
+                                }
+
+                                coroutineScope.launch {
+                                    val request = RegisterRequest(
+                                        email = form.businessEmail,
+                                        password = form.password,
+                                        phoneNumber = form.phoneNumber,
+                                        role = form.role,
+                                        businessName = form.companyName,
+                                        commercialRegistrationNumber = form.commercialRegistration,
+                                        repName = form.repName,
+                                        repJobTitle = form.repJobTitle,
+                                        repPhoneNumber = form.repPhone,
+                                        repEmail = form.repEmail,
+                                        addresses = arrayOf(
+                                            AddressDto(
+                                                id = null,
+                                                street = form.street,
+                                                city = form.city,
+                                                state = form.state,
+                                                zipCode = form.zipCode,
+                                                country = form.country,
+                                            ),
+                                        ),
+                                    )
+
+                                    val result = sessionManager.register(request)
+                                    if (!result.success) {
+                                        snackbarHostState.showSnackbar(result.message ?: "Registration failed")
+                                    }
+                                }
+                            },
+                            onGoToLogin = { onAuthScreenChange(AuthScreen.Login) },
+                            onBack = { onAuthScreenChange(AuthScreen.Welcome) },
+                            isLoading = authState is AuthSessionState.Loading,
+                            authMessage = inlineAuthMessage,
+                        )
+                    }
                 }
             }
         }
@@ -727,6 +787,62 @@ private fun MobileScrollColumn(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         content = content,
+    )
+}
+
+@Composable
+private fun PreAuthScrollColumn(
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .preAuthBackground(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            content()
+            Spacer(modifier = Modifier.height(28.dp))
+        }
+    }
+}
+
+@Composable
+private fun PreAuthScreenBox(
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .preAuthBackground(),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+        ) {
+            content()
+        }
+    }
+}
+
+private fun Modifier.preAuthBackground(): Modifier {
+    return background(
+        Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFF03111F),
+                Color(0xFF0B1F33),
+                Color(0xFF03111F),
+            ),
+        ),
     )
 }
 
