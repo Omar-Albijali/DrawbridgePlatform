@@ -48,6 +48,10 @@ import uqu.drawbridge.platform.ui.components.BackHandler
 import uqu.drawbridge.platform.ui.components.ErrorStateCard
 import uqu.drawbridge.platform.ui.components.LoadingStateCard
 import uqu.drawbridge.platform.ui.components.MainBottomBar
+import uqu.drawbridge.platform.ui.engagement.NotificationsStateHolder
+import uqu.drawbridge.platform.ui.engagement.ReportsStateHolder
+import uqu.drawbridge.platform.ui.engagement.SettingsStateHolder
+import uqu.drawbridge.platform.ui.engagement.SupportStateHolder
 import uqu.drawbridge.platform.ui.model.AppDestination
 import uqu.drawbridge.platform.ui.model.AuthScreen
 import uqu.drawbridge.platform.ui.model.SessionState
@@ -60,7 +64,6 @@ import uqu.drawbridge.platform.ui.operations.InventoryStateHolder
 import uqu.drawbridge.platform.ui.operations.PosStateHolder
 import uqu.drawbridge.platform.ui.operations.ProductManagementStateHolder
 import uqu.drawbridge.platform.ui.platform.rememberPlatformServices
-import uqu.drawbridge.platform.ui.screens.AccountMainScreen
 import uqu.drawbridge.platform.ui.screens.CartMainScreen
 import uqu.drawbridge.platform.ui.screens.CheckoutMainScreen
 import uqu.drawbridge.platform.ui.screens.DashboardMainScreen
@@ -71,13 +74,17 @@ import uqu.drawbridge.platform.ui.screens.LoginAuthScreen
 import uqu.drawbridge.platform.ui.screens.MarketplaceMainScreen
 import uqu.drawbridge.platform.ui.screens.MoreDestinationScreen
 import uqu.drawbridge.platform.ui.screens.MoreMainScreen
+import uqu.drawbridge.platform.ui.screens.NotificationsMainScreen
 import uqu.drawbridge.platform.ui.screens.OrderDetailMainScreen
 import uqu.drawbridge.platform.ui.screens.OrdersMainScreen
 import uqu.drawbridge.platform.ui.screens.PosMainScreen
 import uqu.drawbridge.platform.ui.screens.ProductFormMainScreen
 import uqu.drawbridge.platform.ui.screens.ProductManagementMainScreen
 import uqu.drawbridge.platform.ui.screens.ProductDetailMainScreen
+import uqu.drawbridge.platform.ui.screens.ReportsMainScreen
+import uqu.drawbridge.platform.ui.screens.SettingsMainScreen
 import uqu.drawbridge.platform.ui.screens.SignupAuthScreen
+import uqu.drawbridge.platform.ui.screens.SupportMainScreen
 import uqu.drawbridge.platform.ui.screens.WelcomeAuthScreen
 import uqu.drawbridge.platform.ui.screens.WishlistMainScreen
 import uqu.drawbridge.platform.ui.theme.AppBackground
@@ -480,6 +487,18 @@ private fun MainHost(
     val posStateHolder = remember(session.user.id, session.user.role) {
         PosStateHolder(sessionManager.api, session)
     }
+    val reportsStateHolder = remember(session.user.id, session.user.role) {
+        ReportsStateHolder(sessionManager.api, session)
+    }
+    val supportStateHolder = remember(session.user.id) {
+        SupportStateHolder(sessionManager.api)
+    }
+    val notificationsStateHolder = remember(session.user.id) {
+        NotificationsStateHolder(sessionManager.api, session)
+    }
+    val settingsStateHolder = remember(session.user.id) {
+        SettingsStateHolder(sessionManager.api, session)
+    }
     val productDetailStateHolder = remember(selectedProductId) {
         ProductDetailStateHolder(sessionManager.api)
     }
@@ -657,12 +676,33 @@ private fun MainHost(
                                     onShowMessage = showMessage,
                                 )
                             },
+                            reportsContent = {
+                                ReportsMainScreen(
+                                    reportsStateHolder = reportsStateHolder,
+                                    role = session.user.role,
+                                )
+                            },
+                            supportContent = {
+                                SupportMainScreen(supportStateHolder = supportStateHolder)
+                            },
+                            notificationsContent = {
+                                NotificationsMainScreen(notificationsStateHolder = notificationsStateHolder)
+                            },
+                            settingsContent = {
+                                SettingsMainScreen(
+                                    settingsStateHolder = settingsStateHolder,
+                                    onLogout = onLogout,
+                                )
+                            },
                         )
                     }
                 }
 
                 AppDestination.Settings -> {
-                    AccountMainScreen(onLogout = onLogout)
+                    SettingsMainScreen(
+                        settingsStateHolder = settingsStateHolder,
+                        onLogout = onLogout,
+                    )
                 }
 
                 else -> {

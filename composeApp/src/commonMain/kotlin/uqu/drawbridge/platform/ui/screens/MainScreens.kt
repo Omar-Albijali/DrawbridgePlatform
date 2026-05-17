@@ -197,7 +197,14 @@ internal fun MoreMainScreen(
                         Icon(destination.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     },
                     trailingContent = {
-                        val isReady = destination.destination == AppDestination.POS || destination.destination == AppDestination.Wishlist
+                        val isReady = destination.destination in setOf(
+                            AppDestination.POS,
+                            AppDestination.Wishlist,
+                            AppDestination.Notifications,
+                            AppDestination.Support,
+                            AppDestination.Reports,
+                            AppDestination.Settings,
+                        )
                         StatusChip(
                             text = if (isReady) "Ready" else "Queued",
                             tone = if (isReady) StatusTone.Success else StatusTone.Warning,
@@ -219,6 +226,10 @@ internal fun MoreDestinationScreen(
     onLogout: () -> Unit,
     wishlistContent: @Composable () -> Unit,
     posContent: @Composable () -> Unit,
+    reportsContent: @Composable () -> Unit,
+    supportContent: @Composable () -> Unit,
+    notificationsContent: @Composable () -> Unit,
+    settingsContent: @Composable () -> Unit,
 ) {
     when (destination) {
         AppDestination.Wishlist -> {
@@ -233,10 +244,28 @@ internal fun MoreDestinationScreen(
                 posContent()
             }
         }
+        AppDestination.Reports -> {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SecondaryButton(text = "Back to More", onClick = onBack)
+                reportsContent()
+            }
+        }
+        AppDestination.Support -> {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SecondaryButton(text = "Back to More", onClick = onBack)
+                supportContent()
+            }
+        }
+        AppDestination.Notifications -> {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SecondaryButton(text = "Back to More", onClick = onBack)
+                notificationsContent()
+            }
+        }
         AppDestination.Settings -> {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SecondaryButton(text = "Back to More", onClick = onBack)
-                AccountMainScreen(onLogout = onLogout)
+                settingsContent()
             }
         }
         else -> {

@@ -5,6 +5,8 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -429,6 +431,205 @@ class MobileAuthApi(
             setBody(ResendVerificationRequest(email = email))
         }
         ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
+    }
+
+    suspend fun updateUserProfile(userId: String, request: UpdateUserProfileRequest): UserDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/users/$userId")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(UserPayload.serializer(), body).toUserDto()
+    }
+
+    suspend fun changePassword(userId: String, request: ChangePasswordRequest) {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/users/$userId/password")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun fetchAddresses(): List<AddressResponseDto> {
+        val response = authorizedGet("/addresses")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun createAddress(request: CreateAddressRequest): AddressResponseDto {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/addresses")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(AddressResponseDto.serializer(), body)
+    }
+
+    suspend fun updateAddress(addressId: String, request: CreateAddressRequest): AddressResponseDto {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/addresses/$addressId")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(AddressResponseDto.serializer(), body)
+    }
+
+    suspend fun deleteAddress(addressId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/addresses/$addressId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun fetchPaymentMethods(ownerId: String): List<PaymentMethodDTO> {
+        val response = authorizedGet("/payments/methods/owner/$ownerId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun addPaymentMethod(request: CreatePaymentMethodRequest): PaymentMethodDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/payments/methods")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(PaymentMethodDTO.serializer(), body)
+    }
+
+    suspend fun deletePaymentMethod(paymentMethodId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/payments/methods/$paymentMethodId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun setDefaultPaymentMethod(paymentMethodId: String): PaymentMethodDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/payments/methods/$paymentMethodId/default")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(PaymentMethodDTO.serializer(), body)
+    }
+
+    suspend fun fetchSupportTickets(): List<SupportTicketDTO> {
+        val response = authorizedGet("/support/my")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchSupportTicket(ticketId: String): SupportTicketDTO {
+        val response = authorizedGet("/support/$ticketId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(SupportTicketDTO.serializer(), body)
+    }
+
+    suspend fun createSupportTicket(request: CreateTicketRequest): SupportTicketDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/support")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append("subject", request.subject.trim())
+                        append("category", request.category.name)
+                        append("description", request.description.trim())
+                    },
+                ),
+            )
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(SupportTicketDTO.serializer(), body)
+    }
+
+    suspend fun fetchNotifications(recipientId: String): List<NotificationDTO> {
+        val response = authorizedGet("/notifications/recipient/$recipientId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchUnreadNotificationCount(recipientId: String): Int {
+        val response = authorizedGet("/notifications/recipient/$recipientId/unread-count")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(UnreadCountDTO.serializer(), body).count
+    }
+
+    suspend fun markNotificationRead(notificationId: String): NotificationDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/notifications/$notificationId/read")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(NotificationDTO.serializer(), body)
+    }
+
+    suspend fun markAllNotificationsRead(recipientId: String): Int {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/notifications/recipient/$recipientId/read-all")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(UnreadCountDTO.serializer(), body).count
+    }
+
+    suspend fun fetchNotificationPreferences(userId: String): List<NotificationPreferenceDTO> {
+        val response = authorizedGet("/notifications/preferences/$userId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun upsertNotificationPreference(
+        userId: String,
+        request: UpsertNotificationPreferenceRequest,
+    ): NotificationPreferenceDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/notifications/preferences/$userId")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(NotificationPreferenceDTO.serializer(), body)
     }
 
     private fun buildUrl(path: String): String = "${MobileApiConfig.baseUrl}${path}"

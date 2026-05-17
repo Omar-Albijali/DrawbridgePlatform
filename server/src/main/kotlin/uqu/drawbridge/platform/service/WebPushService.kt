@@ -52,7 +52,7 @@ class WebPushService(
             pushService.send(notification)
             true
         } catch (ex: Exception) {
-            log.warn("Failed to send web push notification to endpoint {}", subscription.endpoint, ex)
+            log.warn("Failed to send web push notification for subscription {}", subscription.id ?: "unknown", ex)
             false
         }
     }

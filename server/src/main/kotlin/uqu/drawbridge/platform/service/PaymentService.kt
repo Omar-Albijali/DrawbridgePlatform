@@ -254,6 +254,8 @@ class PaymentService(
 
     fun getPaymentsDTOByOrderId(orderId: String): List<PaymentDTO> = getPaymentsByOrderId(orderId).map { it.toDTO() }
 
+    fun getPaymentsDTOByOwner(ownerId: String): List<PaymentDTO> = getPaymentsByOwnerId(ownerId).map { it.toDTO() }
+
     fun createPaymentDTO(request: CreatePaymentRequest): PaymentDTO {
         RequestValidation.requireNotBlank(request.orderId, "orderId")
         RequestValidation.requireNotBlank(request.ownerId, "ownerId")

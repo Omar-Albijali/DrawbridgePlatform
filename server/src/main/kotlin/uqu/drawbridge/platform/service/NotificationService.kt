@@ -227,6 +227,10 @@ class NotificationService(
         return webPushSubscriptionRepository.findByUserId(userId)
     }
 
+    fun getPushSubscriptionByEndpoint(endpoint: String): WebPushSubscription? {
+        return webPushSubscriptionRepository.findByEndpoint(endpoint)
+    }
+
     // ==================== DTO MAPPING ====================
 
     fun Notification.toDTO() = NotificationDTO(
