@@ -56,12 +56,17 @@ import uqu.drawbridge.platform.ui.model.primaryTabsFor
 import uqu.drawbridge.platform.ui.marketplace.MarketplaceStateHolder
 import uqu.drawbridge.platform.ui.marketplace.ProductDetailStateHolder
 import uqu.drawbridge.platform.ui.marketplace.WishlistStateHolder
+import uqu.drawbridge.platform.ui.operations.InventoryStateHolder
+import uqu.drawbridge.platform.ui.operations.PosStateHolder
+import uqu.drawbridge.platform.ui.operations.ProductManagementStateHolder
 import uqu.drawbridge.platform.ui.platform.rememberPlatformServices
 import uqu.drawbridge.platform.ui.screens.AccountMainScreen
 import uqu.drawbridge.platform.ui.screens.CartMainScreen
 import uqu.drawbridge.platform.ui.screens.CheckoutMainScreen
 import uqu.drawbridge.platform.ui.screens.DashboardMainScreen
 import uqu.drawbridge.platform.ui.screens.FeaturePlaceholderMainScreen
+import uqu.drawbridge.platform.ui.screens.InventoryDetailMainScreen
+import uqu.drawbridge.platform.ui.screens.InventoryMainScreen
 import uqu.drawbridge.platform.ui.screens.LoginAuthScreen
 import uqu.drawbridge.platform.ui.screens.MarketplaceMainScreen
 import uqu.drawbridge.platform.ui.screens.MoreDestinationScreen
@@ -69,6 +74,8 @@ import uqu.drawbridge.platform.ui.screens.MoreMainScreen
 import uqu.drawbridge.platform.ui.screens.OrderDetailMainScreen
 import uqu.drawbridge.platform.ui.screens.OrdersMainScreen
 import uqu.drawbridge.platform.ui.screens.PosMainScreen
+import uqu.drawbridge.platform.ui.screens.ProductFormMainScreen
+import uqu.drawbridge.platform.ui.screens.ProductManagementMainScreen
 import uqu.drawbridge.platform.ui.screens.ProductDetailMainScreen
 import uqu.drawbridge.platform.ui.screens.SignupAuthScreen
 import uqu.drawbridge.platform.ui.screens.WelcomeAuthScreen
@@ -90,7 +97,9 @@ fun App() {
     var activeMoreDestination by remember { mutableStateOf<AppDestination?>(null) }
     var selectedProductId by remember { mutableStateOf<String?>(null) }
     var selectedOrderId by remember { mutableStateOf<String?>(null) }
+    var selectedInventoryItemId by remember { mutableStateOf<String?>(null) }
     var isCheckoutOpen by remember { mutableStateOf(false) }
+    var isProductFormOpen by remember { mutableStateOf(false) }
     var isBusy by remember { mutableStateOf(false) }
     var darkTheme by remember { mutableStateOf(true) }
 
@@ -111,8 +120,10 @@ fun App() {
         activeMoreDestination = null
         selectedProductId = null
         selectedOrderId = null
+        selectedInventoryItemId = null
         isCheckoutOpen = false
-        if (currentSession != null && pagerState.currentPage >= tabs.size) {
+        isProductFormOpen = false
+        if (currentSession != null && pagerState.currentPage != 0) {
             pagerState.scrollToPage(0)
         }
     }
@@ -140,15 +151,23 @@ fun App() {
             selectedOrderId = null
         }
 
-        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId == null && isCheckoutOpen) {
+        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId == null && selectedInventoryItemId != null) {
+            selectedInventoryItemId = null
+        }
+
+        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId == null && selectedInventoryItemId == null && isProductFormOpen) {
+            isProductFormOpen = false
+        }
+
+        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId == null && selectedInventoryItemId == null && !isProductFormOpen && isCheckoutOpen) {
             isCheckoutOpen = false
         }
 
-        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId == null && !isCheckoutOpen && activeMoreDestination != null) {
+        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId == null && selectedInventoryItemId == null && !isProductFormOpen && !isCheckoutOpen && activeMoreDestination != null) {
             activeMoreDestination = null
         }
 
-        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId == null && !isCheckoutOpen && activeMoreDestination == null && pagerState.currentPage != 0) {
+        BackHandler(enabled = currentSession != null && selectedProductId == null && selectedOrderId == null && selectedInventoryItemId == null && !isProductFormOpen && !isCheckoutOpen && activeMoreDestination == null && pagerState.currentPage != 0) {
             coroutineScope.launch {
                 pagerState.animateScrollToPage(0)
             }
@@ -167,7 +186,9 @@ fun App() {
                             activeMoreDestination = null
                             selectedProductId = null
                             selectedOrderId = null
+                            selectedInventoryItemId = null
                             isCheckoutOpen = false
+                            isProductFormOpen = false
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(tabs.indexOf(tab))
                             }
@@ -201,26 +222,43 @@ fun App() {
                         activeMoreDestination = activeMoreDestination,
                         selectedProductId = selectedProductId,
                         selectedOrderId = selectedOrderId,
+                        selectedInventoryItemId = selectedInventoryItemId,
                         isCheckoutOpen = isCheckoutOpen,
+                        isProductFormOpen = isProductFormOpen,
                         onActiveMoreDestinationChange = {
                             selectedProductId = null
                             selectedOrderId = null
+                            selectedInventoryItemId = null
                             isCheckoutOpen = false
+                            isProductFormOpen = false
                             activeMoreDestination = it
                         },
                         onOpenProduct = { productId ->
                             selectedOrderId = null
+                            selectedInventoryItemId = null
                             isCheckoutOpen = false
+                            isProductFormOpen = false
                             selectedProductId = productId
                         },
                         onCloseProduct = { selectedProductId = null },
                         onOpenOrder = { orderId ->
                             selectedProductId = null
+                            selectedInventoryItemId = null
                             isCheckoutOpen = false
+                            isProductFormOpen = false
                             selectedOrderId = orderId
                         },
                         onCloseOrder = { selectedOrderId = null },
+                        onOpenInventoryItem = { itemId ->
+                            selectedProductId = null
+                            selectedOrderId = null
+                            isCheckoutOpen = false
+                            isProductFormOpen = false
+                            selectedInventoryItemId = itemId
+                        },
+                        onCloseInventoryItem = { selectedInventoryItemId = null },
                         onCheckoutOpenChange = { isCheckoutOpen = it },
+                        onProductFormOpenChange = { isProductFormOpen = it },
                         sessionManager = sessionManager,
                         snackbarHostState = snackbarHostState,
                         onBusyChange = { isBusy = it },
@@ -231,7 +269,9 @@ fun App() {
                             activeMoreDestination = null
                             selectedProductId = null
                             selectedOrderId = null
+                            selectedInventoryItemId = null
                             isCheckoutOpen = false
+                            isProductFormOpen = false
                             authScreen = AuthScreen.Welcome
                         },
                     )
@@ -401,13 +441,18 @@ private fun MainHost(
     activeMoreDestination: AppDestination?,
     selectedProductId: String?,
     selectedOrderId: String?,
+    selectedInventoryItemId: String?,
     isCheckoutOpen: Boolean,
+    isProductFormOpen: Boolean,
     onActiveMoreDestinationChange: (AppDestination?) -> Unit,
     onOpenProduct: (String) -> Unit,
     onCloseProduct: () -> Unit,
     onOpenOrder: (String) -> Unit,
     onCloseOrder: () -> Unit,
+    onOpenInventoryItem: (String) -> Unit,
+    onCloseInventoryItem: () -> Unit,
     onCheckoutOpenChange: (Boolean) -> Unit,
+    onProductFormOpenChange: (Boolean) -> Unit,
     sessionManager: AuthSessionManager,
     snackbarHostState: SnackbarHostState,
     onBusyChange: (Boolean) -> Unit,
@@ -425,6 +470,15 @@ private fun MainHost(
     }
     val ordersStateHolder = remember(session.user.id, session.user.role) {
         OrdersStateHolder(sessionManager.api, session)
+    }
+    val inventoryStateHolder = remember(session.user.id, session.user.role) {
+        InventoryStateHolder(sessionManager.api, session)
+    }
+    val productManagementStateHolder = remember(session.user.id, session.user.role) {
+        ProductManagementStateHolder(sessionManager.api, session)
+    }
+    val posStateHolder = remember(session.user.id, session.user.role) {
+        PosStateHolder(sessionManager.api, session)
     }
     val productDetailStateHolder = remember(selectedProductId) {
         ProductDetailStateHolder(sessionManager.api)
@@ -447,7 +501,12 @@ private fun MainHost(
         state = pagerState,
         modifier = Modifier.fillMaxSize(),
         verticalAlignment = Alignment.Top,
-        userScrollEnabled = activeMoreDestination == null && selectedProductId == null && selectedOrderId == null && !isCheckoutOpen,
+        userScrollEnabled = activeMoreDestination == null &&
+            selectedProductId == null &&
+            selectedOrderId == null &&
+            selectedInventoryItemId == null &&
+            !isProductFormOpen &&
+            !isCheckoutOpen,
     ) { page ->
         val currentTab = tabs.getOrElse(page) { tabs.first() }
         MobileScrollColumn {
@@ -469,6 +528,25 @@ private fun MainHost(
                     ordersStateHolder = ordersStateHolder,
                     session = session,
                     onBack = onCloseOrder,
+                )
+                return@MobileScrollColumn
+            }
+
+            if (selectedInventoryItemId != null) {
+                InventoryDetailMainScreen(
+                    itemId = selectedInventoryItemId,
+                    inventoryStateHolder = inventoryStateHolder,
+                    onBack = onCloseInventoryItem,
+                    onShowMessage = showMessage,
+                )
+                return@MobileScrollColumn
+            }
+
+            if (isProductFormOpen) {
+                ProductFormMainScreen(
+                    productManagementStateHolder = productManagementStateHolder,
+                    onBack = { onProductFormOpenChange(false) },
+                    onShowMessage = showMessage,
                 )
                 return@MobileScrollColumn
             }
@@ -531,6 +609,28 @@ private fun MainHost(
                     )
                 }
 
+                AppDestination.Inventory -> {
+                    InventoryMainScreen(
+                        inventoryStateHolder = inventoryStateHolder,
+                        onOpenDetail = onOpenInventoryItem,
+                    )
+                }
+
+                AppDestination.Products -> {
+                    ProductManagementMainScreen(
+                        productManagementStateHolder = productManagementStateHolder,
+                        onCreateProduct = {
+                            productManagementStateHolder.startCreate()
+                            onProductFormOpenChange(true)
+                        },
+                        onEditProduct = { product ->
+                            productManagementStateHolder.startEdit(product)
+                            onProductFormOpenChange(true)
+                        },
+                        onShowMessage = showMessage,
+                    )
+                }
+
                 AppDestination.More -> {
                     val selectedDestination = activeMoreDestination
                     if (selectedDestination == null) {
@@ -553,25 +653,8 @@ private fun MainHost(
                             },
                             posContent = {
                                 PosMainScreen(
-                                    onScan = { gtin, onResult ->
-                                        coroutineScope.launch {
-                                            onBusyChange(true)
-                                            val result = runCatching {
-                                                sessionManager.api.scanBarcode(
-                                                    retailerId = session.user.id,
-                                                    gtin = gtin,
-                                                )
-                                            }.getOrElse { err ->
-                                                PosScanResponse(
-                                                    productName = "",
-                                                    newStock = 0,
-                                                    message = err.message ?: "Scan failed",
-                                                )
-                                            }
-                                            onResult(result)
-                                            onBusyChange(false)
-                                        }
-                                    },
+                                    posStateHolder = posStateHolder,
+                                    onShowMessage = showMessage,
                                 )
                             },
                         )

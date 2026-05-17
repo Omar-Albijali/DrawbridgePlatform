@@ -98,6 +98,42 @@ internal fun LoginAuthScreen(
                 }
             }
         }
+        AppCard {
+            Text(
+                text = "Test/demo accounts",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = "Use the same seeded accounts as the web app. These shortcuts still sign in through the backend.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SecondaryButton(
+                    text = "Retailer demo",
+                    onClick = {
+                        email = "retailer@test.com"
+                        password = "password"
+                        rememberMe = true
+                        onSubmit("retailer@test.com", "password", true)
+                    },
+                )
+                SecondaryButton(
+                    text = "Wholesaler demo",
+                    onClick = {
+                        email = "wholesaler@test.com"
+                        password = "password"
+                        rememberMe = true
+                        onSubmit("wholesaler@test.com", "password", true)
+                    },
+                )
+            }
+            Text(
+                text = "Password: password",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

@@ -2,14 +2,18 @@ package uqu.drawbridge.platform.controller
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import uqu.drawbridge.platform.*
+import uqu.drawbridge.platform.model.InventoryItem
 import uqu.drawbridge.platform.dto.InventoryAuditLogPageResponse
 import uqu.drawbridge.platform.model.InventoryAuditSourceType
 import uqu.drawbridge.platform.model.InventoryStockTargetType
 import uqu.drawbridge.platform.service.InventoryAuditService
 import uqu.drawbridge.platform.service.InventoryService
+import uqu.drawbridge.platform.service.ProductService
+import uqu.drawbridge.platform.service.UserService
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 
@@ -17,14 +21,20 @@ import java.time.OffsetDateTime
 @RequestMapping("/api/inventory")
 class InventoryController(
     private val inventoryService: InventoryService,
-    private val inventoryAuditService: InventoryAuditService
+    private val inventoryAuditService: InventoryAuditService,
+    private val productService: ProductService,
+    private val userService: UserService
 ) {
 
     // ==================== INVENTORY ITEMS ====================
 
     @GetMapping
-    fun getAllInventoryItems(): ResponseEntity<List<InventoryItemDTO>> {
-        return ResponseEntity.ok(inventoryService.getAllInventoryItemsDTO())
+    fun getAllInventoryItems(authentication: Authentication): ResponseEntity<List<InventoryItemDTO>> {
+        val user = currentUser(authentication)
+        if (user.role != UserRole.RETAILER || user.id == null) {
+            throw AccessDeniedException("Access denied")
+        }
+        return ResponseEntity.ok(inventoryService.getInventoryItemsDTOByRetailer(user.id!!))
     }
 
     @GetMapping("/logs")
@@ -64,7 +74,12 @@ class InventoryController(
     }
 
     @GetMapping("/{id}")
-    fun getInventoryItemById(@PathVariable id: String): ResponseEntity<InventoryItemDTO> {
+    fun getInventoryItemById(
+        authentication: Authentication,
+        @PathVariable id: String
+    ): ResponseEntity<InventoryItemDTO> {
+        val existing = inventoryService.getInventoryItemById(id) ?: return ResponseEntity.notFound().build()
+        requireInventoryOwner(authentication, existing)
         val item = inventoryService.getInventoryItemDTOById(id)
         return if (item != null) {
             ResponseEntity.ok(item)
@@ -74,31 +89,58 @@ class InventoryController(
     }
 
     @GetMapping("/retailer/{retailerId}")
-    fun getInventoryItemsByRetailer(@PathVariable retailerId: String): ResponseEntity<List<InventoryItemDTO>> {
+    fun getInventoryItemsByRetailer(
+        authentication: Authentication,
+        @PathVariable retailerId: String
+    ): ResponseEntity<List<InventoryItemDTO>> {
+        requireRetailerOwner(authentication, retailerId)
         return ResponseEntity.ok(inventoryService.getInventoryItemsDTOByRetailer(retailerId))
     }
 
     @GetMapping("/product/{productId}")
-    fun getInventoryItemsByProduct(@PathVariable productId: String): ResponseEntity<List<InventoryItemDTO>> {
+    fun getInventoryItemsByProduct(
+        authentication: Authentication,
+        @PathVariable productId: String
+    ): ResponseEntity<List<InventoryItemDTO>> {
+        val product = productService.getProductById(productId) ?: return ResponseEntity.notFound().build()
+        requireProductOwner(authentication, product)
         return ResponseEntity.ok(inventoryService.getInventoryItemsDTOByProduct(productId))
     }
 
     @GetMapping("/low-stock")
-    fun getLowStockItems(@RequestParam(defaultValue = "10") threshold: Int): ResponseEntity<List<InventoryItemDTO>> {
-        return ResponseEntity.ok(inventoryService.getLowStockItemsDTO(threshold))
+    fun getLowStockItems(
+        authentication: Authentication,
+        @RequestParam(defaultValue = "10") threshold: Int
+    ): ResponseEntity<List<InventoryItemDTO>> {
+        val user = currentUser(authentication)
+        if (user.role != UserRole.RETAILER || user.id == null) {
+            throw AccessDeniedException("Access denied")
+        }
+        return ResponseEntity.ok(
+            inventoryService.getInventoryItemsDTOByRetailer(user.id!!)
+                .filter { it.currentStock <= threshold }
+        )
     }
 
     @PostMapping
-    fun createInventoryItem(@RequestBody request: CreateInventoryItemRequest): ResponseEntity<InventoryItemDTO> {
+    fun createInventoryItem(
+        authentication: Authentication,
+        @RequestBody request: CreateInventoryItemRequest
+    ): ResponseEntity<InventoryItemDTO> {
+        requireRetailerOwner(authentication, request.retailerId)
         val created = inventoryService.createInventoryItemFromRequest(request)
         return ResponseEntity.status(HttpStatus.CREATED).body(created)
     }
 
     @PutMapping("/{id}")
     fun updateInventoryItem(
+        authentication: Authentication,
         @PathVariable id: String,
         @RequestBody request: CreateInventoryItemRequest
     ): ResponseEntity<InventoryItemDTO> {
+        val existing = inventoryService.getInventoryItemById(id) ?: return ResponseEntity.notFound().build()
+        requireInventoryOwner(authentication, existing)
+        requireRetailerOwner(authentication, request.retailerId)
         val updated = inventoryService.updateInventoryItemFromRequest(id, request)
         return if (updated != null) {
             ResponseEntity.ok(updated)
@@ -109,9 +151,12 @@ class InventoryController(
 
     @PatchMapping("/{id}/quantity")
     fun updateQuantity(
+        authentication: Authentication,
         @PathVariable id: String,
         @RequestParam quantity: Int
     ): ResponseEntity<InventoryItemDTO> {
+        val existing = inventoryService.getInventoryItemById(id) ?: return ResponseEntity.notFound().build()
+        requireInventoryOwner(authentication, existing)
         val updated = inventoryService.updateQuantityDTO(id, quantity)
         return if (updated != null) {
             ResponseEntity.ok(updated)
@@ -121,7 +166,12 @@ class InventoryController(
     }
 
     @DeleteMapping("/{id}")
-    fun deleteInventoryItem(@PathVariable id: String): ResponseEntity<Void> {
+    fun deleteInventoryItem(
+        authentication: Authentication,
+        @PathVariable id: String
+    ): ResponseEntity<Void> {
+        val existing = inventoryService.getInventoryItemById(id) ?: return ResponseEntity.notFound().build()
+        requireInventoryOwner(authentication, existing)
         return if (inventoryService.deleteInventoryItem(id)) {
             ResponseEntity.ok().build()
         } else {
@@ -132,7 +182,12 @@ class InventoryController(
     // ==================== AUTO ORDER CONFIG ====================
 
     @GetMapping("/auto-order/{inventoryId}")
-    fun getAutoOrderConfigByInventoryId(@PathVariable inventoryId: String): ResponseEntity<AutoOrderConfigDTO> {
+    fun getAutoOrderConfigByInventoryId(
+        authentication: Authentication,
+        @PathVariable inventoryId: String
+    ): ResponseEntity<AutoOrderConfigDTO> {
+        val existing = inventoryService.getInventoryItemById(inventoryId) ?: return ResponseEntity.notFound().build()
+        requireInventoryOwner(authentication, existing)
         val config = inventoryService.getAutoOrderConfigDTOByInventoryId(inventoryId)
         return if (config != null) {
             ResponseEntity.ok(config)
@@ -143,9 +198,12 @@ class InventoryController(
 
     @PostMapping("/{inventoryId}/auto-order")
     fun setAutoOrderConfig(
+        authentication: Authentication,
         @PathVariable inventoryId: String,
         @RequestBody request: UpdateAutoOrderConfigRequest
     ): ResponseEntity<InventoryItemDTO> {
+        val existing = inventoryService.getInventoryItemById(inventoryId) ?: return ResponseEntity.notFound().build()
+        requireInventoryOwner(authentication, existing)
         val updated = inventoryService.setAutoOrderConfigFromRequest(inventoryId, request)
         return if (updated != null) {
             ResponseEntity.status(HttpStatus.CREATED).body(updated)
@@ -156,9 +214,12 @@ class InventoryController(
 
     @PutMapping("/auto-order/{inventoryId}")
     fun updateAutoOrderConfig(
+        authentication: Authentication,
         @PathVariable inventoryId: String,
         @RequestBody request: UpdateAutoOrderConfigRequest
     ): ResponseEntity<AutoOrderConfigDTO> {
+        val existing = inventoryService.getInventoryItemById(inventoryId) ?: return ResponseEntity.notFound().build()
+        requireInventoryOwner(authentication, existing)
         val updatedConfig = inventoryService.updateAutoOrderConfigFromRequest(inventoryId, request)
         return if (updatedConfig != null) {
             ResponseEntity.ok(updatedConfig)
@@ -169,9 +230,12 @@ class InventoryController(
 
     @PatchMapping("/auto-order/{inventoryId}/toggle")
     fun toggleAutoOrderConfig(
+        authentication: Authentication,
         @PathVariable inventoryId: String,
         @RequestParam enabled: Boolean
     ): ResponseEntity<AutoOrderConfigDTO> {
+        val existing = inventoryService.getInventoryItemById(inventoryId) ?: return ResponseEntity.notFound().build()
+        requireInventoryOwner(authentication, existing)
         val updatedConfig = inventoryService.toggleAutoOrderConfigDTO(inventoryId, enabled)
         return if (updatedConfig != null) {
             ResponseEntity.ok(updatedConfig)
@@ -189,12 +253,39 @@ class InventoryController(
     // ==================== POS SCAN ====================
 
     @PostMapping("/scan")
-    fun scanBarcode(@RequestBody request: PosScanRequest): ResponseEntity<PosScanResponse> {
+    fun scanBarcode(
+        authentication: Authentication,
+        @RequestBody request: PosScanRequest
+    ): ResponseEntity<PosScanResponse> {
+        requireRetailerOwner(authentication, request.retailerId)
         val result = inventoryService.scanByGtin(request.retailerId, request.gtin)
         return if (result.message == "OK") {
             ResponseEntity.ok(result)
         } else {
             ResponseEntity.status(HttpStatus.NOT_FOUND).body(result)
+        }
+    }
+
+    private fun currentUser(authentication: Authentication): uqu.drawbridge.platform.model.User {
+        return userService.getUserByEmail(authentication.name)
+            ?: throw AccessDeniedException("Access denied")
+    }
+
+    private fun requireRetailerOwner(authentication: Authentication, retailerId: String) {
+        val user = currentUser(authentication)
+        if (user.role != UserRole.RETAILER || user.id != retailerId) {
+            throw AccessDeniedException("Access denied")
+        }
+    }
+
+    private fun requireInventoryOwner(authentication: Authentication, item: InventoryItem) {
+        requireRetailerOwner(authentication, item.retailerId)
+    }
+
+    private fun requireProductOwner(authentication: Authentication, product: uqu.drawbridge.platform.model.Product) {
+        val user = currentUser(authentication)
+        if (user.role != UserRole.WHOLESALER || product.wholesaler.id != user.id) {
+            throw AccessDeniedException("Access denied")
         }
     }
 }

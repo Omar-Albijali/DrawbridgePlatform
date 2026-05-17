@@ -315,8 +315,11 @@ class ProductService(
         RequestValidation.requireNotBlank(request.name, "name")
         RequestValidation.requireNotBlank(request.description, "description")
         RequestValidation.requireNotBlank(request.categoryId, "categoryId")
-        RequestValidation.requirePositive(request.stock, "stock")
+        RequestValidation.requireNonNegative(request.stock, "stock")
         RequestValidation.requirePositive(request.minimumOrderQuantity, "minimumOrderQuantity")
+        require(request.minimumOrderQuantity <= request.stock) {
+            "minimumOrderQuantity cannot exceed stock"
+        }
         val parsedPrice = RequestValidation.parsePositiveBigDecimal(request.price.toString(), "price")
         val wholesaler = userRepository.findById(request.wholesalerId).orElseThrow {
             NoSuchElementException("Wholesaler not found: ${request.wholesalerId}")
@@ -341,8 +344,11 @@ class ProductService(
         RequestValidation.requireNotBlank(request.name, "name")
         RequestValidation.requireNotBlank(request.description, "description")
         RequestValidation.requireNotBlank(request.categoryId, "categoryId")
-        RequestValidation.requirePositive(request.stock, "stock")
+        RequestValidation.requireNonNegative(request.stock, "stock")
         RequestValidation.requirePositive(request.minimumOrderQuantity, "minimumOrderQuantity")
+        require(request.minimumOrderQuantity <= request.stock) {
+            "minimumOrderQuantity cannot exceed stock"
+        }
         val parsedPrice = RequestValidation.parsePositiveBigDecimal(request.price.toString(), "price")
         val existing = getProductById(id) ?: return null
         val previousStockQuantity = existing.stockQuantity

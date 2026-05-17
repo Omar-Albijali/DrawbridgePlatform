@@ -19,7 +19,7 @@ val localEnv = Properties().apply {
 
 buildConfig {
     packageName("uqu.drawbridge.platform.shared")
-    buildConfigField("String", "API_BASE_URL", "\"${localEnv.getProperty("COMPOSE_API_BASE_URL") ?: "http://10.0.2.2:8080/api"}\"")
+    buildConfigField("String", "API_BASE_URL", "\"${localEnv.getProperty("COMPOSE_API_BASE_URL")?.trim().orEmpty()}\"")
 }
 
 kotlin {

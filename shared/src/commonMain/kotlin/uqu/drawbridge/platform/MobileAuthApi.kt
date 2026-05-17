@@ -8,6 +8,7 @@ import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -160,6 +161,85 @@ class MobileAuthApi(
             newStock = parsed["newStock"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
             message = parsed.stringValue("message"),
         )
+    }
+
+    suspend fun fetchInventoryByRetailer(retailerId: String): List<InventoryItemDTO> {
+        val response = authorizedGet("/inventory/retailer/$retailerId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchInventoryItem(inventoryItemId: String): InventoryItemDTO {
+        val response = authorizedGet("/inventory/$inventoryItemId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(InventoryItemDTO.serializer(), body)
+    }
+
+    suspend fun updateInventoryQuantity(inventoryItemId: String, quantity: Int): InventoryItemDTO {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/inventory/$inventoryItemId/quantity")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("quantity", quantity)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(InventoryItemDTO.serializer(), body)
+    }
+
+    suspend fun fetchProductsByWholesaler(wholesalerId: String): List<ProductDTO> {
+        val response = authorizedGet("/products/wholesaler/$wholesalerId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun createProduct(request: CreateProductRequest): ProductDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/products")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(ProductDTO.serializer(), body)
+    }
+
+    suspend fun updateProduct(productId: String, request: CreateProductRequest): ProductDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/products/$productId")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(ProductDTO.serializer(), body)
+    }
+
+    suspend fun deleteProduct(productId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/products/$productId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun toggleProductPublished(productId: String): ProductDTO {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/products/$productId/toggle-published")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(ProductDTO.serializer(), body)
     }
 
     suspend fun fetchMarketplaceProducts(query: MarketplaceProductQuery = MarketplaceProductQuery()): PaginatedProductResponse {
