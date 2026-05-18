@@ -3,25 +3,128 @@ package uqu.drawbridge.platform.ui.components
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.vector.ImageVector
 import uqu.drawbridge.platform.ui.model.AppDestination
 import uqu.drawbridge.platform.ui.model.MainTab
+import uqu.drawbridge.platform.ui.theme.AppNavySurfaceHigh
+import uqu.drawbridge.platform.ui.theme.AppMutedText
+import uqu.drawbridge.platform.ui.theme.Primary500
 import uqu.drawbridge.platform.ui.theme.SuccessColor
 import uqu.drawbridge.platform.ui.theme.WarningColor
+
+@Composable
+internal fun GlassCard(
+    modifier: Modifier = Modifier,
+    shape: RoundedCornerShape = RoundedCornerShape(8.dp),
+    contentPadding: Dp = 16.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.075f)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(13.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+internal fun GlassPill(
+    text: String,
+    modifier: Modifier = Modifier,
+    tint: Color = Primary500,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(999.dp),
+        color = tint.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.24f)),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (tint == Primary500) Color(0xFF8EF3C5) else tint,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+internal fun GlassIconTile(
+    icon: ImageVector,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    size: Dp = 28.dp,
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(8.dp))
+            .background(tint.copy(alpha = 0.16f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(size * 0.56f),
+        )
+    }
+}
+
+@Composable
+internal fun GlassIconLabelRow(
+    icon: ImageVector,
+    text: String,
+    tint: Color = Primary500,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GlassIconTile(icon = icon, tint = tint, size = 28.dp)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            color = Color(0xFFF8FAFC),
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
 
 @Composable
 internal fun MainBottomBar(
@@ -29,24 +132,91 @@ internal fun MainBottomBar(
     currentTab: MainTab,
     onSelectTab: (MainTab) -> Unit,
 ) {
-    NavigationBar(
-        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-        tonalElevation = 8.dp,
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(top = 1.dp, bottom = 7.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        tabs.forEach { tab ->
-            NavigationBarItem(
-                selected = tab == currentTab,
-                onClick = { onSelectTab(tab) },
-                icon = {
-                    Icon(
-                        imageVector = tab.icon,
-                        contentDescription = tab.title,
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.92f),
+            shape = RoundedCornerShape(999.dp),
+            color = AppNavySurfaceHigh.copy(alpha = 0.94f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 5.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                tabs.forEach { tab ->
+                    MainBottomBarItem(
+                        tab = tab,
+                        selected = tab == currentTab,
+                        onClick = { onSelectTab(tab) },
+                        modifier = Modifier.weight(1f),
                     )
-                },
-                label = { Text(tab.title, fontWeight = if (tab == currentTab) FontWeight.Bold else FontWeight.Medium) },
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainBottomBarItem(
+    tab: MainTab,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.96f else 1f)
+    val itemColor by animateColorAsState(
+        if (selected) Primary500.copy(alpha = 0.13f) else Color.Transparent,
+    )
+    val iconColor by animateColorAsState(if (selected) Primary500 else AppMutedText)
+    val labelColor by animateColorAsState(if (selected) Color(0xFFF7FFFB) else AppMutedText)
+    val indication = LocalIndication.current
+
+    Column(
+        modifier = modifier
+            .height(36.dp)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .clip(RoundedCornerShape(999.dp))
+            .background(itemColor)
+            .selectable(
+                selected = selected,
+                interactionSource = interactionSource,
+                indication = indication,
+                role = Role.Tab,
+                onClick = onClick,
+            )
+            .padding(horizontal = 2.dp, vertical = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = tab.icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(16.dp),
             )
         }
+        Text(
+            text = tab.title,
+            style = MaterialTheme.typography.labelSmall,
+            color = labelColor,
+            fontWeight = if (selected) FontWeight.Black else FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

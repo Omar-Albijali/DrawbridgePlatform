@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -199,7 +200,12 @@ fun App() {
             },
             bottomBar = {
                 if (currentSession != null && tabs.isNotEmpty()) {
-                    val currentTab = tabs.getOrElse(pagerState.currentPage) { tabs.first() }
+                    val selectedTabIndex = if (pagerState.isScrollInProgress) {
+                        pagerState.targetPage
+                    } else {
+                        pagerState.currentPage
+                    }
+                    val currentTab = tabs.getOrElse(selectedTabIndex) { tabs.first() }
                     MainBottomBar(
                         tabs = tabs,
                         currentTab = currentTab,
@@ -220,14 +226,7 @@ fun App() {
         ) { innerPadding ->
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (currentSession == null) {
-                            Modifier
-                        } else {
-                            Modifier.padding(innerPadding)
-                        },
-                    ),
+                    .fillMaxSize(),
             ) {
                 if (currentSession == null) {
                     AuthHost(
@@ -289,6 +288,7 @@ fun App() {
                         sessionManager = sessionManager,
                         snackbarHostState = snackbarHostState,
                         onBusyChange = { isBusy = it },
+                        bottomContentPadding = innerPadding.calculateBottomPadding(),
                         onLogout = {
                             coroutineScope.launch {
                                 sessionManager.logout()
@@ -308,7 +308,9 @@ fun App() {
                     visible = isBusy || authState is AuthSessionState.Loading || authState is AuthSessionState.RestoringSession,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically(),
-                    modifier = Modifier.align(Alignment.TopCenter),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding(),
                 ) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
@@ -523,6 +525,7 @@ private fun MainHost(
     sessionManager: AuthSessionManager,
     snackbarHostState: SnackbarHostState,
     onBusyChange: (Boolean) -> Unit,
+    bottomContentPadding: Dp,
     onLogout: () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -588,7 +591,28 @@ private fun MainHost(
             !isCheckoutOpen,
     ) { page ->
         val currentTab = tabs.getOrElse(page) { tabs.first() }
-        MobileScrollColumn {
+        val routeKey = listOf(
+            currentTab.destination.name,
+            activeMoreDestination?.name.orEmpty(),
+            selectedProductId.orEmpty(),
+            selectedOrderId.orEmpty(),
+            selectedInventoryItemId.orEmpty(),
+            isCheckoutOpen.toString(),
+            isProductFormOpen.toString(),
+        ).joinToString(":")
+        val isRootDashboard = currentTab.destination == AppDestination.Home &&
+            activeMoreDestination == null &&
+            selectedProductId == null &&
+            selectedOrderId == null &&
+            selectedInventoryItemId == null &&
+            !isProductFormOpen &&
+            !isCheckoutOpen
+
+        MobileScrollColumn(
+            routeKey = routeKey,
+            compactTop = isRootDashboard,
+            bottomContentPadding = bottomContentPadding,
+        ) {
             if (selectedProductId != null) {
                 ProductDetailMainScreen(
                     productId = selectedProductId,
@@ -634,13 +658,23 @@ private fun MainHost(
                 AppDestination.Home -> {
                     DashboardMainScreen(
                         dashboardSummary = dashboardSummary,
+                        session = session,
+                        ordersStateHolder = ordersStateHolder,
+                        notificationsStateHolder = notificationsStateHolder,
                         onRefresh = {
                             coroutineScope.launch {
                                 onBusyChange(true)
-                                sessionManager.setDashboardSummary(fetchDashboardSummary(sessionManager.api, session))
-                                onBusyChange(false)
+                                try {
+                                    ordersStateHolder.refresh()
+                                    notificationsStateHolder.load()
+                                    sessionManager.setDashboardSummary(fetchDashboardSummary(sessionManager.api, session))
+                                } finally {
+                                    onBusyChange(false)
+                                }
                             }
                         },
+                        onOpenOrders = { openTab(AppDestination.Orders) },
+                        onOpenOrder = onOpenOrder,
                     )
                 }
 
@@ -754,6 +788,12 @@ private fun MainHost(
                                     onLogout = onLogout,
                                 )
                             },
+                            inventoryContent = {
+                                InventoryMainScreen(
+                                    inventoryStateHolder = inventoryStateHolder,
+                                    onOpenDetail = onOpenInventoryItem,
+                                )
+                            },
                         )
                     }
                 }
@@ -775,16 +815,25 @@ private fun MainHost(
 
 @Composable
 private fun MobileScrollColumn(
+    routeKey: String,
+    compactTop: Boolean = false,
+    bottomContentPadding: Dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val topPadding: Dp = if (compactTop) 8.dp else 16.dp
+    val bottomPadding = bottomContentPadding + 16.dp
+    val scrollState = rememberScrollState()
+    LaunchedEffect(routeKey) {
+        scrollState.scrollTo(0)
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
             .imePadding()
             .padding(horizontal = 16.dp)
-            .padding(top = 24.dp, bottom = 12.dp)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(scrollState)
+            .padding(top = topPadding, bottom = bottomPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         content = content,
     )

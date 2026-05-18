@@ -27,6 +27,12 @@ internal val SuccessColor = Color(0xFF10B981)
 internal val WarningColor = Color(0xFFF59E0B)
 internal val ErrorColor = Color(0xFFEF4444)
 
+internal val AppNavyBase = Color(0xFF03111F)
+internal val AppNavySurface = Color(0xFF0B1F33)
+internal val AppNavySurfaceHigh = Color(0xFF102A3D)
+internal val AppDarkLine = Color(0xFF27465C)
+internal val AppMutedText = Color(0xFFA8B7C7)
+
 private val LightScheme = lightColorScheme(
     primary = Primary500,
     onPrimary = Color(0xFF052E2B),

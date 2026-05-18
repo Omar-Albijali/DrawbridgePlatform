@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import uqu.drawbridge.platform.DashboardSummary
 import uqu.drawbridge.platform.MobileApiConfig
 import uqu.drawbridge.platform.ui.components.AppCard
 import uqu.drawbridge.platform.ui.components.AppTextField
@@ -54,52 +53,6 @@ internal fun HomeMainScreen(
                 PrimaryButton(text = "Open Dashboard", onClick = onOpenDashboard)
                 SecondaryButton(text = "Logout", onClick = onLogout)
             }
-        }
-    }
-}
-
-@Composable
-internal fun DashboardMainScreen(
-    dashboardSummary: DashboardSummary?,
-    onRefresh: () -> Unit,
-) {
-    ScreenSection(
-        title = "Dashboard",
-        subtitle = "Track order flow and business volume.",
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            StatCard(
-                modifier = Modifier.weight(1f),
-                value = "${dashboardSummary?.totalOrders ?: 0}",
-                label = "Orders",
-            )
-            StatCard(
-                modifier = Modifier.weight(1f),
-                value = "${dashboardSummary?.pendingOrders ?: 0}",
-                label = "Pending",
-            )
-            StatCard(
-                modifier = Modifier.weight(1f),
-                value = "${dashboardSummary?.processingOrders ?: 0}",
-                label = "Processing",
-            )
-        }
-        AppCard {
-            Text(
-                "Total Value",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "SAR ${dashboardSummary?.totalAmount ?: 0.0}",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            PrimaryButton(text = "Refresh Data", onClick = onRefresh)
         }
     }
 }
@@ -204,6 +157,7 @@ internal fun MoreMainScreen(
                             AppDestination.Support,
                             AppDestination.Reports,
                             AppDestination.Settings,
+                            AppDestination.Inventory,
                         )
                         StatusChip(
                             text = if (isReady) "Ready" else "Queued",
@@ -230,8 +184,15 @@ internal fun MoreDestinationScreen(
     supportContent: @Composable () -> Unit,
     notificationsContent: @Composable () -> Unit,
     settingsContent: @Composable () -> Unit,
+    inventoryContent: @Composable () -> Unit,
 ) {
     when (destination) {
+        AppDestination.Inventory -> {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SecondaryButton(text = "Back to More", onClick = onBack)
+                inventoryContent()
+            }
+        }
         AppDestination.Wishlist -> {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SecondaryButton(text = "Back to More", onClick = onBack)
