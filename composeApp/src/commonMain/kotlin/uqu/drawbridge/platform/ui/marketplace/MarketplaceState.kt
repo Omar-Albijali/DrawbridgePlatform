@@ -69,6 +69,10 @@ internal class MarketplaceStateHolder(
         state = state.copy(searchInput = value)
     }
 
+    suspend fun fetchImageBytes(imageUrl: String): ByteArray {
+        return api.fetchImageBytes(imageUrl)
+    }
+
     suspend fun applySearch() {
         state = state.copy(appliedSearch = state.searchInput.trim())
         loadPage(reset = true)
@@ -344,6 +348,10 @@ internal class ProductDetailStateHolder(
                     )
                 },
             )
+    }
+
+    suspend fun fetchImageBytes(imageUrl: String): ByteArray {
+        return api.fetchImageBytes(imageUrl)
     }
 }
 

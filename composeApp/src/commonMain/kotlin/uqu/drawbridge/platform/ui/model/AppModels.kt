@@ -9,7 +9,6 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.ui.graphics.vector.ImageVector
 import uqu.drawbridge.platform.UserDTO
@@ -62,7 +61,7 @@ internal fun primaryTabsFor(role: UserRole): List<MainTab> {
         UserRole.RETAILER -> listOf(
             MainTab(AppDestination.Home, "Home", Icons.Default.Home),
             MainTab(AppDestination.Marketplace, "Market", Icons.Default.Search),
-            MainTab(AppDestination.Cart, "Cart", Icons.Default.ShoppingCart),
+            MainTab(AppDestination.Inventory, "Inventory", Icons.Default.Inventory2),
             MainTab(AppDestination.Orders, "Orders", Icons.AutoMirrored.Filled.ListAlt),
             MainTab(AppDestination.More, "More", Icons.Default.Menu),
         )

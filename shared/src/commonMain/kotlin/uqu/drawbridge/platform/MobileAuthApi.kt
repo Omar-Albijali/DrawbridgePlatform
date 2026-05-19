@@ -1,6 +1,7 @@
 package uqu.drawbridge.platform
 
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
@@ -288,6 +289,15 @@ class MobileAuthApi(
         return json.decodeFromString(body)
     }
 
+    suspend fun fetchImageBytes(imageUrl: String): ByteArray {
+        val resolvedUrl = resolveResourceUrl(imageUrl)
+        val response = client.get(resolvedUrl)
+        if (!response.status.isSuccess()) {
+            ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
+        }
+        return response.body()
+    }
+
     suspend fun fetchWishlist(userId: String): List<WishlistDTO> {
         val response = authorizedGet("/wishlist/$userId")
         val body = response.bodyAsText()
@@ -395,6 +405,47 @@ class MobileAuthApi(
         val body = response.bodyAsText()
         ensureSuccess(response.status, body)
         return json.decodeFromString(OrderDTO.serializer(), body)
+    }
+
+    suspend fun updateOrderStatus(orderId: String, status: OrderStatus): OrderDTO {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/orders/$orderId/status")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("status", status.name)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(OrderDTO.serializer(), body)
+    }
+
+    suspend fun confirmOrderDelivery(orderId: String): OrderDTO {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/orders/$orderId/confirm-delivery")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(OrderDTO.serializer(), body)
+    }
+
+    suspend fun cancelOrder(orderId: String): OrderDTO {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/orders/$orderId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(OrderDTO.serializer(), body)
+    }
+
+    suspend fun fetchInvoiceByOrder(orderId: String): InvoiceDTO {
+        val response = authorizedGet("/payments/invoices/order/$orderId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(InvoiceDTO.serializer(), body)
     }
 
     suspend fun forgotPassword(email: String) {
@@ -633,6 +684,21 @@ class MobileAuthApi(
     }
 
     private fun buildUrl(path: String): String = "${MobileApiConfig.baseUrl}${path}"
+
+    private fun resolveResourceUrl(resourceUrl: String): String {
+        val trimmed = resourceUrl.trim()
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            return trimmed
+        }
+
+        val apiBase = MobileApiConfig.baseUrl.trimEnd('/')
+        val origin = apiBase.removeSuffix("/api")
+        val path = when {
+            trimmed.startsWith("/") -> trimmed
+            else -> "/$trimmed"
+        }
+        return origin + path
+    }
 
     private suspend fun authorizedGet(path: String, tokenOverride: String? = null): HttpResponse {
         val token = requireBearerToken(tokenOverride)

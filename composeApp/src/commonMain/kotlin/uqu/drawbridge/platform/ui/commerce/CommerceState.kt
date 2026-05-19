@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import uqu.drawbridge.platform.CartItemDTO
+import uqu.drawbridge.platform.InvoiceDTO
 import uqu.drawbridge.platform.MobileApiException
 import uqu.drawbridge.platform.MobileAuthApi
 import uqu.drawbridge.platform.OrderDTO
@@ -125,6 +126,10 @@ internal class CartStateHolder(
 
     fun clearCheckoutResult() {
         checkoutState = CheckoutUiState()
+    }
+
+    suspend fun fetchImageBytes(imageUrl: String): ByteArray {
+        return api.fetchImageBytes(imageUrl)
     }
 
     suspend fun addProduct(product: ProductDTO, requestedQuantity: Int? = null): AuthActionResult {
@@ -286,7 +291,9 @@ internal class CartStateHolder(
 internal enum class OrderStatusFilter(val label: String) {
     All("All"),
     Pending("Pending"),
-    Active("Active"),
+    Confirmed("Confirmed"),
+    Processing("Processing"),
+    Shipped("Shipped"),
     Delivered("Delivered"),
     Cancelled("Cancelled"),
 }
@@ -298,7 +305,9 @@ internal data class OrdersUiState(
     val hasLoaded: Boolean = false,
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
+    val busyOrderIds: Set<String> = emptySet(),
     val errorMessage: String? = null,
+    val actionMessage: String? = null,
 ) {
     val filteredOrders: List<OrderDTO>
         get() {
@@ -314,11 +323,9 @@ internal data class OrdersUiState(
                     when (statusFilter) {
                         OrderStatusFilter.All -> true
                         OrderStatusFilter.Pending -> order.status == OrderStatus.PENDING
-                        OrderStatusFilter.Active -> order.status in setOf(
-                            OrderStatus.CONFIRMED,
-                            OrderStatus.PROCESSING,
-                            OrderStatus.SHIPPED,
-                        )
+                        OrderStatusFilter.Confirmed -> order.status == OrderStatus.CONFIRMED
+                        OrderStatusFilter.Processing -> order.status == OrderStatus.PROCESSING
+                        OrderStatusFilter.Shipped -> order.status == OrderStatus.SHIPPED
                         OrderStatusFilter.Delivered -> order.status == OrderStatus.DELIVERED
                         OrderStatusFilter.Cancelled -> order.status == OrderStatus.CANCELLED
                     }
@@ -329,7 +336,9 @@ internal data class OrdersUiState(
 
 internal data class OrderDetailUiState(
     val order: OrderDTO? = null,
+    val invoice: InvoiceDTO? = null,
     val isLoading: Boolean = false,
+    val isActionInProgress: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -355,12 +364,10 @@ internal class OrdersStateHolder(
             isLoading = !state.hasLoaded,
             isRefreshing = state.hasLoaded,
             errorMessage = null,
+            actionMessage = null,
         )
         runCatching {
-            when (session.user.role) {
-                UserRole.RETAILER -> api.fetchOrdersByRetailer(session.user.id)
-                UserRole.WHOLESALER -> api.fetchOrdersByWholesaler(session.user.id)
-            }
+            fetchOrdersForRole()
         }.fold(
             onSuccess = { orders ->
                 state = state.copy(
@@ -390,8 +397,8 @@ internal class OrdersStateHolder(
         state = state.copy(statusFilter = filter)
     }
 
-    suspend fun loadOrder(orderId: String) {
-        if (detailState.order?.id == orderId && detailState.errorMessage == null) {
+    suspend fun loadOrder(orderId: String, force: Boolean = false) {
+        if (!force && detailState.order?.id == orderId && detailState.errorMessage == null) {
             return
         }
 
@@ -410,6 +417,106 @@ internal class OrdersStateHolder(
 
     fun clearOrderDetail() {
         detailState = OrderDetailUiState()
+    }
+
+    suspend fun fetchImageBytes(imageUrl: String): ByteArray {
+        return api.fetchImageBytes(imageUrl)
+    }
+
+    suspend fun updateOrderStatus(orderId: String, status: OrderStatus): AuthActionResult {
+        val label = when (status) {
+            OrderStatus.CONFIRMED -> "Order confirmed."
+            OrderStatus.PROCESSING -> "Order marked as processing."
+            OrderStatus.SHIPPED -> "Order marked as shipped."
+            else -> "Order updated."
+        }
+        return mutateOrder(orderId = orderId, successMessage = label) {
+            api.updateOrderStatus(orderId, status)
+        }
+    }
+
+    suspend fun confirmDelivery(orderId: String): AuthActionResult {
+        return mutateOrder(orderId = orderId, successMessage = "Receipt confirmed.") {
+            api.confirmOrderDelivery(orderId)
+        }
+    }
+
+    suspend fun cancelOrder(orderId: String): AuthActionResult {
+        if (session.user.role != UserRole.RETAILER) {
+            return AuthActionResult(success = false, message = "Only retailer accounts can cancel orders.")
+        }
+        return mutateOrder(orderId = orderId, successMessage = "Order cancelled.") {
+            api.cancelOrder(orderId)
+        }
+    }
+
+    suspend fun loadInvoice(orderId: String): AuthActionResult {
+        detailState = detailState.copy(isActionInProgress = true, errorMessage = null)
+        return runCatching { api.fetchInvoiceByOrder(orderId) }.fold(
+            onSuccess = { invoice ->
+                detailState = detailState.copy(invoice = invoice, isActionInProgress = false)
+                AuthActionResult(
+                    success = true,
+                    message = "Invoice ${invoice.invoiceNumber} is ready.",
+                )
+            },
+            onFailure = { error ->
+                val apiError = error as? MobileApiException
+                val message = if (apiError?.statusCode == 404) {
+                    "Invoice generated from order details."
+                } else {
+                    userReadableMessage(error, "Invoice is not available for this order yet.")
+                }
+                detailState = detailState.copy(isActionInProgress = false)
+                AuthActionResult(success = apiError?.statusCode == 404, message = message)
+            },
+        )
+    }
+
+    private suspend fun mutateOrder(
+        orderId: String,
+        successMessage: String,
+        mutation: suspend () -> OrderDTO,
+    ): AuthActionResult {
+        state = state.copy(busyOrderIds = state.busyOrderIds + orderId, actionMessage = null)
+        if (detailState.order?.id == orderId) {
+            detailState = detailState.copy(isActionInProgress = true, errorMessage = null)
+        }
+
+        return runCatching { mutation() }.fold(
+            onSuccess = { updatedOrder ->
+                val refreshedOrders = runCatching { fetchOrdersForRole() }.getOrNull()
+                state = state.copy(
+                    orders = refreshedOrders ?: state.orders.map { if (it.id == orderId) updatedOrder else it },
+                    busyOrderIds = state.busyOrderIds - orderId,
+                    errorMessage = null,
+                    actionMessage = successMessage,
+                )
+                if (detailState.order?.id == orderId) {
+                    detailState = detailState.copy(order = updatedOrder, isActionInProgress = false)
+                }
+                AuthActionResult(success = true, message = successMessage)
+            },
+            onFailure = { error ->
+                val message = userReadableMessage(error, "Unable to update this order.")
+                state = state.copy(
+                    busyOrderIds = state.busyOrderIds - orderId,
+                    errorMessage = message,
+                    actionMessage = null,
+                )
+                if (detailState.order?.id == orderId) {
+                    detailState = detailState.copy(isActionInProgress = false)
+                }
+                AuthActionResult(success = false, message = message)
+            },
+        )
+    }
+
+    private suspend fun fetchOrdersForRole(): List<OrderDTO> {
+        return when (session.user.role) {
+            UserRole.RETAILER -> api.fetchOrdersByRetailer(session.user.id)
+            UserRole.WHOLESALER -> api.fetchOrdersByWholesaler(session.user.id)
+        }
     }
 }
 

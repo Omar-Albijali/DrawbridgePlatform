@@ -3,8 +3,6 @@ package uqu.drawbridge.platform.ui.theme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -14,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 internal val Primary500 = Color(0xFF10B981)
@@ -95,24 +92,27 @@ internal fun DrawbridgeTheme(
 internal fun AppBackground() {
     val isDark = MaterialTheme.colorScheme.surface.red < 0.2f
     
-    val gradientStart = if (isDark) Color(0xFF020617) else Color(0xFFF8FAFC)
-    val gradientEnd = if (isDark) Color(0xFF0F172A) else Color(0xFFEFF6FF)
-    val topBand = if (isDark) Color(0xFF052E2B) else Color(0xFFD1FAE5)
+    val gradientColors = if (isDark) {
+        listOf(
+            Color(0xFF03111F),
+            Color(0xFF0B1F33),
+            Color(0xFF03111F),
+        )
+    } else {
+        listOf(
+            Color(0xFFF8FAFC),
+            Color(0xFFEFF6FF),
+            Color(0xFFF8FAFC),
+        )
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(gradientStart, gradientEnd)
+                    colors = gradientColors,
                 )
             ),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(96.dp)
-                .background(topBand.copy(alpha = if (isDark) 0.28f else 0.55f)),
-        )
-    }
+    )
 }

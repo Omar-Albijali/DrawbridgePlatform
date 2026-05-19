@@ -264,6 +264,7 @@ fun App() {
                             selectedInventoryItemId = null
                             isCheckoutOpen = false
                             isProductFormOpen = false
+                            activeMoreDestination = null
                             selectedProductId = productId
                         },
                         onCloseProduct = { selectedProductId = null },
@@ -631,6 +632,7 @@ private fun MainHost(
                     ordersStateHolder = ordersStateHolder,
                     session = session,
                     onBack = onCloseOrder,
+                    onShowMessage = showMessage,
                 )
                 return@MobileScrollColumn
             }
@@ -651,6 +653,38 @@ private fun MainHost(
                     onBack = { onProductFormOpenChange(false) },
                     onShowMessage = showMessage,
                 )
+                return@MobileScrollColumn
+            }
+
+            if (activeMoreDestination == AppDestination.Cart) {
+                if (isCheckoutOpen) {
+                    CheckoutMainScreen(
+                        cartStateHolder = cartStateHolder,
+                        onBackToCart = { onCheckoutOpenChange(false) },
+                        onViewOrders = {
+                            onCheckoutOpenChange(false)
+                            onActiveMoreDestinationChange(null)
+                            coroutineScope.launch {
+                                ordersStateHolder.refresh()
+                            }
+                            openTab(AppDestination.Orders)
+                        },
+                        onShowMessage = showMessage,
+                    )
+                } else {
+                    CartMainScreen(
+                        cartStateHolder = cartStateHolder,
+                        onOpenMarketplace = {
+                            onActiveMoreDestinationChange(null)
+                            openTab(AppDestination.Marketplace)
+                        },
+                        onOpenCheckout = {
+                            cartStateHolder.clearCheckoutResult()
+                            onCheckoutOpenChange(true)
+                        },
+                        onShowMessage = showMessage,
+                    )
+                }
                 return@MobileScrollColumn
             }
 
@@ -682,7 +716,9 @@ private fun MainHost(
                     MarketplaceMainScreen(
                         marketplaceStateHolder = marketplaceStateHolder,
                         wishlistStateHolder = wishlistStateHolder,
+                        cartStateHolder = cartStateHolder,
                         onOpenProduct = onOpenProduct,
+                        onOpenCart = { onActiveMoreDestinationChange(AppDestination.Cart) },
                         onShowMessage = showMessage,
                     )
                 }
