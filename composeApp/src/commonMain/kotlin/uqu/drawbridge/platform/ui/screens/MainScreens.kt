@@ -303,6 +303,7 @@ private fun moreDestinationTint(destination: AppDestination): Color {
         AppDestination.Wishlist -> Color(0xFFFF5A8A)
         AppDestination.Notifications -> Color(0xFFFFB020)
         AppDestination.POS -> Color(0xFF60A5FA)
+        AppDestination.Reports -> Color(0xFF7DD3FC)
         AppDestination.Support -> Color(0xFFC084FC)
         AppDestination.Inventory -> Color(0xFF34D399)
         else -> Color(0xFFA8B7C7)
@@ -316,6 +317,7 @@ internal fun MoreDestinationScreen(
     onLogout: () -> Unit,
     wishlistContent: @Composable () -> Unit,
     posContent: @Composable () -> Unit,
+    reportsContent: @Composable () -> Unit,
     supportContent: @Composable () -> Unit,
     notificationsContent: @Composable () -> Unit,
     settingsContent: @Composable () -> Unit,
@@ -344,6 +346,12 @@ internal fun MoreDestinationScreen(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SecondaryButton(text = "Back to More", onClick = onBack)
                 AccountMainScreen(onLogout = onLogout)
+            }
+        }
+        AppDestination.Reports -> {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SecondaryButton(text = "Back to More", onClick = onBack)
+                reportsContent()
             }
         }
         AppDestination.Support -> {

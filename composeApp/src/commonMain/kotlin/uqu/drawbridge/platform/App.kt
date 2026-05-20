@@ -57,6 +57,7 @@ import uqu.drawbridge.platform.ui.components.ErrorStateCard
 import uqu.drawbridge.platform.ui.components.LoadingStateCard
 import uqu.drawbridge.platform.ui.components.MainBottomBar
 import uqu.drawbridge.platform.ui.engagement.NotificationsStateHolder
+import uqu.drawbridge.platform.ui.engagement.ReportsStateHolder
 import uqu.drawbridge.platform.ui.engagement.SettingsStateHolder
 import uqu.drawbridge.platform.ui.engagement.SupportStateHolder
 import uqu.drawbridge.platform.ui.model.AppDestination
@@ -88,6 +89,7 @@ import uqu.drawbridge.platform.ui.screens.PosMainScreen
 import uqu.drawbridge.platform.ui.screens.ProductFormMainScreen
 import uqu.drawbridge.platform.ui.screens.ProductManagementMainScreen
 import uqu.drawbridge.platform.ui.screens.ProductDetailMainScreen
+import uqu.drawbridge.platform.ui.screens.ReportsMainScreen
 import uqu.drawbridge.platform.ui.screens.SettingsMainScreen
 import uqu.drawbridge.platform.ui.screens.SignupAuthScreen
 import uqu.drawbridge.platform.ui.screens.SplashAuthScreen
@@ -550,6 +552,9 @@ private fun MainHost(
     val posStateHolder = remember(session.user.id, session.user.role) {
         PosStateHolder(sessionManager.api, session)
     }
+    val reportsStateHolder = remember(session.user.id, session.user.role) {
+        ReportsStateHolder(sessionManager.api, session)
+    }
     val supportStateHolder = remember(session.user.id) {
         SupportStateHolder(sessionManager.api)
     }
@@ -803,6 +808,12 @@ private fun MainHost(
                                 PosMainScreen(
                                     posStateHolder = posStateHolder,
                                     onShowMessage = showMessage,
+                                )
+                            },
+                            reportsContent = {
+                                ReportsMainScreen(
+                                    reportsStateHolder = reportsStateHolder,
+                                    role = session.user.role,
                                 )
                             },
                             supportContent = {

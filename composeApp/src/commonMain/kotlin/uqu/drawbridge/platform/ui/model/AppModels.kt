@@ -90,6 +90,7 @@ internal fun moreDestinationsFor(role: UserRole): List<MoreDestination> {
             settings,
             MoreDestination(AppDestination.Inventory, "Inventory", "Stock health and update tools", Icons.Default.Inventory2),
             notifications,
+            MoreDestination(AppDestination.Reports, "Reports", "Sales and stock insights", Icons.AutoMirrored.Filled.ListAlt),
             support,
         )
     }
