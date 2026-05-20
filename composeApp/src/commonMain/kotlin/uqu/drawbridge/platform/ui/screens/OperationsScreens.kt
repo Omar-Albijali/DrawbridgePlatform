@@ -1,21 +1,21 @@
 package uqu.drawbridge.platform.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -60,6 +60,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import uqu.drawbridge.platform.CategoryDTO
 import uqu.drawbridge.platform.InventoryAuditLogDTO
@@ -80,6 +83,7 @@ import uqu.drawbridge.platform.ui.components.StatCard
 import uqu.drawbridge.platform.ui.components.StatusChip
 import uqu.drawbridge.platform.ui.components.StatusTone
 import uqu.drawbridge.platform.ui.operations.AutoRestockUiState
+import uqu.drawbridge.platform.ui.operations.InventoryDetailUiState
 import uqu.drawbridge.platform.ui.operations.InventoryHistoryUiState
 import uqu.drawbridge.platform.ui.operations.InventoryMode
 import uqu.drawbridge.platform.ui.operations.InventoryStateHolder
@@ -110,6 +114,7 @@ internal fun InventoryMainScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     var showAddInventory by remember { mutableStateOf(false) }
+    var selectedDetailItemId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         inventoryStateHolder.loadInitial()
@@ -117,87 +122,225 @@ internal fun InventoryMainScreen(
 
     val historyState = inventoryStateHolder.historyState
     val autoRestockState = inventoryStateHolder.autoRestockState
-    val activePanel = when {
-        autoRestockState.item != null -> "restock"
-        historyState.item != null -> "history"
-        else -> "list"
-    }
-    AnimatedContent(
-        targetState = activePanel,
-        transitionSpec = {
-            val opening = targetState != "list"
-            val enterOffset: (Int) -> Int = if (opening) {
-                { width -> (width * 0.16f).toInt() }
-            } else {
-                { width -> -(width * 0.10f).toInt() }
-            }
-            val exitOffset: (Int) -> Int = if (opening) {
-                { width -> -(width * 0.08f).toInt() }
-            } else {
-                { width -> (width * 0.12f).toInt() }
-            }
-            (fadeIn(animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)) +
-                slideInHorizontally(animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing), initialOffsetX = enterOffset))
-                .togetherWith(
-                    fadeOut(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
-                        slideOutHorizontally(animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing), targetOffsetX = exitOffset),
-                )
-                .using(SizeTransform(clip = false))
+    InventoryListContent(
+        inventoryStateHolder = inventoryStateHolder,
+        showAddInventory = showAddInventory,
+        onShowAddInventoryChange = { showAddInventory = it },
+        onOpenDetail = { itemId ->
+            showAddInventory = false
+            selectedDetailItemId = itemId
+            coroutineScope.launch { inventoryStateHolder.loadDetail(itemId) }
         },
-        modifier = Modifier.fillMaxWidth(),
-    ) { panel ->
-        when (panel) {
-            "list" -> {
-                InventoryListContent(
-                    inventoryStateHolder = inventoryStateHolder,
-                    showAddInventory = showAddInventory,
-                    onShowAddInventoryChange = { showAddInventory = it },
-                    onOpenDetail = onOpenDetail,
-                    onOpenHistory = { item ->
-                        showAddInventory = false
-                        inventoryStateHolder.resetAddInventoryForm()
-                        coroutineScope.launch { inventoryStateHolder.openStockHistory(item) }
-                    },
-                    onOpenAutoRestock = { item ->
-                        showAddInventory = false
-                        inventoryStateHolder.resetAddInventoryForm()
-                        inventoryStateHolder.openAutoRestockConfig(item)
-                    },
-                    onShowMessage = onShowMessage,
-                )
-            }
-            "history" -> {
-                historyState.item?.let { selectedHistoryItem ->
-                    InventoryHistoryScreen(
-                        item = selectedHistoryItem,
-                        historyState = historyState,
-                        onClose = inventoryStateHolder::closeStockHistory,
-                        onRetry = { coroutineScope.launch { inventoryStateHolder.reloadStockHistory() } },
-                        onLoadMore = { coroutineScope.launch { inventoryStateHolder.loadMoreStockHistory() } },
-                    )
+        onOpenHistory = { item ->
+            showAddInventory = false
+            inventoryStateHolder.resetAddInventoryForm()
+            coroutineScope.launch { inventoryStateHolder.openStockHistory(item) }
+        },
+        onOpenAutoRestock = { item ->
+            showAddInventory = false
+            inventoryStateHolder.resetAddInventoryForm()
+            inventoryStateHolder.openAutoRestockConfig(item)
+        },
+        onShowMessage = onShowMessage,
+    )
+
+    selectedDetailItemId?.let { itemId ->
+        InventoryPanelDialog(onDismiss = { selectedDetailItemId = null }) { closePanel ->
+            ManualStockEditScreen(
+                itemId = itemId,
+                detail = inventoryStateHolder.detailState,
+                onClose = closePanel,
+                onRetry = { coroutineScope.launch { inventoryStateHolder.loadDetail(itemId) } },
+                onStockDraftChange = inventoryStateHolder::updateStockDraft,
+                onSave = {
+                    coroutineScope.launch {
+                        val result = inventoryStateHolder.saveStock()
+                        result.message?.let(onShowMessage)
+                    }
+                },
+            )
+        }
+    }
+
+    historyState.item?.let { selectedHistoryItem ->
+        InventoryPanelDialog(onDismiss = inventoryStateHolder::closeStockHistory) { closePanel ->
+            InventoryHistoryScreen(
+                item = selectedHistoryItem,
+                historyState = historyState,
+                onClose = closePanel,
+                onRetry = { coroutineScope.launch { inventoryStateHolder.reloadStockHistory() } },
+                onLoadMore = { coroutineScope.launch { inventoryStateHolder.loadMoreStockHistory() } },
+            )
+        }
+    }
+
+    autoRestockState.item?.let { selectedRestockItem ->
+        InventoryPanelDialog(onDismiss = inventoryStateHolder::closeAutoRestockConfig) { closePanel ->
+            AutoRestockConfigScreen(
+                item = selectedRestockItem,
+                state = autoRestockState,
+                onClose = closePanel,
+                onSelectSchedule = inventoryStateHolder::selectAutoRestockSchedule,
+                onThresholdChange = inventoryStateHolder::updateAutoRestockThreshold,
+                onQuantityChange = inventoryStateHolder::updateAutoRestockQuantity,
+                onIntervalChange = inventoryStateHolder::updateAutoRestockInterval,
+                onDayOfWeekChange = inventoryStateHolder::updateAutoRestockDayOfWeek,
+                onDayOfMonthChange = inventoryStateHolder::updateAutoRestockDayOfMonth,
+                onSave = {
+                    coroutineScope.launch {
+                        val result = inventoryStateHolder.saveAutoRestockConfig()
+                        result.message?.let(onShowMessage)
+                        if (result.success) closePanel()
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun InventoryPanelDialog(
+    onDismiss: () -> Unit,
+    content: @Composable (onClose: () -> Unit) -> Unit,
+) {
+    val coroutineScope = rememberCoroutineScope()
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+    val closePanel: () -> Unit = {
+        coroutineScope.launch {
+            visible = false
+            delay(180)
+            onDismiss()
+        }
+    }
+    Dialog(
+        onDismissRequest = closePanel,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.42f))
+                .padding(horizontal = 16.dp, vertical = 72.dp),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(animationSpec = tween(160, easing = FastOutSlowInEasing)) +
+                    slideInVertically(animationSpec = tween(280, easing = FastOutSlowInEasing)) { -it / 3 },
+                exit = fadeOut(animationSpec = tween(130, easing = FastOutSlowInEasing)) +
+                    slideOutVertically(animationSpec = tween(180, easing = FastOutSlowInEasing)) { -it / 5 },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    content(closePanel)
                 }
             }
-            else -> {
-                autoRestockState.item?.let { selectedRestockItem ->
-                    AutoRestockConfigScreen(
-                        item = selectedRestockItem,
-                        state = autoRestockState,
-                        onClose = inventoryStateHolder::closeAutoRestockConfig,
-                        onSelectSchedule = inventoryStateHolder::selectAutoRestockSchedule,
-                        onThresholdChange = inventoryStateHolder::updateAutoRestockThreshold,
-                        onQuantityChange = inventoryStateHolder::updateAutoRestockQuantity,
-                        onIntervalChange = inventoryStateHolder::updateAutoRestockInterval,
-                        onDayOfWeekChange = inventoryStateHolder::updateAutoRestockDayOfWeek,
-                        onDayOfMonthChange = inventoryStateHolder::updateAutoRestockDayOfMonth,
-                        onSave = {
-                            coroutineScope.launch {
-                                val result = inventoryStateHolder.saveAutoRestockConfig()
-                                result.message?.let(onShowMessage)
+        }
+    }
+}
+
+@Composable
+private fun ManualStockEditScreen(
+    itemId: String,
+    detail: InventoryDetailUiState,
+    onClose: () -> Unit,
+    onRetry: () -> Unit,
+    onStockDraftChange: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    val item = detail.inventoryItem
+    val product = detail.catalogProduct
+    val title = item?.name ?: product?.name ?: "Inventory detail"
+    val subtitle = item?.supplier ?: product?.brand?.ifBlank { product.category } ?: "#${shortId(itemId)}"
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 420.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(InventoryPanelBg)
+                    .padding(18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Manual Stock Edit", style = MaterialTheme.typography.titleMedium, color = InventoryText, fontWeight = FontWeight.Black)
+                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = InventoryMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close stock edit", tint = InventoryMuted, modifier = Modifier.size(22.dp))
+                }
+            }
+
+            Column(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                when {
+                    detail.isLoading -> InventoryStatePanel(
+                        label = "Loading",
+                        title = "Loading stock",
+                        message = "Fetching current inventory detail.",
+                    )
+                    detail.errorMessage != null && item == null && product == null -> InventoryStatePanel(
+                        label = "Issue",
+                        title = "Inventory unavailable",
+                        message = detail.errorMessage,
+                        actionText = "Try again",
+                        onAction = onRetry,
+                    )
+                    else -> {
+                        val currentStock = item?.currentStock ?: product?.stock ?: 0
+                        val moq = item?.minimumOrderQuantity ?: product?.minimumOrderQuantity ?: 1
+                        val statusText = item?.let(::inventoryStatusLabel) ?: product?.let(::stockStatusLabel) ?: "Stock"
+                        val statusTone = item?.let(::inventoryStatusTone) ?: product?.let(::stockStatusTone) ?: StatusTone.Neutral
+
+                        Text(title, style = MaterialTheme.typography.titleLarge, color = InventoryText, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Surface(shape = RoundedCornerShape(10.dp), color = HistoryPanel, border = BorderStroke(1.dp, InventoryBorder)) {
+                            Row(
+                                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("Current stock", style = MaterialTheme.typography.labelMedium, color = InventoryMuted, fontWeight = FontWeight.Bold)
+                                    Text(currentStock.toString(), style = MaterialTheme.typography.headlineSmall, color = InventoryText, fontWeight = FontWeight.Black)
+                                    Text("MOQ ${moq.coerceAtLeast(1)}", style = MaterialTheme.typography.bodySmall, color = InventoryMuted, fontWeight = FontWeight.SemiBold)
+                                }
+                                StatusChip(text = statusText, tone = statusTone)
                             }
-                        },
-                    )
+                        }
+
+                        detail.errorMessage?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = InventoryDanger, fontWeight = FontWeight.SemiBold)
+                        }
+                        AutoRestockNumberInput(
+                            label = "New stock quantity",
+                            value = detail.stockDraft,
+                            suffix = "units",
+                            helper = "Client validation prevents negative stock.",
+                            onChange = onStockDraftChange,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                            InventoryActionButton("Cancel", Icons.Default.Close, onClose, Modifier.weight(1f))
+                            InventoryActionButton(if (detail.isSaving) "Saving..." else "Save Stock", Icons.Default.CheckCircle, onSave, Modifier.weight(1f))
+                        }
+                    }
                 }
             }
+            Spacer(modifier = Modifier.height(2.dp))
         }
     }
 }

@@ -475,7 +475,7 @@ internal class InventoryStateHolder(
                     busyItemIds = state.busyItemIds - item.id,
                     actionMessage = "Auto-restock configuration saved.",
                 )
-                closeAutoRestockConfig()
+                autoRestockState = autoRestockState.copy(isSaving = false)
                 AuthActionResult(true, "Auto-restock configuration saved.")
             },
             onFailure = { error ->

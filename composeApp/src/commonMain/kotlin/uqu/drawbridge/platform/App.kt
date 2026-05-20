@@ -11,6 +11,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -608,11 +609,13 @@ private fun MainHost(
             selectedInventoryItemId == null &&
             !isProductFormOpen &&
             !isCheckoutOpen
+        val pageScrollState = rememberScrollState()
 
         MobileScrollColumn(
             routeKey = routeKey,
             compactTop = isRootDashboard,
             bottomContentPadding = bottomContentPadding,
+            scrollState = pageScrollState,
         ) {
             if (selectedProductId != null) {
                 ProductDetailMainScreen(
@@ -856,13 +859,14 @@ private fun MobileScrollColumn(
     routeKey: String,
     compactTop: Boolean = false,
     bottomContentPadding: Dp,
+    scrollState: ScrollState? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val topPadding: Dp = if (compactTop) 8.dp else 16.dp
     val bottomPadding = bottomContentPadding + 16.dp
-    val scrollState = rememberScrollState()
+    val effectiveScrollState = scrollState ?: rememberScrollState()
     LaunchedEffect(routeKey) {
-        scrollState.scrollTo(0)
+        effectiveScrollState.scrollTo(0)
     }
     Column(
         modifier = Modifier
@@ -870,7 +874,7 @@ private fun MobileScrollColumn(
             .statusBarsPadding()
             .imePadding()
             .padding(horizontal = 16.dp)
-            .verticalScroll(scrollState)
+            .verticalScroll(effectiveScrollState)
             .padding(top = topPadding, bottom = bottomPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         content = content,
