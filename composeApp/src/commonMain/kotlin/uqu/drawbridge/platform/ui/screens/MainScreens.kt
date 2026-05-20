@@ -1,33 +1,39 @@
 package uqu.drawbridge.platform.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import uqu.drawbridge.platform.MobileApiConfig
 import uqu.drawbridge.platform.ui.components.AppCard
-import uqu.drawbridge.platform.ui.components.AppTextField
-import uqu.drawbridge.platform.ui.components.BarcodeScannerView
 import uqu.drawbridge.platform.ui.components.DeferredFeatureCard
 import uqu.drawbridge.platform.ui.components.EmptyStateCard
 import uqu.drawbridge.platform.ui.components.PrimaryButton
 import uqu.drawbridge.platform.ui.components.ScreenSection
 import uqu.drawbridge.platform.ui.components.SecondaryButton
-import uqu.drawbridge.platform.ui.components.StatCard
-import uqu.drawbridge.platform.ui.components.StatusChip
-import uqu.drawbridge.platform.ui.components.StatusTone
 import uqu.drawbridge.platform.ui.model.AppDestination
 import uqu.drawbridge.platform.ui.model.MoreDestination
 import uqu.drawbridge.platform.ui.model.SessionState
@@ -133,43 +139,173 @@ internal fun MoreMainScreen(
     onOpenDestination: (AppDestination) -> Unit,
     onLogout: () -> Unit,
 ) {
-    ScreenSection(
-        title = "More",
-        subtitle = "Role-based tools, preferences, and support.",
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        MoreHeaderCard()
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            destinations.chunked(2).forEach { rowDestinations ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    rowDestinations.forEach { destination ->
+                        MoreMenuCard(
+                            destination = destination,
+                            onClick = { onOpenDestination(destination.destination) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (rowDestinations.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
+            MoreLogoutButton(onClick = onLogout)
+        }
+    }
+}
+
+@Composable
+private fun MoreHeaderCard() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(118.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF102A3D).copy(alpha = 0.92f)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        destinations.forEach { destination ->
-            AppCard {
-                ListItem(
-                    headlineContent = {
-                        Text(destination.title, fontWeight = FontWeight.Bold)
-                    },
-                    supportingContent = {
-                        Text(destination.description)
-                    },
-                    leadingContent = {
-                        Icon(destination.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    },
-                    trailingContent = {
-                        val isReady = destination.destination in setOf(
-                            AppDestination.POS,
-                            AppDestination.Wishlist,
-                            AppDestination.Notifications,
-                            AppDestination.Support,
-                            AppDestination.Reports,
-                            AppDestination.Settings,
-                            AppDestination.Inventory,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = "More",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.ExtraBold,
+            )
+            Text(
+                text = "Account, tools, and support",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MoreMenuCard(
+    destination: MoreDestination,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tint = moreDestinationTint(destination.destination)
+    Card(
+        onClick = onClick,
+        modifier = modifier.height(154.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.045f)),
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color.White.copy(alpha = 0.1f),
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .background(tint.copy(alpha = 0.13f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(destination.icon, contentDescription = null, tint = tint)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            text = destination.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
                         )
-                        StatusChip(
-                            text = if (isReady) "Ready" else "Queued",
-                            tone = if (isReady) StatusTone.Success else StatusTone.Warning,
+                        Text(
+                            text = destination.description,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
                         )
-                    },
-                )
-                SecondaryButton(text = "Open", onClick = { onOpenDestination(destination.destination) })
+                    }
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
         }
+    }
+}
 
-        SecondaryButton(text = "Logout", onClick = onLogout)
+@Composable
+private fun MoreLogoutButton(onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.08f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.ExitToApp,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.size(14.dp))
+            Text(
+                text = "Logout",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Black,
+            )
+        }
+    }
+}
+
+private fun moreDestinationTint(destination: AppDestination): Color {
+    return when (destination) {
+        AppDestination.Account -> Color(0xFF10B981)
+        AppDestination.Settings -> Color(0xFF93C5FD)
+        AppDestination.Wishlist -> Color(0xFFFF5A8A)
+        AppDestination.Notifications -> Color(0xFFFFB020)
+        AppDestination.POS -> Color(0xFF60A5FA)
+        AppDestination.Support -> Color(0xFFC084FC)
+        AppDestination.Inventory -> Color(0xFF34D399)
+        else -> Color(0xFFA8B7C7)
     }
 }
 
@@ -180,7 +316,6 @@ internal fun MoreDestinationScreen(
     onLogout: () -> Unit,
     wishlistContent: @Composable () -> Unit,
     posContent: @Composable () -> Unit,
-    reportsContent: @Composable () -> Unit,
     supportContent: @Composable () -> Unit,
     notificationsContent: @Composable () -> Unit,
     settingsContent: @Composable () -> Unit,
@@ -205,10 +340,10 @@ internal fun MoreDestinationScreen(
                 posContent()
             }
         }
-        AppDestination.Reports -> {
+        AppDestination.Account -> {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SecondaryButton(text = "Back to More", onClick = onBack)
-                reportsContent()
+                AccountMainScreen(onLogout = onLogout)
             }
         }
         AppDestination.Support -> {

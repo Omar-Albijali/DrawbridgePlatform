@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.ui.graphics.vector.ImageVector
 import uqu.drawbridge.platform.UserDTO
@@ -28,6 +29,7 @@ internal enum class AppDestination {
     Inventory,
     Products,
     More,
+    Account,
     Wishlist,
     Notifications,
     Support,
@@ -69,21 +71,27 @@ internal fun primaryTabsFor(role: UserRole): List<MainTab> {
 }
 
 internal fun moreDestinationsFor(role: UserRole): List<MoreDestination> {
-    val common = listOf(
-        MoreDestination(AppDestination.Notifications, "Notifications", "Inbox and read status", Icons.Default.Notifications),
-        MoreDestination(AppDestination.Support, "Support", "Tickets and help requests", Icons.Default.Person),
-        MoreDestination(AppDestination.Reports, "Reports", "Sales, orders, and inventory summaries", Icons.Default.Menu),
-        MoreDestination(AppDestination.Settings, "Settings", "Profile, security, and app preferences", Icons.Default.Person),
-    )
+    val account = MoreDestination(AppDestination.Account, "Account", "Profile and preferences", Icons.Default.Person)
+    val settings = MoreDestination(AppDestination.Settings, "Settings", "App configuration", Icons.Default.Settings)
+    val notifications = MoreDestination(AppDestination.Notifications, "Notifications", "Alerts and updates", Icons.Default.Notifications)
+    val support = MoreDestination(AppDestination.Support, "Support", "Help and tickets", Icons.Default.Person)
 
     return when (role) {
         UserRole.RETAILER -> listOf(
+            account,
+            settings,
             MoreDestination(AppDestination.Wishlist, "Wishlist", "Saved marketplace products", Icons.Default.Favorite),
-            MoreDestination(AppDestination.POS, "POS", "Barcode and manual GTIN tools", Icons.Default.Search),
-        ) + common
+            notifications,
+            MoreDestination(AppDestination.POS, "POS", "External POS integration", Icons.Default.Storefront),
+            support,
+        )
         UserRole.WHOLESALER -> listOf(
+            account,
+            settings,
             MoreDestination(AppDestination.Inventory, "Inventory", "Stock health and update tools", Icons.Default.Inventory2),
-        ) + common
+            notifications,
+            support,
+        )
     }
 }
 
