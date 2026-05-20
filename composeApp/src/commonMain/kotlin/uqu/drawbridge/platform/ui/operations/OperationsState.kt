@@ -4,12 +4,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import uqu.drawbridge.platform.CategoryDTO
+import uqu.drawbridge.platform.CreateInventoryItemRequest
 import uqu.drawbridge.platform.CreateProductRequest
+import uqu.drawbridge.platform.InventoryAuditLogDTO
 import uqu.drawbridge.platform.InventoryItemDTO
 import uqu.drawbridge.platform.InventoryStatus
+import uqu.drawbridge.platform.MarketplaceProductQuery
 import uqu.drawbridge.platform.MobileAuthApi
 import uqu.drawbridge.platform.PosScanResponse
 import uqu.drawbridge.platform.ProductDTO
+import uqu.drawbridge.platform.ScheduleType
+import uqu.drawbridge.platform.UpdateAutoOrderConfigRequest
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.ui.auth.AuthActionResult
 import uqu.drawbridge.platform.ui.commerce.userReadableMessage
@@ -30,6 +35,14 @@ internal data class InventoryUiState(
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
     val busyItemIds: Set<String> = emptySet(),
+    val addInventoryProducts: List<ProductDTO> = emptyList(),
+    val addInventorySearchInput: String = "",
+    val selectedAddProduct: ProductDTO? = null,
+    val addStockDraft: String = "0",
+    val addThresholdDraft: String = "10",
+    val addAutoRestock: Boolean = false,
+    val isLoadingAddProducts: Boolean = false,
+    val isSubmittingAddInventory: Boolean = false,
     val errorMessage: String? = null,
     val actionMessage: String? = null,
 ) {
@@ -68,6 +81,24 @@ internal data class InventoryUiState(
             InventoryMode.RetailerInventory -> inventoryItems.count { it.status == InventoryStatus.OUT_OF_STOCK || it.currentStock <= 0 }
             InventoryMode.CatalogStock -> catalogProducts.count { it.stock <= 0 }
         }
+
+    val autoRestockCount: Int
+        get() = when (mode) {
+            InventoryMode.RetailerInventory -> inventoryItems.count { it.autoRestock }
+            InventoryMode.CatalogStock -> 0
+        }
+
+    val filteredAddInventoryProducts: List<ProductDTO>
+        get() {
+            val search = addInventorySearchInput.trim()
+            return addInventoryProducts.filter { product ->
+                search.isEmpty() ||
+                    product.name.contains(search, ignoreCase = true) ||
+                    product.brand.contains(search, ignoreCase = true) ||
+                    product.supplier.contains(search, ignoreCase = true) ||
+                    product.category.contains(search, ignoreCase = true)
+            }
+        }
 }
 
 internal data class InventoryDetailUiState(
@@ -75,6 +106,32 @@ internal data class InventoryDetailUiState(
     val catalogProduct: ProductDTO? = null,
     val stockDraft: String = "",
     val isLoading: Boolean = false,
+    val isSaving: Boolean = false,
+    val errorMessage: String? = null,
+)
+
+internal data class InventoryHistoryUiState(
+    val item: InventoryItemDTO? = null,
+    val logs: List<InventoryAuditLogDTO> = emptyList(),
+    val page: Int = 0,
+    val totalElements: Int = 0,
+    val totalPages: Int = 0,
+    val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val errorMessage: String? = null,
+) {
+    val hasMore: Boolean
+        get() = page + 1 < totalPages
+}
+
+internal data class AutoRestockUiState(
+    val item: InventoryItemDTO? = null,
+    val scheduleType: ScheduleType = ScheduleType.THRESHOLD_BASED,
+    val minThresholdDraft: String = "10",
+    val reorderQuantityDraft: String = "10",
+    val intervalDaysDraft: String = "7",
+    val dayOfWeek: String = "MONDAY",
+    val dayOfMonthDraft: String = "1",
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
 )
@@ -93,6 +150,12 @@ internal class InventoryStateHolder(
         private set
 
     var detailState: InventoryDetailUiState by mutableStateOf(InventoryDetailUiState())
+        private set
+
+    var historyState: InventoryHistoryUiState by mutableStateOf(InventoryHistoryUiState())
+        private set
+
+    var autoRestockState: AutoRestockUiState by mutableStateOf(AutoRestockUiState())
         private set
 
     suspend fun loadInitial() {
@@ -146,6 +209,335 @@ internal class InventoryStateHolder(
 
     fun updateSearchInput(value: String) {
         state = state.copy(searchInput = value)
+    }
+
+    fun updateAddInventorySearchInput(value: String) {
+        state = state.copy(addInventorySearchInput = value)
+    }
+
+    fun selectAddInventoryProduct(product: ProductDTO) {
+        state = state.copy(
+            selectedAddProduct = product,
+            addStockDraft = "0",
+            addThresholdDraft = "10",
+            addAutoRestock = false,
+        )
+    }
+
+    fun clearAddInventorySelection() {
+        state = state.copy(selectedAddProduct = null)
+    }
+
+    fun resetAddInventoryForm() {
+        state = state.copy(
+            addInventorySearchInput = "",
+            selectedAddProduct = null,
+            addStockDraft = "0",
+            addThresholdDraft = "10",
+            addAutoRestock = false,
+            isSubmittingAddInventory = false,
+        )
+    }
+
+    fun updateAddStockDraft(value: String) {
+        state = state.copy(addStockDraft = value.filter { it.isDigit() })
+    }
+
+    fun updateAddThresholdDraft(value: String) {
+        state = state.copy(addThresholdDraft = value.filter { it.isDigit() })
+    }
+
+    fun toggleAddAutoRestock() {
+        state = state.copy(addAutoRestock = !state.addAutoRestock)
+    }
+
+    suspend fun loadAddInventoryProducts(force: Boolean = false) {
+        if (mode != InventoryMode.RetailerInventory) return
+        if (!force && state.addInventoryProducts.isNotEmpty()) return
+        state = state.copy(isLoadingAddProducts = true, errorMessage = null)
+        runCatching {
+            api.fetchMarketplaceProducts(MarketplaceProductQuery(size = 50)).content
+        }.fold(
+            onSuccess = { products ->
+                state = state.copy(addInventoryProducts = products, isLoadingAddProducts = false)
+            },
+            onFailure = { error ->
+                state = state.copy(
+                    isLoadingAddProducts = false,
+                    errorMessage = userReadableMessage(error, "Unable to load marketplace products."),
+                )
+            },
+        )
+    }
+
+    suspend fun createInventoryItem(): AuthActionResult {
+        if (mode != InventoryMode.RetailerInventory) {
+            return AuthActionResult(success = false, message = "Inventory creation is available for retailer accounts.")
+        }
+        val product = state.selectedAddProduct
+        if (product == null) {
+            return AuthActionResult(success = false, message = "Select a product first.")
+        }
+        val currentStock = state.addStockDraft.toIntOrNull()
+        val minThreshold = state.addThresholdDraft.toIntOrNull()
+        val validationMessage = when {
+            currentStock == null || currentStock < 0 -> "Stock must be zero or higher."
+            minThreshold == null || minThreshold < 0 -> "Minimum threshold must be zero or higher."
+            else -> null
+        }
+        if (validationMessage != null) {
+            state = state.copy(errorMessage = validationMessage)
+            return AuthActionResult(success = false, message = validationMessage)
+        }
+        val validatedStock = currentStock ?: 0
+        val validatedThreshold = minThreshold ?: 0
+
+        state = state.copy(isSubmittingAddInventory = true, errorMessage = null)
+        return runCatching {
+            api.createInventoryItem(
+                CreateInventoryItemRequest(
+                    productId = product.id,
+                    retailerId = session.user.id,
+                    currentStock = validatedStock,
+                    minThreshold = validatedThreshold,
+                    autoRestock = state.addAutoRestock,
+                ),
+            )
+        }.fold(
+            onSuccess = {
+                resetAddInventoryForm()
+                refresh()
+                state = state.copy(actionMessage = "Product added to inventory.")
+                AuthActionResult(success = true, message = "Product added to inventory.")
+            },
+            onFailure = { error ->
+                val message = userReadableMessage(error, "Unable to add product to inventory.")
+                state = state.copy(isSubmittingAddInventory = false, errorMessage = message)
+                AuthActionResult(success = false, message = message)
+            },
+        )
+    }
+
+    suspend fun toggleAutoRestock(item: InventoryItemDTO): AuthActionResult {
+        if (mode != InventoryMode.RetailerInventory) {
+            return AuthActionResult(success = false, message = "Auto-restock is available for retailer inventory.")
+        }
+
+        val enabled = !item.autoRestock
+        val originalItems = state.inventoryItems
+        state = state.copy(
+            inventoryItems = state.inventoryItems.map { current ->
+                if (current.id == item.id) {
+                    current.copy(
+                        autoRestock = enabled,
+                        autoOrderConfig = current.autoOrderConfig?.copy(enabled = enabled),
+                    )
+                } else {
+                    current
+                }
+            },
+            busyItemIds = state.busyItemIds + item.id,
+            errorMessage = null,
+            actionMessage = null,
+        )
+
+        return runCatching {
+            api.toggleAutoOrderConfig(item.id, enabled)
+        }.fold(
+            onSuccess = { config ->
+                state = state.copy(
+                    inventoryItems = state.inventoryItems.map { current ->
+                        if (current.id == item.id) {
+                            current.copy(autoRestock = config.enabled, autoOrderConfig = config)
+                        } else {
+                            current
+                        }
+                    },
+                    busyItemIds = state.busyItemIds - item.id,
+                    actionMessage = if (config.enabled) "Auto-restock enabled." else "Auto-restock disabled.",
+                )
+                AuthActionResult(
+                    success = true,
+                    message = if (config.enabled) "Auto-restock enabled." else "Auto-restock disabled.",
+                )
+            },
+            onFailure = { error ->
+                val message = userReadableMessage(error, "Unable to update auto-restock.")
+                state = state.copy(
+                    inventoryItems = originalItems,
+                    busyItemIds = state.busyItemIds - item.id,
+                    errorMessage = message,
+                )
+                AuthActionResult(success = false, message = message)
+            },
+        )
+    }
+
+    suspend fun openStockHistory(item: InventoryItemDTO) {
+        historyState = InventoryHistoryUiState(item = item, isLoading = true)
+        loadStockHistoryPage(item = item, page = 0, replace = true)
+    }
+
+    fun closeStockHistory() {
+        historyState = InventoryHistoryUiState()
+    }
+
+    fun openAutoRestockConfig(item: InventoryItemDTO) {
+        val minimumOrderQuantity = item.minimumOrderQuantity.coerceAtLeast(1)
+        val config = item.autoOrderConfig
+        autoRestockState = AutoRestockUiState(
+            item = item,
+            scheduleType = config?.scheduleType ?: ScheduleType.THRESHOLD_BASED,
+            minThresholdDraft = (config?.minThreshold ?: 10).toString(),
+            reorderQuantityDraft = (config?.reorderQuantity ?: item.reorderQuantity ?: minimumOrderQuantity)
+                .coerceAtLeast(minimumOrderQuantity)
+                .toString(),
+            intervalDaysDraft = (config?.intervalDays ?: 7).toString(),
+            dayOfWeek = config?.dayOfWeek ?: "MONDAY",
+            dayOfMonthDraft = config?.dayOfMonth ?: "1",
+        )
+    }
+
+    fun closeAutoRestockConfig() {
+        autoRestockState = AutoRestockUiState()
+    }
+
+    fun selectAutoRestockSchedule(scheduleType: ScheduleType) {
+        autoRestockState = autoRestockState.copy(scheduleType = scheduleType, errorMessage = null)
+    }
+
+    fun updateAutoRestockThreshold(value: String) {
+        autoRestockState = autoRestockState.copy(minThresholdDraft = value.filter { it.isDigit() }, errorMessage = null)
+    }
+
+    fun updateAutoRestockQuantity(value: String) {
+        autoRestockState = autoRestockState.copy(reorderQuantityDraft = value.filter { it.isDigit() }, errorMessage = null)
+    }
+
+    fun updateAutoRestockInterval(value: String) {
+        autoRestockState = autoRestockState.copy(intervalDaysDraft = value.filter { it.isDigit() }, errorMessage = null)
+    }
+
+    fun updateAutoRestockDayOfWeek(value: String) {
+        autoRestockState = autoRestockState.copy(dayOfWeek = value, errorMessage = null)
+    }
+
+    fun updateAutoRestockDayOfMonth(value: String) {
+        autoRestockState = autoRestockState.copy(dayOfMonthDraft = value.filter { it.isDigit() }, errorMessage = null)
+    }
+
+    suspend fun saveAutoRestockConfig(): AuthActionResult {
+        val item = autoRestockState.item ?: return AuthActionResult(false, "No inventory item selected.")
+        val minimumOrderQuantity = item.minimumOrderQuantity.coerceAtLeast(1)
+        val threshold = autoRestockState.minThresholdDraft.toIntOrNull() ?: 0
+        val reorderQuantity = autoRestockState.reorderQuantityDraft.toIntOrNull()
+        val intervalDays = autoRestockState.intervalDaysDraft.toIntOrNull()
+        val dayOfMonth = autoRestockState.dayOfMonthDraft.toIntOrNull()
+        val validationMessage = when {
+            reorderQuantity == null || reorderQuantity < minimumOrderQuantity -> "Reorder quantity must be at least $minimumOrderQuantity."
+            autoRestockState.scheduleType == ScheduleType.INTERVAL_DAYS && (intervalDays == null || intervalDays < 1) -> "Interval must be at least 1 day."
+            autoRestockState.scheduleType == ScheduleType.MONTHLY && (dayOfMonth == null || dayOfMonth !in 1..28) -> "Day of month must be 1-28."
+            else -> null
+        }
+        if (validationMessage != null) {
+            autoRestockState = autoRestockState.copy(errorMessage = validationMessage)
+            return AuthActionResult(false, validationMessage)
+        }
+        val validatedReorderQuantity = reorderQuantity ?: minimumOrderQuantity
+        val validatedIntervalDays = intervalDays ?: 1
+        val validatedDayOfMonth = dayOfMonth ?: 1
+
+        autoRestockState = autoRestockState.copy(isSaving = true, errorMessage = null)
+        state = state.copy(busyItemIds = state.busyItemIds + item.id)
+        return runCatching {
+            api.updateAutoOrderConfig(
+                inventoryItemId = item.id,
+                request = UpdateAutoOrderConfigRequest(
+                    enabled = true,
+                    minThreshold = threshold,
+                    reorderQuantity = validatedReorderQuantity,
+                    scheduleType = autoRestockState.scheduleType,
+                    intervalDays = if (autoRestockState.scheduleType == ScheduleType.INTERVAL_DAYS) validatedIntervalDays else null,
+                    dayOfWeek = if (autoRestockState.scheduleType == ScheduleType.WEEKLY) autoRestockState.dayOfWeek else null,
+                    dayOfMonth = if (autoRestockState.scheduleType == ScheduleType.MONTHLY) validatedDayOfMonth.toString() else null,
+                ),
+            )
+        }.fold(
+            onSuccess = { config ->
+                state = state.copy(
+                    inventoryItems = state.inventoryItems.map { current ->
+                        if (current.id == item.id) {
+                            current.copy(autoRestock = true, autoOrderConfig = config, reorderQuantity = config.reorderQuantity)
+                        } else {
+                            current
+                        }
+                    },
+                    busyItemIds = state.busyItemIds - item.id,
+                    actionMessage = "Auto-restock configuration saved.",
+                )
+                closeAutoRestockConfig()
+                AuthActionResult(true, "Auto-restock configuration saved.")
+            },
+            onFailure = { error ->
+                val message = userReadableMessage(error, "Unable to save auto-restock configuration.")
+                autoRestockState = autoRestockState.copy(isSaving = false, errorMessage = message)
+                state = state.copy(busyItemIds = state.busyItemIds - item.id, errorMessage = message)
+                AuthActionResult(false, message)
+            },
+        )
+    }
+
+    suspend fun reloadStockHistory() {
+        val item = historyState.item ?: return
+        loadStockHistoryPage(item = item, page = 0, replace = true)
+    }
+
+    suspend fun loadMoreStockHistory() {
+        val item = historyState.item ?: return
+        if (!historyState.hasMore || historyState.isLoadingMore || historyState.isLoading) return
+        loadStockHistoryPage(item = item, page = historyState.page + 1, replace = false)
+    }
+
+    private suspend fun loadStockHistoryPage(
+        item: InventoryItemDTO,
+        page: Int,
+        replace: Boolean,
+    ) {
+        historyState = historyState.copy(
+            isLoading = replace,
+            isLoadingMore = !replace,
+            errorMessage = null,
+        )
+
+        runCatching {
+            api.fetchInventoryAuditLogs(
+                inventoryItemId = item.id,
+                stockTargetType = "RETAILER_INVENTORY",
+                page = page,
+                size = 10,
+            )
+        }.fold(
+            onSuccess = { result ->
+                if (historyState.item?.id != item.id) return@fold
+                historyState = historyState.copy(
+                    logs = if (replace) result.items else historyState.logs + result.items,
+                    page = result.page,
+                    totalElements = result.totalElements,
+                    totalPages = result.totalPages,
+                    isLoading = false,
+                    isLoadingMore = false,
+                    errorMessage = null,
+                )
+            },
+            onFailure = { error ->
+                if (historyState.item?.id != item.id) return@fold
+                historyState = historyState.copy(
+                    isLoading = false,
+                    isLoadingMore = false,
+                    errorMessage = userReadableMessage(error, "Unable to load stock history."),
+                )
+            },
+        )
     }
 
     suspend fun loadDetail(itemId: String) {

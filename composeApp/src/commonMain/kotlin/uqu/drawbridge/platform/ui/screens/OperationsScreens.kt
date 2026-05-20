@@ -1,6 +1,16 @@
 package uqu.drawbridge.platform.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,15 +20,27 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,15 +51,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import uqu.drawbridge.platform.CategoryDTO
+import uqu.drawbridge.platform.InventoryAuditLogDTO
 import uqu.drawbridge.platform.InventoryItemDTO
 import uqu.drawbridge.platform.InventoryStatus
 import uqu.drawbridge.platform.ProductDTO
+import uqu.drawbridge.platform.ScheduleType
 import uqu.drawbridge.platform.ui.components.AppCard
 import uqu.drawbridge.platform.ui.components.AppTextField
 import uqu.drawbridge.platform.ui.components.BarcodeScannerView
@@ -50,107 +79,1412 @@ import uqu.drawbridge.platform.ui.components.SecondaryButton
 import uqu.drawbridge.platform.ui.components.StatCard
 import uqu.drawbridge.platform.ui.components.StatusChip
 import uqu.drawbridge.platform.ui.components.StatusTone
+import uqu.drawbridge.platform.ui.operations.AutoRestockUiState
+import uqu.drawbridge.platform.ui.operations.InventoryHistoryUiState
 import uqu.drawbridge.platform.ui.operations.InventoryMode
 import uqu.drawbridge.platform.ui.operations.InventoryStateHolder
 import uqu.drawbridge.platform.ui.operations.PosStateHolder
 import uqu.drawbridge.platform.ui.operations.ProductManagementStateHolder
 
+private val InventoryText = Color(0xFFF8FAFC)
+private val InventoryMuted = Color(0xFFA8B7C7)
+private val InventoryCardBg = Color(0xFF102A3D).copy(alpha = 0.92f)
+private val InventoryPanelBg = Color(0xFF162F43).copy(alpha = 0.86f)
+private val InventoryBorder = Color.White.copy(alpha = 0.12f)
+private val InventorySoftLine = Color.White.copy(alpha = 0.08f)
+private val InventoryIconBg = Color(0xFF183348)
+private val InventoryWarning = Color(0xFFFFA726)
+private val InventoryDanger = Color(0xFFFF5A65)
+private val InventorySuccess = Color(0xFF10B981)
+private val HistoryText = InventoryText
+private val HistoryMuted = InventoryMuted
+private val HistorySoftText = Color(0xFF7F95AA)
+private val HistoryBorder = InventoryBorder
+private val HistoryPanel = Color.White.copy(alpha = 0.04f)
+
 @Composable
 internal fun InventoryMainScreen(
     inventoryStateHolder: InventoryStateHolder,
     onOpenDetail: (String) -> Unit,
+    onShowMessage: (String) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val state = inventoryStateHolder.state
+    var showAddInventory by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         inventoryStateHolder.loadInitial()
     }
 
-    ScreenSection(
-        title = if (state.mode == InventoryMode.CatalogStock) "Inventory" else "Retail inventory",
-        subtitle = if (state.mode == InventoryMode.CatalogStock) {
-            "Track owned catalog stock and low-stock products."
-        } else {
-            "Track live retailer stock and POS-driven quantity changes."
-        },
-    ) {
-        when {
-            state.isLoading -> {
-                repeat(3) {
-                    LoadingStateCard(title = "Loading inventory", message = "Checking current stock levels.")
-                }
-                return@ScreenSection
+    val historyState = inventoryStateHolder.historyState
+    val autoRestockState = inventoryStateHolder.autoRestockState
+    val activePanel = when {
+        autoRestockState.item != null -> "restock"
+        historyState.item != null -> "history"
+        else -> "list"
+    }
+    AnimatedContent(
+        targetState = activePanel,
+        transitionSpec = {
+            val opening = targetState != "list"
+            val enterOffset: (Int) -> Int = if (opening) {
+                { width -> (width * 0.16f).toInt() }
+            } else {
+                { width -> -(width * 0.10f).toInt() }
             }
+            val exitOffset: (Int) -> Int = if (opening) {
+                { width -> -(width * 0.08f).toInt() }
+            } else {
+                { width -> (width * 0.12f).toInt() }
+            }
+            (fadeIn(animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing)) +
+                slideInHorizontally(animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing), initialOffsetX = enterOffset))
+                .togetherWith(
+                    fadeOut(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
+                        slideOutHorizontally(animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing), targetOffsetX = exitOffset),
+                )
+                .using(SizeTransform(clip = false))
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) { panel ->
+        when (panel) {
+            "list" -> {
+                InventoryListContent(
+                    inventoryStateHolder = inventoryStateHolder,
+                    showAddInventory = showAddInventory,
+                    onShowAddInventoryChange = { showAddInventory = it },
+                    onOpenDetail = onOpenDetail,
+                    onOpenHistory = { item ->
+                        showAddInventory = false
+                        inventoryStateHolder.resetAddInventoryForm()
+                        coroutineScope.launch { inventoryStateHolder.openStockHistory(item) }
+                    },
+                    onOpenAutoRestock = { item ->
+                        showAddInventory = false
+                        inventoryStateHolder.resetAddInventoryForm()
+                        inventoryStateHolder.openAutoRestockConfig(item)
+                    },
+                    onShowMessage = onShowMessage,
+                )
+            }
+            "history" -> {
+                historyState.item?.let { selectedHistoryItem ->
+                    InventoryHistoryScreen(
+                        item = selectedHistoryItem,
+                        historyState = historyState,
+                        onClose = inventoryStateHolder::closeStockHistory,
+                        onRetry = { coroutineScope.launch { inventoryStateHolder.reloadStockHistory() } },
+                        onLoadMore = { coroutineScope.launch { inventoryStateHolder.loadMoreStockHistory() } },
+                    )
+                }
+            }
+            else -> {
+                autoRestockState.item?.let { selectedRestockItem ->
+                    AutoRestockConfigScreen(
+                        item = selectedRestockItem,
+                        state = autoRestockState,
+                        onClose = inventoryStateHolder::closeAutoRestockConfig,
+                        onSelectSchedule = inventoryStateHolder::selectAutoRestockSchedule,
+                        onThresholdChange = inventoryStateHolder::updateAutoRestockThreshold,
+                        onQuantityChange = inventoryStateHolder::updateAutoRestockQuantity,
+                        onIntervalChange = inventoryStateHolder::updateAutoRestockInterval,
+                        onDayOfWeekChange = inventoryStateHolder::updateAutoRestockDayOfWeek,
+                        onDayOfMonthChange = inventoryStateHolder::updateAutoRestockDayOfMonth,
+                        onSave = {
+                            coroutineScope.launch {
+                                val result = inventoryStateHolder.saveAutoRestockConfig()
+                                result.message?.let(onShowMessage)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InventoryListContent(
+    inventoryStateHolder: InventoryStateHolder,
+    showAddInventory: Boolean,
+    onShowAddInventoryChange: (Boolean) -> Unit,
+    onOpenDetail: (String) -> Unit,
+    onOpenHistory: (InventoryItemDTO) -> Unit,
+    onOpenAutoRestock: (InventoryItemDTO) -> Unit,
+    onShowMessage: (String) -> Unit,
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val state = inventoryStateHolder.state
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        InventoryCatalogHeader(
+            mode = state.mode,
+            onAddInventory = {
+                if (state.mode == InventoryMode.RetailerInventory) {
+                    onShowAddInventoryChange(!showAddInventory)
+                    if (!showAddInventory) {
+                        coroutineScope.launch { inventoryStateHolder.loadAddInventoryProducts() }
+                    } else {
+                        inventoryStateHolder.resetAddInventoryForm()
+                    }
+                } else {
+                    coroutineScope.launch { inventoryStateHolder.refresh() }
+                }
+            },
+            isRefreshing = state.isRefreshing,
+        )
+
+        if (showAddInventory && state.mode == InventoryMode.RetailerInventory) {
+            AddInventoryPanel(
+                state = state,
+                onSearchChange = inventoryStateHolder::updateAddInventorySearchInput,
+                onSelectProduct = inventoryStateHolder::selectAddInventoryProduct,
+                onChangeProduct = inventoryStateHolder::clearAddInventorySelection,
+                onStockChange = inventoryStateHolder::updateAddStockDraft,
+                onThresholdChange = inventoryStateHolder::updateAddThresholdDraft,
+                onToggleAutoRestock = inventoryStateHolder::toggleAddAutoRestock,
+                onCancel = {
+                    onShowAddInventoryChange(false)
+                    inventoryStateHolder.resetAddInventoryForm()
+                },
+                onSubmit = {
+                    coroutineScope.launch {
+                        val result = inventoryStateHolder.createInventoryItem()
+                        result.message?.let(onShowMessage)
+                        if (result.success) {
+                            onShowAddInventoryChange(false)
+                        }
+                    }
+                },
+            )
+        }
+
+        when {
+            state.isLoading -> InventoryStatePanel(
+                label = "Loading",
+                title = "Loading inventory",
+                message = "Checking current stock levels.",
+            )
             state.errorMessage != null && state.totalCount == 0 -> {
-                ErrorStateCard(
+                InventoryStatePanel(
+                    label = "Issue",
                     title = "Could not load inventory",
                     message = state.errorMessage,
                     actionText = "Try again",
                     onAction = { coroutineScope.launch { inventoryStateHolder.refresh() } },
                 )
-                return@ScreenSection
+            }
+            else -> {
+                InventoryStatsGrid(state = state)
+
+                InventorySearchField(
+                    value = state.searchInput,
+                    onValueChange = inventoryStateHolder::updateSearchInput,
+                    placeholder = if (state.mode == InventoryMode.CatalogStock) {
+                        "Search catalog stock..."
+                    } else {
+                        "Search inventory..."
+                    },
+                )
+
+                if (state.errorMessage != null) {
+                    InventoryStatePanel(
+                        label = "Issue",
+                        title = "Inventory needs attention",
+                        message = state.errorMessage,
+                        actionText = "Refresh",
+                        onAction = { coroutineScope.launch { inventoryStateHolder.refresh() } },
+                    )
+                }
+
+                if (state.mode == InventoryMode.CatalogStock) {
+                    if (state.filteredCatalogProducts.isEmpty()) {
+                        InventoryStatePanel(
+                            title = "No products found",
+                            message = if (state.catalogProducts.isEmpty()) {
+                                "Create products before managing catalog stock."
+                            } else {
+                                "Try a different search."
+                            },
+                        )
+                    } else {
+                        state.filteredCatalogProducts.forEach { product ->
+                            CatalogStockCard(
+                                product = product,
+                                isBusy = product.id in state.busyItemIds,
+                                onOpenDetail = { onOpenDetail(product.id) },
+                            )
+                        }
+                    }
+                } else {
+                    if (state.filteredInventoryItems.isEmpty()) {
+                        InventoryStatePanel(
+                            title = "No inventory items found",
+                            message = if (state.inventoryItems.isEmpty()) {
+                                "Inventory entries will appear when products are stocked."
+                            } else {
+                                "Try a different search."
+                            },
+                        )
+                    } else {
+                        state.filteredInventoryItems.forEach { item ->
+                            RetailerInventoryCard(
+                                item = item,
+                                isBusy = item.id in state.busyItemIds,
+                                onToggleAutoRestock = {
+                                    coroutineScope.launch {
+                                        val result = inventoryStateHolder.toggleAutoRestock(item)
+                                        result.message?.let(onShowMessage)
+                                    }
+                                },
+                                onOpenDetail = { onOpenDetail(item.id) },
+                                onOpenHistory = { onOpenHistory(item) },
+                                onOpenAutoRestock = { onOpenAutoRestock(item) },
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
+}
 
+@Composable
+private fun AutoRestockConfigScreen(
+    item: InventoryItemDTO,
+    state: AutoRestockUiState,
+    onClose: () -> Unit,
+    onSelectSchedule: (ScheduleType) -> Unit,
+    onThresholdChange: (String) -> Unit,
+    onQuantityChange: (String) -> Unit,
+    onIntervalChange: (String) -> Unit,
+    onDayOfWeekChange: (String) -> Unit,
+    onDayOfMonthChange: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 690.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primary)
+                    .padding(18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
+                        Text("Auto-Restock Configuration", style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(item.name, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.78f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close auto-restock", tint = Color.White, modifier = Modifier.size(22.dp))
+                }
+            }
+
+            Column(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text("Restock Strategy", style = MaterialTheme.typography.titleSmall, color = InventoryText, fontWeight = FontWeight.Black)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AutoRestockStrategyOption(ScheduleType.THRESHOLD_BASED, state.scheduleType, "Threshold Based", "Reorder below a set level", Icons.Default.Settings, onSelectSchedule)
+                    AutoRestockStrategyOption(ScheduleType.WEEKLY, state.scheduleType, "Weekly Schedule", "Reorder on a weekly day", Icons.Default.CheckCircle, onSelectSchedule)
+                    AutoRestockStrategyOption(ScheduleType.MONTHLY, state.scheduleType, "Monthly Schedule", "Reorder on a monthly day", Icons.Default.Inventory2, onSelectSchedule)
+                    AutoRestockStrategyOption(ScheduleType.INTERVAL_DAYS, state.scheduleType, "Fixed Interval", "Reorder every X days", Icons.Default.History, onSelectSchedule)
+                }
+
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(InventorySoftLine, RoundedCornerShape(999.dp)))
+                Text("Configuration Details", style = MaterialTheme.typography.titleSmall, color = InventoryText, fontWeight = FontWeight.Black)
+                Surface(shape = RoundedCornerShape(8.dp), color = InventoryPanelBg, border = BorderStroke(1.dp, InventoryBorder)) {
+                    Text(
+                        "Product MOQ: ${item.minimumOrderQuantity.coerceAtLeast(1)} units",
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = InventoryMuted,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+
+                when (state.scheduleType) {
+                    ScheduleType.THRESHOLD_BASED -> AutoRestockNumberInput("Minimum Threshold", state.minThresholdDraft, "units", "Trigger reorder below this stock", onThresholdChange)
+                    ScheduleType.WEEKLY -> AutoRestockWeekPicker(selected = state.dayOfWeek, onSelected = onDayOfWeekChange)
+                    ScheduleType.MONTHLY -> AutoRestockNumberInput("Day of Month", state.dayOfMonthDraft, "day", "Use 1-28", onDayOfMonthChange)
+                    ScheduleType.INTERVAL_DAYS -> AutoRestockNumberInput("Interval Days", state.intervalDaysDraft, "days", "Reorder every X days", onIntervalChange)
+                    ScheduleType.DAILY -> Unit
+                }
+
+                AutoRestockNumberInput("Reorder Quantity", state.reorderQuantityDraft, "units", "Amount to order when triggered", onQuantityChange)
+                state.errorMessage?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = InventoryDanger, fontWeight = FontWeight.SemiBold)
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    InventoryActionButton("Cancel", Icons.Default.Close, onClose, Modifier.weight(1f))
+                    InventoryActionButton(if (state.isSaving) "Saving..." else "Save", Icons.Default.CheckCircle, onSave, Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutoRestockStrategyOption(
+    scheduleType: ScheduleType,
+    selected: ScheduleType,
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onSelect: (ScheduleType) -> Unit,
+) {
+    val active = scheduleType == selected
+    Surface(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onSelect(scheduleType) },
+        shape = RoundedCornerShape(10.dp),
+        color = if (active) Color(0xFF0D3C34) else HistoryPanel,
+        border = BorderStroke(1.dp, if (active) InventorySuccess else InventoryBorder),
+    ) {
+        Row(modifier = Modifier.padding(13.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = if (active) InventorySuccess else InventoryMuted, modifier = Modifier.size(20.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = InventoryText, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = if (active) Color(0xFF71E8C1) else InventoryMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutoRestockNumberInput(
+    label: String,
+    value: String,
+    suffix: String,
+    helper: String,
+    onChange: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = InventoryText, fontWeight = FontWeight.Black)
+        Surface(shape = RoundedCornerShape(8.dp), color = InventoryPanelBg, border = BorderStroke(1.dp, InventoryBorder)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                BasicTextField(
+                    value = value,
+                    onValueChange = onChange,
+                    textStyle = MaterialTheme.typography.titleMedium.copy(color = InventoryText, fontWeight = FontWeight.SemiBold),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.weight(1f),
+                )
+                Text(suffix, style = MaterialTheme.typography.bodyMedium, color = InventoryMuted, fontWeight = FontWeight.Bold)
+            }
+        }
+        Text(helper, style = MaterialTheme.typography.bodySmall, color = InventoryMuted, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun AutoRestockWeekPicker(
+    selected: String,
+    onSelected: (String) -> Unit,
+) {
+    val days = listOf("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY")
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Day of Week", style = MaterialTheme.typography.labelLarge, color = InventoryText, fontWeight = FontWeight.Black)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            days.chunked(4).forEach { rowDays ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    rowDays.forEach { day ->
+                        AutoRestockDayChip(day.take(3), selected == day, { onSelected(day) }, Modifier.weight(1f))
+                    }
+                    repeat(4 - rowDays.size) { Spacer(modifier = Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutoRestockDayChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.height(40.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = if (selected) Color(0xFF0D3C34) else HistoryPanel,
+        border = BorderStroke(1.dp, if (selected) InventorySuccess else InventoryBorder),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(text, style = MaterialTheme.typography.labelMedium, color = if (selected) InventorySuccess else InventoryMuted, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+private fun InventoryHistoryScreen(
+    item: InventoryItemDTO,
+    historyState: InventoryHistoryUiState,
+    onClose: () -> Unit,
+    onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 690.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+        shadowElevation = 0.dp,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Inventory2,
+                            contentDescription = null,
+                            tint = HistorySoftText,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        Text(
+                            text = "STOCK HISTORY",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = HistoryMuted,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                    }
+                    Text(
+                        text = item.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = HistoryText,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = item.supplier,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = HistoryMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                IconButton(onClick = onClose, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close stock history",
+                        tint = HistorySoftText,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(HistoryBorder),
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(InventoryPanelBg)
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = eventCountLabel(historyState.totalElements),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = HistoryText,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    text = "NEWEST FIRST",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = HistoryMuted,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(HistoryBorder),
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                when {
+                    historyState.isLoading -> {
+                        repeat(3) {
+                            InventoryHistoryLoadingCard()
+                        }
+                    }
+                    historyState.errorMessage != null -> {
+                        InventoryHistoryStateCard(
+                            title = "Unable to load stock history",
+                            message = historyState.errorMessage,
+                            actionText = "Try again",
+                            onAction = onRetry,
+                        )
+                    }
+                    historyState.logs.isEmpty() -> {
+                        InventoryHistoryStateCard(
+                            title = "No stock history yet",
+                            message = "Stock movements for this inventory item will appear here.",
+                        )
+                    }
+                    else -> {
+                        historyState.logs.forEach { log ->
+                            InventoryHistoryEventCard(log = log)
+                        }
+                        InventoryHistoryFooter(
+                            hasMore = historyState.hasMore,
+                            isLoadingMore = historyState.isLoadingMore,
+                            onLoadMore = onLoadMore,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InventoryHistoryLoadingCard() {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(98.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = HistoryPanel,
+        border = BorderStroke(1.dp, HistoryBorder),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(120.dp)
+                    .height(14.dp)
+                    .background(HistoryBorder, RoundedCornerShape(999.dp)),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .background(HistoryBorder.copy(alpha = 0.55f), RoundedCornerShape(999.dp)),
+            )
+            Box(
+                modifier = Modifier
+                    .width(160.dp)
+                    .height(10.dp)
+                    .background(HistoryBorder.copy(alpha = 0.55f), RoundedCornerShape(999.dp)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun InventoryHistoryStateCard(
+    title: String,
+    message: String,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = HistoryPanel,
+        border = BorderStroke(1.dp, HistoryBorder),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            InventoryProductTile(modifier = Modifier.size(48.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, color = HistoryText, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = HistoryMuted, textAlign = TextAlign.Center)
+            if (actionText != null && onAction != null) {
+                InventoryHistoryFooterButton(text = actionText, enabled = true, onClick = onAction)
+            }
+        }
+    }
+}
+
+@Composable
+private fun InventoryHistoryEventCard(log: InventoryAuditLogDTO) {
+    val amountTone = amountTone(log.changeAmount)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = HistoryPanel,
+        border = BorderStroke(1.dp, HistoryBorder),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(13.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(amountTone.background, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = amountSymbol(log.changeAmount),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = amountTone.foreground,
+                        fontWeight = FontWeight.Normal,
+                    )
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        InventoryHistorySourceChip(sourceType = log.sourceType)
+                        InventoryHistoryAmountChip(amount = log.changeAmount)
+                    }
+                    Text(
+                        text = "${log.quantityBefore} \u2192 ${log.quantityAfter}",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = HistoryText,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Text(
+                        text = formatAuditDateTime(log.createdAt),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = HistoryMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                InventoryHistoryMetaBlock(
+                    label = "Changed by",
+                    value = log.changedBy.ifBlank { "SYSTEM" },
+                    modifier = Modifier.weight(1f),
+                )
+                InventoryHistoryMetaBlock(
+                    label = "Reason",
+                    value = log.reason?.takeIf { it.isNotBlank() } ?: "Not specified",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InventoryHistorySourceChip(sourceType: String) {
+    val tone = sourceTone(sourceType)
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = tone.background,
+        border = BorderStroke(1.dp, tone.border),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = sourceIcon(sourceType),
+                contentDescription = null,
+                tint = tone.foreground,
+                modifier = Modifier.size(12.dp),
+            )
+            Text(
+                text = sourceLabel(sourceType),
+                style = MaterialTheme.typography.labelSmall,
+                color = tone.foreground,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun InventoryHistoryAmountChip(amount: Int) {
+    val tone = amountTone(amount)
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = tone.background,
+        border = BorderStroke(1.dp, tone.border),
+    ) {
+        Text(
+            text = formatSignedAmount(amount),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = tone.foreground,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun InventoryHistoryMetaBlock(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = HistoryMuted, fontWeight = FontWeight.SemiBold)
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall,
+            color = HistoryText,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun InventoryHistoryFooter(
+    hasMore: Boolean,
+    isLoadingMore: Boolean,
+    onLoadMore: () -> Unit,
+) {
+    val enabled = hasMore && !isLoadingMore
+    InventoryHistoryFooterButton(
+        text = when {
+            isLoadingMore -> "Loading..."
+            hasMore -> "Load more"
+            else -> "All history loaded"
+        },
+        enabled = enabled,
+        onClick = onLoadMore,
+    )
+}
+
+@Composable
+private fun InventoryHistoryFooterButton(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = HistoryPanel,
+        border = BorderStroke(1.dp, if (enabled) HistoryBorder else Color.Transparent),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = HistoryMuted,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+private data class HistoryTone(
+    val background: Color,
+    val foreground: Color,
+    val border: Color,
+)
+
+private fun eventCountLabel(totalElements: Int): String {
+    return "$totalElements ${if (totalElements == 1) "EVENT" else "EVENTS"}"
+}
+
+private fun sourceLabel(sourceType: String): String = when (sourceType.uppercase()) {
+    "MANUAL" -> "Manual"
+    "ORDER" -> "Order"
+    "RESTOCK" -> "Restock"
+    "POS" -> "POS"
+    else -> "System"
+}
+
+private fun sourceIcon(sourceType: String): ImageVector = when (sourceType.uppercase()) {
+    "MANUAL" -> Icons.Default.History
+    "ORDER" -> Icons.Default.ShoppingCart
+    "RESTOCK" -> Icons.Default.CheckCircle
+    "POS" -> Icons.Default.Inventory2
+    else -> Icons.Default.Settings
+}
+
+private fun sourceTone(sourceType: String): HistoryTone = when (sourceType.uppercase()) {
+    "MANUAL" -> HistoryTone(Color(0xFF153A5C), Color(0xFF9CCBFF), Color(0xFF275B86))
+    "ORDER" -> HistoryTone(Color(0xFF172D61), Color(0xFF94B2FF), Color(0xFF3155A1))
+    "RESTOCK" -> HistoryTone(Color(0xFF0D3C34), Color(0xFF71E8C1), Color(0xFF167C67))
+    "POS" -> HistoryTone(Color(0xFF3B1747), Color(0xFFF0ABFC), Color(0xFF7E2F91))
+    else -> HistoryTone(Color.White.copy(alpha = 0.06f), HistoryMuted, HistoryBorder)
+}
+
+private fun amountTone(amount: Int): HistoryTone = when {
+    amount > 0 -> HistoryTone(Color(0xFF0D3C34), Color(0xFF35D399), Color(0xFF167C67))
+    amount < 0 -> HistoryTone(Color(0xFF4A1D26), Color(0xFFFF8A94), Color(0xFF8D3442))
+    else -> HistoryTone(Color.White.copy(alpha = 0.06f), HistoryMuted, HistoryBorder)
+}
+
+private fun amountSymbol(amount: Int): String = when {
+    amount > 0 -> "\u2191"
+    amount < 0 -> "\u2193"
+    else -> "\u2194"
+}
+
+private fun formatSignedAmount(amount: Int): String {
+    return if (amount > 0) "+$amount" else amount.toString()
+}
+
+private fun formatAuditDateTime(value: String): String {
+    val normalized = value.trim().replace("T", " ").removeSuffix("Z").substringBefore(".")
+    val parts = normalized.split(" ")
+    val dateParts = parts.getOrNull(0)?.split("-").orEmpty()
+    val timeParts = parts.getOrNull(1)?.split(":").orEmpty()
+    val year = dateParts.getOrNull(0)?.toIntOrNull()
+    val month = dateParts.getOrNull(1)?.toIntOrNull()
+    val day = dateParts.getOrNull(2)?.toIntOrNull()
+    val hour = timeParts.getOrNull(0)?.toIntOrNull()
+    val minute = timeParts.getOrNull(1)?.toIntOrNull()
+    if (year == null || month == null || day == null || hour == null || minute == null) {
+        return value.take(16).replace("T", " ")
+    }
+
+    val displayHour = when (val hour12 = hour % 12) {
+        0 -> 12
+        else -> hour12
+    }
+    val amPm = if (hour >= 12) "PM" else "AM"
+    return "${monthName(month)} $day, $year, ${displayHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} $amPm"
+}
+
+private fun monthName(month: Int): String = when (month) {
+    1 -> "Jan"
+    2 -> "Feb"
+    3 -> "Mar"
+    4 -> "Apr"
+    5 -> "May"
+    6 -> "Jun"
+    7 -> "Jul"
+    8 -> "Aug"
+    9 -> "Sep"
+    10 -> "Oct"
+    11 -> "Nov"
+    12 -> "Dec"
+    else -> "Date"
+}
+
+@Composable
+private fun InventoryCatalogHeader(
+    mode: InventoryMode,
+    onAddInventory: () -> Unit,
+    isRefreshing: Boolean,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text(
+                    text = "Inventory",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = InventoryText,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = if (mode == InventoryMode.CatalogStock) {
+                        "Monitor catalog stock, reorder needs, and product availability"
+                    } else {
+                        "Monitor stock, reorder needs, and automation"
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = InventoryMuted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onAddInventory),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.primary,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Text(
+                        text = if (isRefreshing) "Refreshing inventory..." else {
+                            if (mode == InventoryMode.CatalogStock) "Refresh Catalog Stock" else "Add Product to Inventory"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InventoryStatsGrid(state: uqu.drawbridge.platform.ui.operations.InventoryUiState) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            StatCard(value = state.totalCount.toString(), label = "Items", modifier = Modifier.weight(1f))
-            StatCard(value = state.lowStockCount.toString(), label = "Low", modifier = Modifier.weight(1f))
-            StatCard(value = state.outOfStockCount.toString(), label = "Out", modifier = Modifier.weight(1f))
-        }
-
-        AppCard {
-            AppTextField(
-                value = state.searchInput,
-                onValueChange = inventoryStateHolder::updateSearchInput,
-                label = "Search inventory",
+            InventoryStatTile(
+                value = state.totalCount.toString(),
+                label = "Total Items",
+                icon = Icons.Default.Inventory2,
+                tint = InventoryMuted,
+                modifier = Modifier.weight(1f),
             )
-            SecondaryButton(
-                text = if (state.isRefreshing) "Refreshing..." else "Refresh",
-                onClick = { coroutineScope.launch { inventoryStateHolder.refresh() } },
-                enabled = !state.isRefreshing,
+            InventoryStatTile(
+                value = state.lowStockCount.toString(),
+                label = "Low Stock",
+                icon = Icons.Default.Inventory2,
+                tint = InventoryWarning,
+                modifier = Modifier.weight(1f),
             )
         }
-
-        if (state.errorMessage != null) {
-            ErrorStateCard(
-                title = "Inventory needs attention",
-                message = state.errorMessage,
-                actionText = "Refresh",
-                onAction = { coroutineScope.launch { inventoryStateHolder.refresh() } },
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            InventoryStatTile(
+                value = state.outOfStockCount.toString(),
+                label = "Out of Stock",
+                icon = Icons.Default.Inventory2,
+                tint = InventoryDanger,
+                modifier = Modifier.weight(1f),
+            )
+            InventoryStatTile(
+                value = state.autoRestockCount.toString(),
+                label = "Auto-Restock",
+                icon = Icons.Default.CheckCircle,
+                tint = InventorySuccess,
+                modifier = Modifier.weight(1f),
             )
         }
+    }
+}
 
-        if (state.mode == InventoryMode.CatalogStock) {
-            if (state.filteredCatalogProducts.isEmpty()) {
-                EmptyStateCard(
-                    title = "No products found",
-                    message = if (state.catalogProducts.isEmpty()) "Create products before managing catalog stock." else "Try a different search.",
+@Composable
+private fun InventoryStatTile(
+    value: String,
+    label: String,
+    icon: ImageVector,
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.height(112.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, tint.copy(alpha = if (tint == InventoryMuted) 0.18f else 0.45f)),
+        shadowElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = InventoryMuted,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                color = InventoryText,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun InventorySearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Search, contentDescription = null, tint = InventoryMuted, modifier = Modifier.size(20.dp))
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (value.isBlank()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = InventoryMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = InventoryText,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InventoryStatePanel(
+    title: String,
+    message: String,
+    label: String = "Empty",
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(30.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            StatusChip(text = label, tone = StatusTone.Neutral)
+            Text(title, style = MaterialTheme.typography.titleLarge, color = InventoryText, fontWeight = FontWeight.Black)
+            Text(message, style = MaterialTheme.typography.bodyLarge, color = InventoryMuted)
+            if (actionText != null && onAction != null) {
+                PrimaryButton(text = actionText, onClick = onAction)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddInventoryPanel(
+    state: uqu.drawbridge.platform.ui.operations.InventoryUiState,
+    onSearchChange: (String) -> Unit,
+    onSelectProduct: (ProductDTO) -> Unit,
+    onChangeProduct: () -> Unit,
+    onStockChange: (String) -> Unit,
+    onThresholdChange: (String) -> Unit,
+    onToggleAutoRestock: () -> Unit,
+    onCancel: () -> Unit,
+    onSubmit: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Add Inventory Item",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = InventoryText,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Text(
+                        text = if (state.selectedAddProduct == null) "Select a marketplace product" else "Configure stock controls",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = InventoryMuted,
+                    )
+                }
+                StatusChip(text = if (state.selectedAddProduct == null) "Step 1" else "Step 2", tone = StatusTone.Success)
+            }
+
+            val selectedProduct = state.selectedAddProduct
+            if (selectedProduct == null) {
+                InventorySearchField(
+                    value = state.addInventorySearchInput,
+                    onValueChange = onSearchChange,
+                    placeholder = "Search marketplace products...",
+                )
+                when {
+                    state.isLoadingAddProducts -> Text(
+                        text = "Loading products...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = InventoryMuted,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    state.filteredAddInventoryProducts.isEmpty() -> Text(
+                        text = "No products found.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = InventoryMuted,
+                    )
+                    else -> state.filteredAddInventoryProducts.take(8).forEach { product ->
+                        AddInventoryProductRow(product = product, onClick = { onSelectProduct(product) })
+                    }
+                }
+                InventoryActionButton(
+                    text = "Cancel",
+                    icon = Icons.Default.MoreVert,
+                    onClick = onCancel,
                 )
             } else {
-                state.filteredCatalogProducts.forEach { product ->
-                    CatalogStockCard(
-                        product = product,
-                        isBusy = product.id in state.busyItemIds,
-                        onOpenDetail = { onOpenDetail(product.id) },
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = InventoryPanelBg,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        InventoryProductTile(modifier = Modifier.size(54.dp))
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(
+                                text = selectedProduct.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = InventoryText,
+                                fontWeight = FontWeight.Black,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = selectedProduct.brand.ifBlank { selectedProduct.supplier.ifBlank { selectedProduct.category } },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = InventoryMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Text(
+                            text = "Change",
+                            modifier = Modifier.clickable(onClick = onChangeProduct),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Black,
+                        )
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    InventoryNumberField(
+                        label = "Current Stock",
+                        value = state.addStockDraft,
+                        onValueChange = onStockChange,
+                        modifier = Modifier.weight(1f),
+                    )
+                    InventoryNumberField(
+                        label = "Min Threshold",
+                        value = state.addThresholdDraft,
+                        onValueChange = onThresholdChange,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    InventoryToggle(checked = state.addAutoRestock, enabled = !state.isSubmittingAddInventory, onClick = onToggleAutoRestock)
+                    Text(
+                        text = "Enable Auto-Restock",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = InventoryText,
+                        fontWeight = FontWeight.Black,
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    InventoryActionButton(
+                        text = "Cancel",
+                        icon = Icons.Default.MoreVert,
+                        onClick = onCancel,
+                        modifier = Modifier.weight(1f),
+                    )
+                    InventoryActionButton(
+                        text = if (state.isSubmittingAddInventory) "Adding..." else "Add",
+                        icon = Icons.Default.Add,
+                        onClick = onSubmit,
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }
-        } else {
-            if (state.filteredInventoryItems.isEmpty()) {
-                EmptyStateCard(
-                    title = "No inventory items found",
-                    message = if (state.inventoryItems.isEmpty()) "Inventory entries will appear when products are stocked." else "Try a different search.",
+        }
+    }
+}
+
+@Composable
+private fun AddInventoryProductRow(
+    product: ProductDTO,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.035f),
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            InventoryProductTile(modifier = Modifier.size(52.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = product.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = InventoryText,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-            } else {
-                state.filteredInventoryItems.forEach { item ->
-                    RetailerInventoryCard(
-                        item = item,
-                        isBusy = item.id in state.busyItemIds,
-                        onOpenDetail = { onOpenDetail(item.id) },
-                    )
-                }
+                Text(
+                    text = product.brand.ifBlank { product.supplier.ifBlank { product.category } },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = InventoryMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
+            Text(
+                text = "MOQ ${product.minimumOrderQuantity.coerceAtLeast(1)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = InventoryMuted,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun InventoryNumberField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.height(76.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = InventoryPanelBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = InventoryMuted,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = MaterialTheme.typography.titleLarge.copy(
+                    color = InventoryText,
+                    fontWeight = FontWeight.Black,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            )
         }
     }
 }
@@ -559,24 +1893,103 @@ internal fun PosMainScreen(
 private fun RetailerInventoryCard(
     item: InventoryItemDTO,
     isBusy: Boolean,
+    onToggleAutoRestock: () -> Unit,
     onOpenDetail: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onOpenAutoRestock: () -> Unit,
 ) {
-    AppCard(modifier = Modifier.clickable(onClick = onOpenDetail)) {
-        InventoryCardHeader(
-            title = item.name,
-            subtitle = item.supplier,
-            stock = item.currentStock,
-            statusText = inventoryStatusLabel(item),
-            statusTone = inventoryStatusTone(item),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            StatusChip(text = "MOQ ${item.minimumOrderQuantity.coerceAtLeast(1)}", tone = StatusTone.Neutral)
-            StatusChip(text = "Reorder ${item.reorderQuantity ?: item.autoOrderConfig?.reorderQuantity ?: 0}", tone = StatusTone.Neutral)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+        shadowElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            InventoryCardTop(
+                title = item.name,
+                subtitle = item.supplier,
+                statusText = inventoryStatusLabel(item),
+                statusTone = inventoryStatusTone(item),
+                onMore = onOpenDetail,
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    InventoryMetricLine(label = "Stock:", value = item.currentStock.toString())
+                    InventoryMetricLine(label = "SKU:", value = shortId(item.id).uppercase())
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    InventoryMetricLine(label = "MOQ:", value = item.minimumOrderQuantity.coerceAtLeast(1).toString())
+                    InventoryMetricLine(label = "Min:", value = item.autoOrderConfig?.minThreshold?.toString() ?: "0")
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(InventorySoftLine, RoundedCornerShape(999.dp)),
+            )
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = HistoryPanel,
+                border = BorderStroke(1.dp, InventoryBorder),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.Settings, contentDescription = null, tint = InventoryMuted, modifier = Modifier.size(22.dp))
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            text = if (isBusy) "Updating..." else "Auto-Restock",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = InventoryText,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = "Automatically reorder when stock is low",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = InventoryMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    InventoryToggle(
+                        checked = item.autoRestock,
+                        enabled = !isBusy,
+                        onClick = onToggleAutoRestock,
+                    )
+                }
+            }
+
+            if (item.autoRestock) {
+                InventoryAutoRestockPanel(item = item)
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                InventoryActionButton(
+                    text = "History",
+                    icon = Icons.Default.History,
+                    onClick = onOpenHistory,
+                    modifier = Modifier.weight(1f),
+                )
+                InventoryActionButton(
+                    text = "Configure",
+                    icon = Icons.Default.Settings,
+                    onClick = onOpenAutoRestock,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
-        if (item.autoRestock) {
-            StatusChip(text = "Auto restock on", tone = StatusTone.Success)
-        }
-        SecondaryButton(text = if (isBusy) "Updating..." else "View and update", onClick = onOpenDetail, enabled = !isBusy)
     }
 }
 
@@ -586,19 +1999,246 @@ private fun CatalogStockCard(
     isBusy: Boolean,
     onOpenDetail: () -> Unit,
 ) {
-    AppCard(modifier = Modifier.clickable(onClick = onOpenDetail)) {
-        InventoryCardHeader(
-            title = product.name,
-            subtitle = "${product.category.ifBlank { "Uncategorized" }} • GTIN ${product.gtin.ifBlank { "Not set" }}",
-            stock = product.stock,
-            statusText = stockStatusLabel(product),
-            statusTone = stockStatusTone(product),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            StatusChip(text = "MOQ ${product.minimumOrderQuantity.coerceAtLeast(1)}", tone = StatusTone.Neutral)
-            StatusChip(text = if (product.published) "Published" else "Draft", tone = if (product.published) StatusTone.Success else StatusTone.Neutral)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !isBusy, onClick = onOpenDetail),
+        shape = RoundedCornerShape(14.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+        shadowElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            InventoryCardTop(
+                title = product.name,
+                subtitle = product.brand.ifBlank { product.category.ifBlank { "Catalog product" } },
+                statusText = stockStatusLabel(product),
+                statusTone = stockStatusTone(product),
+                onMore = onOpenDetail,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    InventoryMetricLine(label = "Stock:", value = product.stock.toString())
+                    InventoryMetricLine(label = "GTIN:", value = product.gtin.ifBlank { "Not set" })
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    InventoryMetricLine(label = "MOQ:", value = product.minimumOrderQuantity.coerceAtLeast(1).toString())
+                    InventoryMetricLine(label = "State:", value = if (product.published) "Live" else "Draft")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                InventoryActionButton(
+                    text = if (isBusy) "Updating..." else "Update Stock",
+                    icon = Icons.Default.Settings,
+                    onClick = onOpenDetail,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
-        SecondaryButton(text = if (isBusy) "Updating..." else "View and update", onClick = onOpenDetail, enabled = !isBusy)
+    }
+}
+
+@Composable
+private fun InventoryCardTop(
+    title: String,
+    subtitle: String,
+    statusText: String,
+    statusTone: StatusTone,
+    onMore: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
+        InventoryProductTile(modifier = Modifier.size(74.dp))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                color = InventoryText,
+                fontWeight = FontWeight.Black,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = InventoryMuted,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            StatusChip(text = statusText, tone = statusTone)
+        }
+        IconButton(onClick = onMore, modifier = Modifier.size(34.dp)) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "More",
+                tint = InventoryMuted,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun InventoryProductTile(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(InventoryIconBg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Inventory2,
+            contentDescription = null,
+            tint = InventoryMuted,
+            modifier = Modifier.size(34.dp),
+        )
+    }
+}
+
+@Composable
+private fun InventoryMetricLine(
+    label: String,
+    value: String,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = InventoryMuted,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = InventoryText,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun InventoryToggle(
+    checked: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .width(50.dp)
+            .height(28.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(999.dp),
+        color = if (checked) InventorySuccess else Color(0xFF607286),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 3.dp),
+            contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .background(Color.White, RoundedCornerShape(999.dp)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun InventoryAutoRestockPanel(item: InventoryItemDTO) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = Color(0xFF0D3C34).copy(alpha = 0.72f),
+        border = BorderStroke(1.dp, InventorySuccess.copy(alpha = 0.38f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .background(InventorySuccess, RoundedCornerShape(7.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+                }
+                Text("Active Configuration", style = MaterialTheme.typography.titleSmall, color = InventoryText, fontWeight = FontWeight.Black)
+            }
+            InventoryConfigTextLine("Reorder Quantity", "${item.reorderQuantity ?: item.autoOrderConfig?.reorderQuantity ?: 0} units")
+            InventoryConfigTextLine("Trigger Threshold", "${item.autoOrderConfig?.minThreshold ?: 0} units")
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(InventorySuccess.copy(alpha = 0.24f), RoundedCornerShape(999.dp)))
+            InventoryConfigTextLine("Next Restock Date", nextRestockLabel(item) ?: scheduleSummary(item), compact = true)
+        }
+    }
+}
+
+@Composable
+private fun InventoryConfigTextLine(label: String, value: String, compact: Boolean = false) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium, color = Color(0xFF71E8C1), fontWeight = FontWeight.SemiBold)
+        Text(value, style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium, color = InventoryText, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun InventoryConfigLine(label: String, value: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = InventoryMuted, fontWeight = FontWeight.SemiBold)
+        Text(value.toString(), style = MaterialTheme.typography.bodyMedium, color = InventoryText, fontWeight = FontWeight.Black)
+    }
+}
+
+@Composable
+private fun InventoryActionButton(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .height(50.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.035f),
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = InventoryText, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleMedium,
+                color = InventoryText,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -804,6 +2444,23 @@ private fun inventoryStatusTone(item: InventoryItemDTO): StatusTone {
         item.currentStock <= 0 || item.status == InventoryStatus.OUT_OF_STOCK -> StatusTone.Error
         item.status == InventoryStatus.LOW_STOCK -> StatusTone.Warning
         else -> StatusTone.Success
+    }
+}
+
+private fun nextRestockLabel(item: InventoryItemDTO): String? {
+    return item.autoOrderConfig?.nextScheduledAt
+        ?.takeIf { item.autoRestock && it.isNotBlank() }
+        ?.take(10)
+}
+
+private fun scheduleSummary(item: InventoryItemDTO): String {
+    val config = item.autoOrderConfig ?: return "Not scheduled"
+    return when (config.scheduleType) {
+        ScheduleType.THRESHOLD_BASED -> "Triggers below ${config.minThreshold} units"
+        ScheduleType.DAILY -> "Daily restock check"
+        ScheduleType.WEEKLY -> "Weekly${config.dayOfWeek?.let { " on ${it.lowercase().replaceFirstChar { char -> char.uppercase() }}" } ?: ""}"
+        ScheduleType.MONTHLY -> "Monthly${config.dayOfMonth?.let { " on day $it" } ?: ""}"
+        ScheduleType.INTERVAL_DAYS -> "Every ${config.intervalDays ?: 0} days"
     }
 }
 

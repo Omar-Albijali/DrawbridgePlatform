@@ -76,6 +76,32 @@ data class UpdateAutoOrderConfigRequest(
     val dayOfMonth: String?
 )
 
+@Serializable
+data class InventoryAuditLogDTO(
+    val id: String,
+    val productId: String,
+    val inventoryItemId: String?,
+    val stockTargetType: String,
+    val changeType: String,
+    val sourceType: String,
+    val sourceId: String?,
+    val quantityBefore: Int,
+    val quantityAfter: Int,
+    val changeAmount: Int,
+    val changedBy: String,
+    val reason: String?,
+    val createdAt: String
+)
+
+@Serializable
+data class InventoryAuditLogPageResponse(
+    val items: List<InventoryAuditLogDTO>,
+    val page: Int,
+    val size: Int,
+    val totalElements: Int,
+    val totalPages: Int
+)
+
 @JsExport
 @Serializable
 data class PosScanRequest(

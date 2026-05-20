@@ -762,6 +762,7 @@ private fun MainHost(
                     InventoryMainScreen(
                         inventoryStateHolder = inventoryStateHolder,
                         onOpenDetail = onOpenInventoryItem,
+                        onShowMessage = showMessage,
                     )
                 }
 
@@ -828,6 +829,7 @@ private fun MainHost(
                                 InventoryMainScreen(
                                     inventoryStateHolder = inventoryStateHolder,
                                     onOpenDetail = onOpenInventoryItem,
+                                    onShowMessage = showMessage,
                                 )
                             },
                         )

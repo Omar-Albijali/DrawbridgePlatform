@@ -180,6 +180,19 @@ class MobileAuthApi(
         return json.decodeFromString(InventoryItemDTO.serializer(), body)
     }
 
+    suspend fun createInventoryItem(request: CreateInventoryItemRequest): InventoryItemDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/inventory")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(InventoryItemDTO.serializer(), body)
+    }
+
     suspend fun updateInventoryQuantity(inventoryItemId: String, quantity: Int): InventoryItemDTO {
         val token = requireBearerToken()
         val response = client.patch(buildUrl("/inventory/$inventoryItemId/quantity")) {
@@ -190,6 +203,58 @@ class MobileAuthApi(
         val body = response.bodyAsText()
         ensureSuccess(response.status, body)
         return json.decodeFromString(InventoryItemDTO.serializer(), body)
+    }
+
+    suspend fun toggleAutoOrderConfig(inventoryItemId: String, enabled: Boolean): AutoOrderConfigDTO {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/inventory/auto-order/$inventoryItemId/toggle")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("enabled", enabled)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(AutoOrderConfigDTO.serializer(), body)
+    }
+
+    suspend fun updateAutoOrderConfig(
+        inventoryItemId: String,
+        request: UpdateAutoOrderConfigRequest,
+    ): AutoOrderConfigDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/inventory/auto-order/$inventoryItemId")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(AutoOrderConfigDTO.serializer(), body)
+    }
+
+    suspend fun fetchInventoryAuditLogs(
+        productId: String? = null,
+        inventoryItemId: String? = null,
+        stockTargetType: String? = null,
+        sourceType: String? = null,
+        page: Int = 0,
+        size: Int = 20,
+    ): InventoryAuditLogPageResponse {
+        val token = requireBearerToken()
+        val response = client.get(buildUrl("/inventory/logs")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            productId?.takeIf { it.isNotBlank() }?.let { parameter("productId", it) }
+            inventoryItemId?.takeIf { it.isNotBlank() }?.let { parameter("inventoryItemId", it) }
+            stockTargetType?.takeIf { it.isNotBlank() }?.let { parameter("stockTargetType", it) }
+            sourceType?.takeIf { it.isNotBlank() }?.let { parameter("sourceType", it) }
+            parameter("page", page)
+            parameter("size", size)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(InventoryAuditLogPageResponse.serializer(), body)
     }
 
     suspend fun fetchProductsByWholesaler(wholesalerId: String): List<ProductDTO> {
