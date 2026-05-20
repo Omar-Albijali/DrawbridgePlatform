@@ -317,7 +317,6 @@ internal fun MoreDestinationScreen(
     onLogout: () -> Unit,
     wishlistContent: @Composable () -> Unit,
     posContent: @Composable () -> Unit,
-    reportsContent: @Composable () -> Unit,
     supportContent: @Composable () -> Unit,
     notificationsContent: @Composable () -> Unit,
     settingsContent: @Composable () -> Unit,
@@ -346,12 +345,6 @@ internal fun MoreDestinationScreen(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SecondaryButton(text = "Back to More", onClick = onBack)
                 AccountMainScreen(onLogout = onLogout)
-            }
-        }
-        AppDestination.Reports -> {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SecondaryButton(text = "Back to More", onClick = onBack)
-                reportsContent()
             }
         }
         AppDestination.Support -> {
