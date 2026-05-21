@@ -197,6 +197,7 @@ internal fun MarketplaceMainScreen(
                 message = "Try a different search, category, brand, or sort option.",
                 actionText = "Reset filters",
                 onAction = { coroutineScope.launch { marketplaceStateHolder.clearFilters() } },
+                label = "No results",
             )
         } else {
             MarketplaceProductGrid(

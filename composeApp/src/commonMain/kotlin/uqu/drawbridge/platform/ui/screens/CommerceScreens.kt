@@ -1,5 +1,14 @@
 package uqu.drawbridge.platform.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -8,12 +17,15 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,12 +34,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,20 +72,26 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.jetbrains.skia.Image as SkiaImage
+import uqu.drawbridge.platform.AddressResponseDto
 import uqu.drawbridge.platform.InvoiceDTO
 import uqu.drawbridge.platform.OrderDTO
 import uqu.drawbridge.platform.OrderGroupDTO
 import uqu.drawbridge.platform.OrderItemDTO
 import uqu.drawbridge.platform.OrderStatus
+import uqu.drawbridge.platform.PaymentMethodDTO
 import uqu.drawbridge.platform.PaymentStatus
 import uqu.drawbridge.platform.ProductDTO
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.ui.commerce.CartProductItem
 import uqu.drawbridge.platform.ui.commerce.CartStateHolder
+import uqu.drawbridge.platform.ui.commerce.CheckoutAddressForm
+import uqu.drawbridge.platform.ui.commerce.CheckoutPaymentForm
+import uqu.drawbridge.platform.ui.commerce.CheckoutStep
 import uqu.drawbridge.platform.ui.commerce.OrderStatusFilter
 import uqu.drawbridge.platform.ui.commerce.OrdersStateHolder
 import uqu.drawbridge.platform.ui.components.AppCard
@@ -231,21 +254,13 @@ internal fun CartMainScreen(
 private fun CartEmptyState(
     onOpenMarketplace: () -> Unit,
 ) {
-    GlassCard(contentPadding = 18.dp) {
-        GlassPill(text = "Empty", tint = CommerceMuted)
-        Text(
-            text = "Your cart is empty",
-            style = MaterialTheme.typography.titleLarge,
-            color = CommerceText,
-            fontWeight = FontWeight.Black,
-        )
-        Text(
-            text = "Add products from the marketplace when you are ready to order.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = CommerceMuted,
-        )
-        SecondaryButton(text = "Browse marketplace", onClick = onOpenMarketplace)
-    }
+    CommerceStatePanel(
+        label = "Empty",
+        title = "Your cart is empty",
+        message = "Add products from the marketplace when you are ready to order.",
+        actionText = "Browse marketplace",
+        onAction = onOpenMarketplace,
+    )
 }
 
 @Composable
@@ -255,48 +270,17 @@ private fun CartHeader(
     onBack: () -> Unit,
     onClear: () -> Unit,
 ) {
-    GlassCard(contentPadding = 16.dp) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = null,
-                        tint = CommerceText,
-                        modifier = Modifier
-                            .size(22.dp)
-                            .clickable(onClick = onBack),
-                    )
-                    Text(
-                        text = "Back",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = CommerceText,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.clickable(onClick = onBack),
-                    )
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(
-                        text = "Shopping Cart",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = CommerceText,
-                        fontWeight = FontWeight.Black,
-                    )
-                    Text(
-                        text = "$itemCount ${if (itemCount == 1) "item" else "items"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = CommerceMuted,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
+    AppPageHeader(
+        title = "Shopping Cart",
+        subtitle = "$itemCount ${if (itemCount == 1) "item" else "items"}",
+        leading = {
+            CheckoutIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                onClick = onBack,
+            )
+        },
+        trailing = {
             Surface(
                 modifier = Modifier
                     .size(42.dp)
@@ -314,6 +298,43 @@ private fun CartHeader(
                         modifier = Modifier.size(20.dp),
                     )
                 }
+            }
+        },
+    )
+}
+
+@Composable
+private fun CommerceStatePanel(
+    label: String,
+    title: String,
+    message: String,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = OrdersCardBg,
+        border = BorderStroke(1.dp, OrdersBorder),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            GlassPill(text = label, tint = OrdersMuted)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = OrdersInk,
+                fontWeight = FontWeight.Black,
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = OrdersSubtle,
+            )
+            if (actionText != null && onAction != null) {
+                SecondaryButton(text = actionText, onClick = onAction)
             }
         }
     }
@@ -619,6 +640,7 @@ internal fun CheckoutMainScreen(
     cartStateHolder: CartStateHolder,
     onBackToCart: () -> Unit,
     onViewOrders: () -> Unit,
+    onContinueShopping: () -> Unit,
     onShowMessage: (String) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -627,20 +649,44 @@ internal fun CheckoutMainScreen(
 
     LaunchedEffect(Unit) {
         cartStateHolder.loadInitial()
+        cartStateHolder.prepareCheckout()
     }
 
-    ScreenSection(
-        title = "Checkout",
-        subtitle = "Confirm your cart and place the order.",
+    val subtotal = checkoutSubtotal(cartState.items)
+    val total = checkoutTotal(subtotal)
+    val selectedAddress = checkoutState.addresses.firstOrNull { it.id == checkoutState.selectedAddressId }
+    val selectedPayment = checkoutState.paymentMethods.firstOrNull { it.id == checkoutState.selectedPaymentMethodId }
+    val backAction = {
+        when (checkoutState.step) {
+            CheckoutStep.Delivery -> onBackToCart()
+            CheckoutStep.Payment -> cartStateHolder.goToCheckoutStep(CheckoutStep.Delivery)
+            CheckoutStep.Confirm -> cartStateHolder.goToCheckoutStep(CheckoutStep.Payment)
+            CheckoutStep.Success -> onContinueShopping()
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        SecondaryButton(text = "Back to cart", onClick = onBackToCart)
+        if (checkoutState.step != CheckoutStep.Success) {
+            CheckoutHeader(
+                itemCount = cartState.itemCount,
+                total = total,
+                onBack = backAction,
+            )
+            CheckoutStepper(step = checkoutState.step)
+        }
 
         checkoutState.successGroup?.let { group ->
-            CheckoutSuccessCard(
+            CheckoutSuccessScreen(
                 group = group,
+                address = selectedAddress,
+                payment = selectedPayment,
                 onViewOrders = onViewOrders,
+                onContinueShopping = onContinueShopping,
             )
-            return@ScreenSection
+            return@Column
         }
 
         if (cartState.items.isEmpty() && cartState.hasLoaded) {
@@ -648,7 +694,7 @@ internal fun CheckoutMainScreen(
                 title = "No items to checkout",
                 message = "Add products to your cart before placing an order.",
             )
-            return@ScreenSection
+            return@Column
         }
 
         if (checkoutState.errorMessage != null) {
@@ -658,91 +704,901 @@ internal fun CheckoutMainScreen(
             )
         }
 
-        AppCard {
-            Text("Order summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            cartState.items.forEach { item ->
-                CheckoutLineItem(item = item)
-            }
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("Estimated subtotal", style = MaterialTheme.typography.titleMedium)
-                Text(formatMoney(cartState.estimatedSubtotal), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
-            }
-            Text(
-                "Drawbridge recalculates order totals and creates separate wholesaler orders at submission.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        if (cartState.isLoading || checkoutState.isLoadingDetails) {
+            LoadingStateCard(title = "Preparing checkout", message = "Loading delivery and payment details.")
+            return@Column
         }
 
-        AppCard {
-            StatusChip(text = "Payment pending", tone = StatusTone.Warning)
-            Text("Payment method", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(
-                "This checkout creates an order with ${statusLabel(PaymentStatus.PENDING.name)} payment status. No card charge is processed here.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        PrimaryButton(
-            text = if (checkoutState.isSubmitting) "Placing order..." else "Place order",
-            onClick = {
-                coroutineScope.launch {
-                    val result = cartStateHolder.checkout()
-                    result.message?.let(onShowMessage)
-                }
+        AnimatedContent(
+            targetState = checkoutState.step,
+            transitionSpec = {
+                val forward = targetState.ordinal > initialState.ordinal
+                val enter = slideInHorizontally(
+                    animationSpec = tween(280, easing = FastOutSlowInEasing),
+                ) { if (forward) it / 3 else -it / 3 } + fadeIn(animationSpec = tween(180))
+                val exit = slideOutHorizontally(
+                    animationSpec = tween(220, easing = FastOutSlowInEasing),
+                ) { if (forward) -it / 4 else it / 4 } + fadeOut(animationSpec = tween(140))
+                enter.togetherWith(exit).using(SizeTransform(clip = false))
             },
-            enabled = !checkoutState.isSubmitting && cartState.items.isNotEmpty() && !cartState.hasInvalidItems,
+            modifier = Modifier.fillMaxWidth(),
+        ) { step ->
+            when (step) {
+                CheckoutStep.Delivery -> CheckoutDeliveryStep(
+                    addresses = checkoutState.addresses,
+                    selectedAddressId = checkoutState.selectedAddressId,
+                    notes = checkoutState.notes,
+                    addressForm = checkoutState.addressForm,
+                    isAddingAddress = checkoutState.isAddingAddress,
+                    isSavingDetails = checkoutState.isSavingDetails,
+                    items = cartState.items,
+                    total = total,
+                    onSelectAddress = cartStateHolder::selectCheckoutAddress,
+                    onNotesChange = cartStateHolder::updateCheckoutNotes,
+                    onToggleAddressForm = cartStateHolder::toggleCheckoutAddressForm,
+                    onAddressFormChange = cartStateHolder::updateCheckoutAddressForm,
+                    onSaveAddress = {
+                        coroutineScope.launch {
+                            val result = cartStateHolder.saveCheckoutAddress()
+                            result.message?.let(onShowMessage)
+                        }
+                    },
+                    onContinue = {
+                        if (checkoutState.selectedAddressId == null) {
+                            onShowMessage("Choose a delivery address.")
+                        } else {
+                            cartStateHolder.goToCheckoutStep(CheckoutStep.Payment)
+                        }
+                    },
+                )
+
+                CheckoutStep.Payment -> CheckoutPaymentStep(
+                    paymentMethods = checkoutState.paymentMethods,
+                    selectedPaymentMethodId = checkoutState.selectedPaymentMethodId,
+                    paymentForm = checkoutState.paymentForm,
+                    isAddingPaymentMethod = checkoutState.isAddingPaymentMethod,
+                    isSavingDetails = checkoutState.isSavingDetails,
+                    total = total,
+                    onSelectPayment = cartStateHolder::selectCheckoutPaymentMethod,
+                    onTogglePaymentForm = cartStateHolder::toggleCheckoutPaymentForm,
+                    onPaymentFormChange = cartStateHolder::updateCheckoutPaymentForm,
+                    onSavePaymentMethod = {
+                        coroutineScope.launch {
+                            val result = cartStateHolder.saveCheckoutPaymentMethod()
+                            result.message?.let(onShowMessage)
+                        }
+                    },
+                    onContinue = {
+                        if (checkoutState.selectedPaymentMethodId == null) {
+                            onShowMessage("Choose a payment card.")
+                        } else {
+                            cartStateHolder.goToCheckoutStep(CheckoutStep.Confirm)
+                        }
+                    },
+                )
+
+                CheckoutStep.Confirm -> CheckoutConfirmStep(
+                    address = selectedAddress,
+                    payment = selectedPayment,
+                    items = cartState.items,
+                    subtotal = subtotal,
+                    total = total,
+                    isSubmitting = checkoutState.isSubmitting,
+                    onEditDelivery = { cartStateHolder.goToCheckoutStep(CheckoutStep.Delivery) },
+                    onEditPayment = { cartStateHolder.goToCheckoutStep(CheckoutStep.Payment) },
+                    onPlaceOrder = {
+                        coroutineScope.launch {
+                            val result = cartStateHolder.checkout()
+                            result.message?.let(onShowMessage)
+                        }
+                    },
+                )
+
+                CheckoutStep.Success -> Unit
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckoutHeader(
+    itemCount: Int,
+    total: Double,
+    onBack: () -> Unit,
+) {
+    GlassCard(contentPadding = 16.dp) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CheckoutIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                onClick = onBack,
+            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = "Checkout",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = CommerceText,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    text = "$itemCount ${if (itemCount == 1) "item" else "items"} · ${formatMoney(total)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CommerceMuted,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckoutStepper(step: CheckoutStep) {
+    val steps = listOf(CheckoutStep.Delivery, CheckoutStep.Payment, CheckoutStep.Confirm)
+    val activeIndex = when (step) {
+        CheckoutStep.Success -> steps.size
+        else -> step.ordinal
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = Color.White.copy(alpha = 0.055f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            steps.forEachIndexed { index, checkoutStep ->
+                CheckoutStepNode(
+                    number = index + 1,
+                    label = checkoutStep.name,
+                    active = activeIndex == index,
+                    completed = activeIndex > index,
+                    modifier = Modifier.weight(1f),
+                )
+                if (index != steps.lastIndex) {
+                    Box(
+                        modifier = Modifier
+                            .weight(0.75f)
+                            .padding(top = 19.dp)
+                            .height(2.dp)
+                            .background(
+                                if (activeIndex > index) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.12f),
+                                RoundedCornerShape(999.dp),
+                            ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckoutStepNode(
+    number: Int,
+    label: String,
+    active: Boolean,
+    completed: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Surface(
+            modifier = Modifier.size(40.dp),
+            shape = RoundedCornerShape(999.dp),
+            color = when {
+                completed || active -> MaterialTheme.colorScheme.primary
+                else -> Color.White.copy(alpha = 0.08f)
+            },
+            border = BorderStroke(1.dp, if (completed || active) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.12f)),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                if (completed) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+                } else {
+                    Text(
+                        number.toString(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (active) Color.White else CommerceMuted,
+                        fontWeight = FontWeight.Black,
+                    )
+                }
+            }
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (active || completed) CommerceText else CommerceMuted,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
         )
+    }
+}
+
+@Composable
+private fun CheckoutDeliveryStep(
+    addresses: List<AddressResponseDto>,
+    selectedAddressId: String?,
+    notes: String,
+    addressForm: CheckoutAddressForm,
+    isAddingAddress: Boolean,
+    isSavingDetails: Boolean,
+    items: List<CartProductItem>,
+    total: Double,
+    onSelectAddress: (String) -> Unit,
+    onNotesChange: (String) -> Unit,
+    onToggleAddressForm: () -> Unit,
+    onAddressFormChange: (CheckoutAddressForm) -> Unit,
+    onSaveAddress: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
+        CheckoutSectionCard(title = "Delivery Address", icon = Icons.Default.LocationOn) {
+            addresses.forEachIndexed { index, address ->
+                CheckoutAddressOption(
+                    address = address,
+                    label = checkoutAddressLabel(index),
+                    selected = address.id == selectedAddressId,
+                    onClick = { onSelectAddress(address.id) },
+                )
+            }
+            CheckoutDashedRow(
+                text = if (isAddingAddress) "Close New Address" else "Add New Address",
+                onClick = onToggleAddressForm,
+            )
+            if (isAddingAddress) {
+                CheckoutAddressFormCard(
+                    form = addressForm,
+                    isSaving = isSavingDetails,
+                    onChange = onAddressFormChange,
+                    onSave = onSaveAddress,
+                )
+            }
+        }
+        CheckoutSectionCard(title = "Order Notes", icon = Icons.AutoMirrored.Filled.Notes) {
+            CheckoutNotesField(value = notes, onValueChange = onNotesChange)
+        }
+        CheckoutItemsCard(items = items)
+        CheckoutActionCard(total = total, buttonText = "Continue to Payment", onClick = onContinue)
+    }
+}
+
+@Composable
+private fun CheckoutPaymentStep(
+    paymentMethods: List<PaymentMethodDTO>,
+    selectedPaymentMethodId: String?,
+    paymentForm: CheckoutPaymentForm,
+    isAddingPaymentMethod: Boolean,
+    isSavingDetails: Boolean,
+    total: Double,
+    onSelectPayment: (String) -> Unit,
+    onTogglePaymentForm: () -> Unit,
+    onPaymentFormChange: (CheckoutPaymentForm) -> Unit,
+    onSavePaymentMethod: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
+        CheckoutSectionCard(title = "Payment Method", icon = Icons.Default.CreditCard) {
+            paymentMethods.forEach { paymentMethod ->
+                CheckoutPaymentOption(
+                    payment = paymentMethod,
+                    selected = paymentMethod.id == selectedPaymentMethodId,
+                    onClick = { onSelectPayment(paymentMethod.id) },
+                )
+            }
+            CheckoutDashedRow(
+                text = if (isAddingPaymentMethod) "Close New Payment Method" else "Add New Payment Method",
+                onClick = onTogglePaymentForm,
+            )
+            if (isAddingPaymentMethod) {
+                CheckoutPaymentFormCard(
+                    form = paymentForm,
+                    isSaving = isSavingDetails,
+                    onChange = onPaymentFormChange,
+                    onSave = onSavePaymentMethod,
+                )
+            }
+        }
+        CheckoutSectionCard(title = "Card Details", icon = Icons.Default.Security) {
+            val selected = paymentMethods.firstOrNull { it.id == selectedPaymentMethodId }
+            Text(
+                text = selected?.maskedDetails ?: "Saved card",
+                style = MaterialTheme.typography.titleMedium,
+                color = CommerceText,
+                fontWeight = FontWeight.Black,
+            )
+            Text(
+                text = "Payment is handled securely with the saved demo card.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = CommerceMuted,
+            )
+        }
+        CheckoutActionCard(total = total, buttonText = "Review Order", onClick = onContinue)
+    }
+}
+
+@Composable
+private fun CheckoutConfirmStep(
+    address: AddressResponseDto?,
+    payment: PaymentMethodDTO?,
+    items: List<CartProductItem>,
+    subtotal: Double,
+    total: Double,
+    isSubmitting: Boolean,
+    onEditDelivery: () -> Unit,
+    onEditPayment: () -> Unit,
+    onPlaceOrder: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
+        CheckoutSectionCard(title = "Delivery Address", icon = Icons.Default.LocationOn) {
+            CheckoutSummaryBlock(
+                icon = Icons.Default.LocationOn,
+                title = "HQ Office",
+                body = address?.let { checkoutAddressBody(it) } ?: "No address selected",
+                action = "Edit",
+                onAction = onEditDelivery,
+            )
+        }
+        CheckoutSectionCard(title = "Payment", icon = Icons.Default.CreditCard) {
+            CheckoutSummaryBlock(
+                icon = Icons.Default.CreditCard,
+                title = "Credit / Debit Card",
+                body = payment?.maskedDetails ?: "Saved card",
+                action = "Edit",
+                onAction = onEditPayment,
+            )
+        }
+        CheckoutItemsCard(items = items, title = "Order Items (${items.size})")
+        CheckoutTotalsCard(subtotal = subtotal, total = total)
+        PrimaryButton(
+            text = if (isSubmitting) "Processing payment..." else "Place Order · ${formatMoney(total)}",
+            onClick = onPlaceOrder,
+            enabled = !isSubmitting && items.isNotEmpty(),
+        )
+    }
+}
+
+@Composable
+private fun CheckoutSuccessScreen(
+    group: OrderGroupDTO,
+    address: AddressResponseDto?,
+    payment: PaymentMethodDTO?,
+    onViewOrders: () -> Unit,
+    onContinueShopping: () -> Unit,
+) {
+    val total = checkoutTotal(group.groupTotal)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 42.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        Surface(
+            modifier = Modifier.size(88.dp),
+            shape = RoundedCornerShape(999.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(44.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        Text(
+            text = "Order Placed!",
+            style = MaterialTheme.typography.headlineMedium,
+            color = CommerceText,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = "Your order has been confirmed.\nOrder #${shortId(group.id)}",
+            style = MaterialTheme.typography.bodyLarge,
+            color = CommerceMuted,
+            textAlign = TextAlign.Center,
+        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            color = Color.White.copy(alpha = 0.07f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                CheckoutSummaryLine("Deliver to", address?.city?.let { "HQ Office, $it" } ?: "HQ Office")
+                CheckoutSummaryLine("Payment", payment?.maskedDetails ?: "Credit / Debit Card")
+                CheckoutSummaryLine("Total", formatMoney(total), strong = true)
+            }
+        }
+        PrimaryButton(text = "Track My Order", onClick = onViewOrders)
+        SecondaryButton(text = "Continue Shopping", onClick = onContinueShopping)
+    }
+}
+
+@Composable
+private fun CheckoutSectionCard(
+    title: String,
+    icon: ImageVector,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = Color.White.copy(alpha = 0.075f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CheckoutIconTile(icon = icon)
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = CommerceText,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+            CheckoutDivider()
+            Column(
+                modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                content = content,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CheckoutAddressOption(
+    address: AddressResponseDto,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    CheckoutSelectableRow(selected = selected, onClick = onClick) {
+        CheckoutRadioDot(selected = selected)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(label, style = MaterialTheme.typography.titleMedium, color = CommerceText, fontWeight = FontWeight.Black)
+                if (selected) {
+                    StatusChip(text = "Default", tone = StatusTone.Success)
+                }
+            }
+            Text(
+                text = checkoutAddressBody(address),
+                style = MaterialTheme.typography.bodyMedium,
+                color = CommerceMuted,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CheckoutPaymentOption(
+    payment: PaymentMethodDTO,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    CheckoutSelectableRow(selected = selected, onClick = onClick) {
+        CheckoutRadioDot(selected = selected)
+        CheckoutIconTile(icon = Icons.Default.CreditCard, selected = selected)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Credit / Debit Card", style = MaterialTheme.typography.titleMedium, color = CommerceText, fontWeight = FontWeight.Black)
+            Text(payment.maskedDetails, style = MaterialTheme.typography.bodyMedium, color = CommerceMuted, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun CheckoutSelectableRow(
+    selected: Boolean,
+    onClick: () -> Unit,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(13.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(13.dp),
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.045f),
+        border = BorderStroke(
+            width = if (selected) 2.dp else 1.dp,
+            color = if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.13f),
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun CheckoutRadioDot(selected: Boolean) {
+    Surface(
+        modifier = Modifier.size(28.dp),
+        shape = RoundedCornerShape(999.dp),
+        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        border = BorderStroke(2.dp, if (selected) MaterialTheme.colorScheme.primary else CommerceMuted.copy(alpha = 0.55f)),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .size(9.dp)
+                        .background(Color.White, RoundedCornerShape(999.dp)),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckoutDashedRow(
+    text: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(13.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(13.dp),
+        color = Color.Transparent,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, tint = CommerceMuted, modifier = Modifier.size(20.dp))
+            Text(text, style = MaterialTheme.typography.titleMedium, color = CommerceMuted, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+private fun CheckoutAddressFormCard(
+    form: CheckoutAddressForm,
+    isSaving: Boolean,
+    onChange: (CheckoutAddressForm) -> Unit,
+    onSave: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(13.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        CheckoutInputField(form.street, { onChange(form.copy(street = it)) }, "Street")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            CheckoutInputField(form.city, { onChange(form.copy(city = it)) }, "City", modifier = Modifier.weight(1f))
+            CheckoutInputField(form.state, { onChange(form.copy(state = it)) }, "State", modifier = Modifier.weight(1f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            CheckoutInputField(form.zipCode, { onChange(form.copy(zipCode = it)) }, "Zip code", modifier = Modifier.weight(1f))
+            CheckoutInputField(form.country, { onChange(form.copy(country = it)) }, "Country", modifier = Modifier.weight(1f))
+        }
+        PrimaryButton(
+            text = if (isSaving) "Saving address..." else "Save Address",
+            onClick = onSave,
+            enabled = !isSaving,
+        )
+    }
+}
+
+@Composable
+private fun CheckoutPaymentFormCard(
+    form: CheckoutPaymentForm,
+    isSaving: Boolean,
+    onChange: (CheckoutPaymentForm) -> Unit,
+    onSave: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(13.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        CheckoutInputField(form.cardNumber, { onChange(form.copy(cardNumber = it)) }, "Card number")
+        CheckoutInputField(form.cardholderName, { onChange(form.copy(cardholderName = it)) }, "Cardholder name")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            CheckoutInputField(form.expiry, { onChange(form.copy(expiry = it)) }, "MM/YY", modifier = Modifier.weight(1f))
+            CheckoutInputField(form.cvv, { onChange(form.copy(cvv = it)) }, "CVV", modifier = Modifier.weight(1f))
+        }
+        Text(
+            text = "Only masked card details are saved.",
+            style = MaterialTheme.typography.bodySmall,
+            color = CommerceMuted,
+            fontWeight = FontWeight.SemiBold,
+        )
+        PrimaryButton(
+            text = if (isSaving) "Saving payment..." else "Save Payment Method",
+            onClick = onSave,
+            enabled = !isSaving,
+        )
+    }
+}
+
+@Composable
+private fun CheckoutInputField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = CommerceText, fontWeight = FontWeight.SemiBold),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        modifier = modifier.fillMaxWidth(),
+    ) { innerField ->
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .background(Color.White.copy(alpha = 0.055f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 13.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (value.isBlank()) {
+                Text(
+                    placeholder,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = CommerceMuted.copy(alpha = 0.75f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            innerField()
+        }
+    }
+}
+
+@Composable
+private fun CheckoutNotesField(
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = CommerceText),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        modifier = Modifier.fillMaxWidth(),
+    ) { innerField ->
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 112.dp)
+                .background(Color.White.copy(alpha = 0.045f), RoundedCornerShape(12.dp))
+                .padding(14.dp),
+        ) {
+            if (value.isBlank()) {
+                Text(
+                    "Special instructions for this order...",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = CommerceMuted,
+                )
+            }
+            innerField()
+        }
+    }
+}
+
+@Composable
+private fun CheckoutItemsCard(
+    items: List<CartProductItem>,
+    title: String = "Items (${items.size})",
+) {
+    CheckoutSectionCard(title = title, icon = Icons.Default.Inventory2) {
+        items.forEach { item ->
+            CheckoutLineItem(item = item)
+        }
     }
 }
 
 @Composable
 private fun CheckoutLineItem(item: CartProductItem) {
-    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.weight(1f)) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 item.product?.name ?: "Product unavailable",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleSmall,
+                color = CommerceText,
+                fontWeight = FontWeight.Black,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "Qty ${item.quantity} • MOQ ${item.minimumOrderQuantity}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                "${item.product?.supplier ?: "Supplier"} · x${item.quantity}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = CommerceMuted,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(formatMoney(item.lineTotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+        Text(formatMoney(item.lineTotal), style = MaterialTheme.typography.titleSmall, color = CommerceText, fontWeight = FontWeight.Black)
     }
 }
 
 @Composable
-private fun CheckoutSuccessCard(
-    group: OrderGroupDTO,
-    onViewOrders: () -> Unit,
+private fun CheckoutTotalsCard(
+    subtotal: Double,
+    total: Double,
 ) {
-    AppCard {
-        Icon(
-            Icons.Default.CheckCircle,
-            contentDescription = null,
-            modifier = Modifier.size(46.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Text("Order placed", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
-        Text(
-            "Order ${shortId(group.id)} was created with ${group.orders.size} wholesaler order${if (group.orders.size == 1) "" else "s"}.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Text("Order total", style = MaterialTheme.typography.titleMedium)
-            Text(formatMoney(group.groupTotal), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = Color.White.copy(alpha = 0.07f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            CheckoutSummaryLine("Subtotal", formatMoney(subtotal))
+            CheckoutSummaryLine("Shipping", "Free")
+            CheckoutDivider()
+            CheckoutSummaryLine("Total", formatMoney(total), strong = true)
         }
-        StatusChip(text = "Payment ${statusLabel(group.paymentStatus.name)}", tone = paymentTone(group.paymentStatus))
-        PrimaryButton(text = "View orders", onClick = onViewOrders)
     }
+}
+
+@Composable
+private fun CheckoutActionCard(
+    total: Double,
+    buttonText: String,
+    onClick: () -> Unit,
+) {
+    GlassCard(contentPadding = 16.dp) {
+        CheckoutSummaryLine("Total", formatMoney(total), strong = true)
+        PrimaryButton(text = buttonText, onClick = onClick)
+    }
+}
+
+@Composable
+private fun CheckoutSummaryBlock(
+    icon: ImageVector,
+    title: String,
+    body: String,
+    action: String,
+    onAction: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CheckoutIconTile(icon = icon)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = CommerceText, fontWeight = FontWeight.Black)
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = CommerceMuted, fontWeight = FontWeight.SemiBold)
+        }
+        Text(
+            text = action,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Black,
+            modifier = Modifier.clickable(onClick = onAction),
+        )
+    }
+}
+
+@Composable
+private fun CheckoutSummaryLine(
+    label: String,
+    value: String,
+    strong: Boolean = false,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = if (strong) CommerceText else CommerceMuted, fontWeight = if (strong) FontWeight.Black else FontWeight.SemiBold)
+        Text(value, style = MaterialTheme.typography.bodyLarge, color = CommerceText, fontWeight = FontWeight.Black, textAlign = TextAlign.End)
+    }
+}
+
+@Composable
+private fun CheckoutIconTile(
+    icon: ImageVector,
+    selected: Boolean = false,
+) {
+    Surface(
+        modifier = Modifier.size(42.dp),
+        shape = RoundedCornerShape(11.dp),
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.06f),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else CommerceMuted,
+                modifier = Modifier.size(21.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CheckoutIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White.copy(alpha = 0.06f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = contentDescription, tint = CommerceText, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+@Composable
+private fun CheckoutDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(999.dp)),
+    )
+}
+
+private fun checkoutAddressLabel(index: Int): String {
+    return if (index == 0) "HQ Office" else "Warehouse"
+}
+
+private fun checkoutAddressBody(address: AddressResponseDto): String {
+    return "${address.street}\n${address.city}, ${address.zipCode}"
+}
+
+private fun checkoutSubtotal(items: List<CartProductItem>): Double {
+    return checkoutRoundMoney(items.sumOf { it.lineTotal })
+}
+
+private fun checkoutTotal(subtotal: Double): Double {
+    return checkoutRoundMoney(subtotal)
+}
+
+private fun checkoutRoundMoney(value: Double): Double {
+    return kotlin.math.round(value * 100.0) / 100.0
 }
 
 @Composable
@@ -874,49 +1730,13 @@ private fun OrdersEmptyPanel(
         return
     }
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = OrdersCardBg,
-        border = BorderStroke(1.dp, OrdersBorder),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(30.dp),
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            GlassPill(text = label, tint = OrdersMuted)
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = OrdersInk,
-                fontWeight = FontWeight.Black,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Start,
-            )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = OrdersSubtle,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Start,
-            )
-            if (actionText != null && onAction != null) {
-                Surface(
-                    modifier = Modifier
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .clickable(onClick = onAction),
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                ) {
-                    Box(modifier = Modifier.padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
-                        Text(actionText, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Black)
-                    }
-                }
-            }
-        }
-    }
+    CommerceStatePanel(
+        label = label,
+        title = title,
+        message = message,
+        actionText = actionText,
+        onAction = onAction,
+    )
 }
 
 @Composable

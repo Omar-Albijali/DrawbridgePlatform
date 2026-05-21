@@ -3,13 +3,19 @@ package uqu.drawbridge.platform.ui.commerce
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import uqu.drawbridge.platform.CartItemDTO
+import uqu.drawbridge.platform.AddressResponseDto
+import uqu.drawbridge.platform.CreateAddressRequest
+import uqu.drawbridge.platform.CreatePaymentMethodRequest
 import uqu.drawbridge.platform.InvoiceDTO
 import uqu.drawbridge.platform.MobileApiException
 import uqu.drawbridge.platform.MobileAuthApi
 import uqu.drawbridge.platform.OrderDTO
 import uqu.drawbridge.platform.OrderGroupDTO
 import uqu.drawbridge.platform.OrderStatus
+import uqu.drawbridge.platform.PaymentMethodDTO
+import uqu.drawbridge.platform.PaymentMethodType
 import uqu.drawbridge.platform.ProductDTO
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.ui.auth.AuthActionResult
@@ -45,7 +51,41 @@ internal data class CartUiState(
     val hasInvalidItems: Boolean = items.any { it.hasMissingProduct || it.isBelowMinimumOrder || it.isAboveStock }
 }
 
+internal enum class CheckoutStep {
+    Delivery,
+    Payment,
+    Confirm,
+    Success,
+}
+
+internal data class CheckoutAddressForm(
+    val street: String = "",
+    val city: String = "",
+    val state: String = "",
+    val zipCode: String = "",
+    val country: String = "Saudi Arabia",
+)
+
+internal data class CheckoutPaymentForm(
+    val cardNumber: String = "",
+    val cardholderName: String = "",
+    val expiry: String = "",
+    val cvv: String = "",
+)
+
 internal data class CheckoutUiState(
+    val step: CheckoutStep = CheckoutStep.Delivery,
+    val addresses: List<AddressResponseDto> = emptyList(),
+    val paymentMethods: List<PaymentMethodDTO> = emptyList(),
+    val selectedAddressId: String? = null,
+    val selectedPaymentMethodId: String? = null,
+    val notes: String = "",
+    val isAddingAddress: Boolean = false,
+    val addressForm: CheckoutAddressForm = CheckoutAddressForm(),
+    val isAddingPaymentMethod: Boolean = false,
+    val paymentForm: CheckoutPaymentForm = CheckoutPaymentForm(),
+    val isLoadingDetails: Boolean = false,
+    val isSavingDetails: Boolean = false,
     val isSubmitting: Boolean = false,
     val successGroup: OrderGroupDTO? = null,
     val errorMessage: String? = null,
@@ -127,6 +167,204 @@ internal class CartStateHolder(
 
     fun clearCheckoutResult() {
         checkoutState = CheckoutUiState()
+    }
+
+    suspend fun prepareCheckout() {
+        if (!isEnabled) {
+            checkoutState = checkoutState.copy(errorMessage = "Checkout is available for retailer accounts.")
+            return
+        }
+        if (checkoutState.isLoadingDetails) return
+        if (checkoutState.addresses.isNotEmpty() && checkoutState.paymentMethods.isNotEmpty()) return
+
+        checkoutState = checkoutState.copy(isLoadingDetails = true, errorMessage = null)
+        runCatching {
+            val addresses = api.fetchAddresses().ifEmpty {
+                listOf(
+                    api.createAddress(
+                        CreateAddressRequest(
+                            street = "King Fahd Road, Al Olaya",
+                            city = "Riyadh",
+                            state = "Riyadh",
+                            zipCode = "11564",
+                            country = "Saudi Arabia",
+                        ),
+                    ),
+                )
+            }
+            val cardMethods = api.fetchPaymentMethods(session.user.id)
+                .filter { it.type == PaymentMethodType.CREDIT_CARD || it.type == PaymentMethodType.DEBIT_CARD }
+                .ifEmpty {
+                    listOf(
+                        api.addPaymentMethod(
+                            CreatePaymentMethodRequest(
+                                ownerId = session.user.id,
+                                type = PaymentMethodType.CREDIT_CARD.name,
+                                maskedDetails = "Visa **** 4444 (Exp: 12/28)",
+                                isDefault = true,
+                            ),
+                        ),
+                    )
+                }
+            addresses to cardMethods
+        }.fold(
+            onSuccess = { (addresses, paymentMethods) ->
+                checkoutState = checkoutState.copy(
+                    addresses = addresses,
+                    paymentMethods = paymentMethods,
+                    selectedAddressId = checkoutState.selectedAddressId
+                        ?.takeIf { id -> addresses.any { it.id == id } }
+                        ?: addresses.firstOrNull()?.id,
+                    selectedPaymentMethodId = checkoutState.selectedPaymentMethodId
+                        ?.takeIf { id -> paymentMethods.any { it.id == id } }
+                        ?: paymentMethods.firstOrNull { it.isDefault }?.id
+                        ?: paymentMethods.firstOrNull()?.id,
+                    isLoadingDetails = false,
+                    errorMessage = null,
+                )
+            },
+            onFailure = { error ->
+                checkoutState = checkoutState.copy(
+                    isLoadingDetails = false,
+                    errorMessage = userReadableMessage(error, "Unable to prepare checkout right now."),
+                )
+            },
+        )
+    }
+
+    fun selectCheckoutAddress(addressId: String) {
+        checkoutState = checkoutState.copy(selectedAddressId = addressId, errorMessage = null)
+    }
+
+    fun selectCheckoutPaymentMethod(paymentMethodId: String) {
+        checkoutState = checkoutState.copy(selectedPaymentMethodId = paymentMethodId, errorMessage = null)
+    }
+
+    fun updateCheckoutNotes(notes: String) {
+        checkoutState = checkoutState.copy(notes = notes)
+    }
+
+    fun toggleCheckoutAddressForm() {
+        checkoutState = checkoutState.copy(
+            isAddingAddress = !checkoutState.isAddingAddress,
+            addressForm = if (checkoutState.isAddingAddress) CheckoutAddressForm() else checkoutState.addressForm,
+            errorMessage = null,
+        )
+    }
+
+    fun updateCheckoutAddressForm(form: CheckoutAddressForm) {
+        checkoutState = checkoutState.copy(addressForm = form, errorMessage = null)
+    }
+
+    suspend fun saveCheckoutAddress(): AuthActionResult {
+        val form = checkoutState.addressForm
+        if (listOf(form.street, form.city, form.state, form.zipCode, form.country).any { it.isBlank() }) {
+            val message = "Complete the delivery address."
+            checkoutState = checkoutState.copy(errorMessage = message)
+            return AuthActionResult(success = false, message = message)
+        }
+        checkoutState = checkoutState.copy(isSavingDetails = true, errorMessage = null)
+        return runCatching {
+            api.createAddress(
+                CreateAddressRequest(
+                    street = form.street.trim(),
+                    city = form.city.trim(),
+                    state = form.state.trim(),
+                    zipCode = form.zipCode.trim(),
+                    country = form.country.trim(),
+                ),
+            )
+        }.fold(
+            onSuccess = { saved ->
+                checkoutState = checkoutState.copy(
+                    addresses = checkoutState.addresses + saved,
+                    selectedAddressId = saved.id,
+                    addressForm = CheckoutAddressForm(),
+                    isAddingAddress = false,
+                    isSavingDetails = false,
+                    errorMessage = null,
+                )
+                AuthActionResult(success = true, message = "Address added.")
+            },
+            onFailure = { error ->
+                val message = userReadableMessage(error, "Unable to add address.")
+                checkoutState = checkoutState.copy(isSavingDetails = false, errorMessage = message)
+                AuthActionResult(success = false, message = message)
+            },
+        )
+    }
+
+    fun toggleCheckoutPaymentForm() {
+        checkoutState = checkoutState.copy(
+            isAddingPaymentMethod = !checkoutState.isAddingPaymentMethod,
+            paymentForm = if (checkoutState.isAddingPaymentMethod) CheckoutPaymentForm() else checkoutState.paymentForm,
+            errorMessage = null,
+        )
+    }
+
+    fun updateCheckoutPaymentForm(form: CheckoutPaymentForm) {
+        checkoutState = checkoutState.copy(paymentForm = form, errorMessage = null)
+    }
+
+    suspend fun saveCheckoutPaymentMethod(): AuthActionResult {
+        val form = checkoutState.paymentForm
+        val digits = form.cardNumber.filter { it.isDigit() }
+        when {
+            digits.length < 12 -> {
+                val message = "Enter a valid card number."
+                checkoutState = checkoutState.copy(errorMessage = message)
+                return AuthActionResult(success = false, message = message)
+            }
+            form.cardholderName.isBlank() -> {
+                val message = "Enter the cardholder name."
+                checkoutState = checkoutState.copy(errorMessage = message)
+                return AuthActionResult(success = false, message = message)
+            }
+            form.expiry.isBlank() -> {
+                val message = "Enter the card expiry."
+                checkoutState = checkoutState.copy(errorMessage = message)
+                return AuthActionResult(success = false, message = message)
+            }
+            form.cvv.length < 3 -> {
+                val message = "Enter the security code."
+                checkoutState = checkoutState.copy(errorMessage = message)
+                return AuthActionResult(success = false, message = message)
+            }
+        }
+
+        val maskedDetails = "${cardBrand(digits)} **** ${digits.takeLast(4)} (Exp: ${form.expiry.trim()})"
+        checkoutState = checkoutState.copy(isSavingDetails = true, errorMessage = null)
+        return runCatching {
+            api.addPaymentMethod(
+                CreatePaymentMethodRequest(
+                    ownerId = session.user.id,
+                    type = PaymentMethodType.CREDIT_CARD.name,
+                    maskedDetails = maskedDetails,
+                    isDefault = checkoutState.paymentMethods.isEmpty(),
+                ),
+            )
+        }.fold(
+            onSuccess = { saved ->
+                checkoutState = checkoutState.copy(
+                    paymentMethods = checkoutState.paymentMethods + saved,
+                    selectedPaymentMethodId = saved.id,
+                    paymentForm = CheckoutPaymentForm(),
+                    isAddingPaymentMethod = false,
+                    isSavingDetails = false,
+                    errorMessage = null,
+                )
+                AuthActionResult(success = true, message = "Payment method added.")
+            },
+            onFailure = { error ->
+                val message = userReadableMessage(error, "Unable to add payment method.")
+                checkoutState = checkoutState.copy(isSavingDetails = false, errorMessage = message)
+                AuthActionResult(success = false, message = message)
+            },
+        )
+    }
+
+    fun goToCheckoutStep(step: CheckoutStep) {
+        checkoutState = checkoutState.copy(step = step, errorMessage = null)
     }
 
     suspend fun fetchImageBytes(imageUrl: String): ByteArray {
@@ -236,20 +474,37 @@ internal class CartStateHolder(
             return CheckoutResult(success = false, message = message)
         }
 
-        checkoutState = CheckoutUiState(isSubmitting = true)
+        if (checkoutState.selectedAddressId == null) {
+            val message = "Choose a delivery address."
+            checkoutState = checkoutState.copy(errorMessage = message)
+            return CheckoutResult(success = false, message = message)
+        }
+        if (checkoutState.selectedPaymentMethodId == null) {
+            val message = "Choose a payment card."
+            checkoutState = checkoutState.copy(errorMessage = message)
+            return CheckoutResult(success = false, message = message)
+        }
+
+        checkoutState = checkoutState.copy(isSubmitting = true, errorMessage = null)
+        delay(2_000)
         return runCatching { api.checkoutCart(session.user.id) }.fold(
             onSuccess = { group ->
                 refresh()
-                checkoutState = CheckoutUiState(successGroup = group)
+                checkoutState = checkoutState.copy(
+                    step = CheckoutStep.Success,
+                    isSubmitting = false,
+                    successGroup = group,
+                    errorMessage = null,
+                )
                 CheckoutResult(
                     success = true,
-                    message = "Order placed. Payment is pending.",
+                    message = "Order placed.",
                     orderGroup = group,
                 )
             },
             onFailure = { error ->
                 val message = userReadableMessage(error, "Checkout failed. Please review your cart and try again.")
-                checkoutState = CheckoutUiState(errorMessage = message)
+                checkoutState = checkoutState.copy(isSubmitting = false, errorMessage = message)
                 CheckoutResult(success = false, message = message)
             },
         )
@@ -286,6 +541,15 @@ internal class CartStateHolder(
                 AuthActionResult(success = false, message = message)
             },
         )
+    }
+}
+
+private fun cardBrand(digits: String): String {
+    return when {
+        digits.startsWith("4") -> "Visa"
+        digits.startsWith("5") -> "Mastercard"
+        digits.startsWith("6") -> "Mada"
+        else -> "Card"
     }
 }
 

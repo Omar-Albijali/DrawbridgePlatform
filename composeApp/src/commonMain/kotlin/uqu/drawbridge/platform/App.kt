@@ -675,6 +675,11 @@ private fun MainHost(
                             }
                             openTab(AppDestination.Orders)
                         },
+                        onContinueShopping = {
+                            onCheckoutOpenChange(false)
+                            onActiveMoreDestinationChange(null)
+                            openTab(AppDestination.Marketplace)
+                        },
                         onShowMessage = showMessage,
                     )
                 } else {
@@ -740,6 +745,10 @@ private fun MainHost(
                                     ordersStateHolder.refresh()
                                 }
                                 openTab(AppDestination.Orders)
+                            },
+                            onContinueShopping = {
+                                onCheckoutOpenChange(false)
+                                openTab(AppDestination.Marketplace)
                             },
                             onShowMessage = showMessage,
                         )

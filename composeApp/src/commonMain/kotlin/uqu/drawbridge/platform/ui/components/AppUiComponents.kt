@@ -542,11 +542,21 @@ internal fun EmptyStateCard(
     message: String,
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
+    label: String = if (title.contains("found", ignoreCase = true)) "No results" else "Empty",
 ) {
-    AppCard {
-        StatusChip(text = "Empty", tone = StatusTone.Neutral)
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    GlassCard(contentPadding = 16.dp) {
+        GlassPill(text = label, tint = AppMutedText)
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = Color(0xFFF8FAFC),
+            fontWeight = FontWeight.Black,
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = AppMutedText,
+        )
         if (actionText != null && onAction != null) {
             SecondaryButton(text = actionText, onClick = onAction)
         }
@@ -564,10 +574,19 @@ internal fun ErrorStateCard(
     if (isServerNotFound) {
         ServerErrorCard(actionText = actionText, onAction = onAction)
     } else {
-        AppCard {
-            StatusChip(text = "Needs attention", tone = StatusTone.Error)
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        GlassCard(contentPadding = 16.dp) {
+            GlassPill(text = "Needs attention", tint = MaterialTheme.colorScheme.error)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color(0xFFF8FAFC),
+                fontWeight = FontWeight.Black,
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = AppMutedText,
+            )
             if (actionText != null && onAction != null) {
                 SecondaryButton(text = actionText, onClick = onAction)
             }
