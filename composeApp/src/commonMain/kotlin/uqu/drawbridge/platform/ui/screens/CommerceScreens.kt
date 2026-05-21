@@ -72,6 +72,7 @@ import uqu.drawbridge.platform.ui.commerce.CartStateHolder
 import uqu.drawbridge.platform.ui.commerce.OrderStatusFilter
 import uqu.drawbridge.platform.ui.commerce.OrdersStateHolder
 import uqu.drawbridge.platform.ui.components.AppCard
+import uqu.drawbridge.platform.ui.components.AppPageHeader
 import uqu.drawbridge.platform.ui.components.EmptyStateCard
 import uqu.drawbridge.platform.ui.components.ErrorStateCard
 import uqu.drawbridge.platform.ui.components.GlassCard
@@ -822,39 +823,14 @@ internal fun OrdersMainScreen(
 
 @Composable
 private fun OrdersCatalogHeader(session: SessionState) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = OrdersCardBg,
-        border = BorderStroke(1.dp, OrdersBorder),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 22.dp, vertical = 22.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            Text(
-                text = if (session.user.role == UserRole.WHOLESALER) "Customer Orders" else "My Orders",
-                style = MaterialTheme.typography.headlineSmall,
-                color = OrdersInk,
-                fontWeight = FontWeight.Black,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = if (session.user.role == UserRole.WHOLESALER) {
-                    "Track fulfillment and customer delivery status"
-                } else {
-                    "Track your purchases and delivery status"
-                },
-                style = MaterialTheme.typography.bodyLarge,
-                color = OrdersSubtle,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+    AppPageHeader(
+        title = if (session.user.role == UserRole.WHOLESALER) "Customer Orders" else "My Orders",
+        subtitle = if (session.user.role == UserRole.WHOLESALER) {
+            "Track fulfillment and customer delivery status"
+        } else {
+            "Track your purchases and delivery status"
+        },
+    )
 }
 
 @Composable

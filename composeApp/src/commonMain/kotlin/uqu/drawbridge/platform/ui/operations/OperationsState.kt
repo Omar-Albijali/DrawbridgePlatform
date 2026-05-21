@@ -13,12 +13,14 @@ import uqu.drawbridge.platform.MarketplaceProductQuery
 import uqu.drawbridge.platform.MobileAuthApi
 import uqu.drawbridge.platform.PosScanResponse
 import uqu.drawbridge.platform.ProductDTO
+import uqu.drawbridge.platform.ProductImageResponse
 import uqu.drawbridge.platform.ScheduleType
 import uqu.drawbridge.platform.UpdateAutoOrderConfigRequest
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.ui.auth.AuthActionResult
 import uqu.drawbridge.platform.ui.common.userReadableMessage
 import uqu.drawbridge.platform.ui.model.SessionState
+import uqu.drawbridge.platform.ui.platform.PickedFile
 
 internal enum class InventoryMode {
     RetailerInventory,
@@ -157,6 +159,8 @@ internal class InventoryStateHolder(
 
     var autoRestockState: AutoRestockUiState by mutableStateOf(AutoRestockUiState())
         private set
+
+    suspend fun fetchImageBytes(imageUrl: String): ByteArray = api.fetchImageBytes(imageUrl)
 
     suspend fun loadInitial() {
         if (state.hasLoaded || state.isLoading) return
@@ -655,10 +659,29 @@ internal data class ProductFormUiState(
     val gtin: String = "",
     val categoryId: String = "",
     val published: Boolean = true,
+    val images: List<ProductFormImage> = emptyList(),
+    val removedImageIds: Set<String> = emptySet(),
+    val isLoadingImages: Boolean = false,
+    val imageErrorMessage: String? = null,
+    val rating: Double = 0.0,
+    val reviews: Int = 0,
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null,
 ) {
     val isEditing: Boolean = productId != null
+}
+
+internal data class ProductFormImage(
+    val localId: String,
+    val remoteId: String? = null,
+    val url: String? = null,
+    val name: String = "",
+    val mimeType: String? = null,
+    val bytes: ByteArray? = null,
+    val sortIndex: Int = 0,
+) {
+    val isNew: Boolean
+        get() = bytes != null
 }
 
 internal data class ProductManagementUiState(
@@ -695,6 +718,11 @@ internal class ProductManagementStateHolder(
         private set
 
     val isEnabled: Boolean = session.user.role == UserRole.WHOLESALER
+
+    val brandName: String
+        get() = session.user.company.ifBlank { "Your company" }
+
+    suspend fun fetchImageBytes(imageUrl: String): ByteArray = api.fetchImageBytes(imageUrl)
 
     suspend fun loadInitial() {
         if (state.hasLoaded || state.isLoading) return
@@ -765,11 +793,82 @@ internal class ProductManagementStateHolder(
             gtin = product.gtin,
             categoryId = state.categories.firstOrNull { it.name == product.category }?.id.orEmpty(),
             published = product.published,
+            images = product.images.mapIndexed { index, url ->
+                ProductFormImage(
+                    localId = "existing-url-$index-$url",
+                    url = url,
+                    name = "Product image ${index + 1}",
+                    sortIndex = index,
+                )
+            },
+            rating = product.rating,
+            reviews = product.reviews,
         )
     }
 
     fun updateForm(update: ProductFormUiState.() -> ProductFormUiState) {
         formState = formState.update()
+    }
+
+    suspend fun loadFormProductImages(force: Boolean = false) {
+        val productId = formState.productId ?: return
+        if (!force && formState.images.any { it.remoteId != null }) return
+
+        formState = formState.copy(isLoadingImages = true, imageErrorMessage = null)
+        runCatching { api.fetchProductImages(productId) }.fold(
+            onSuccess = { images ->
+                formState = formState.copy(
+                    images = images.toProductFormImages().ifEmpty { formState.images },
+                    removedImageIds = emptySet(),
+                    isLoadingImages = false,
+                    imageErrorMessage = null,
+                )
+            },
+            onFailure = { error ->
+                formState = formState.copy(
+                    isLoadingImages = false,
+                    imageErrorMessage = userReadableMessage(error, "Unable to load product images."),
+                )
+            },
+        )
+    }
+
+    fun addPickedProductImage(file: PickedFile): AuthActionResult {
+        val mimeType = file.mimeType ?: guessImageMimeType(file.name)
+        val validationMessage = when {
+            formState.images.size >= MaxProductImages -> "You can upload up to $MaxProductImages product images."
+            !mimeType.startsWith("image/") -> "Select a PNG, JPG, or WebP image."
+            file.bytes.isEmpty() -> "Selected image is empty."
+            file.bytes.size > MaxProductImageBytes -> "Image must be 10MB or smaller."
+            else -> null
+        }
+        if (validationMessage != null) {
+            formState = formState.copy(imageErrorMessage = validationMessage)
+            return AuthActionResult(false, validationMessage)
+        }
+
+        val index = formState.images.size
+        val image = ProductFormImage(
+            localId = "local-$index-${file.name}-${file.bytes.size}",
+            name = file.name.ifBlank { "product-image-${index + 1}.jpg" },
+            mimeType = mimeType,
+            bytes = file.bytes,
+            sortIndex = index,
+        )
+        formState = formState.copy(
+            images = (formState.images + image).withProductImageSortIndex(),
+            imageErrorMessage = null,
+        )
+        return AuthActionResult(true, "Image added.")
+    }
+
+    fun removeProductFormImage(localId: String) {
+        val image = formState.images.firstOrNull { it.localId == localId } ?: return
+        formState = formState.copy(
+            images = formState.images.filterNot { it.localId == localId }.withProductImageSortIndex(),
+            removedImageIds = image.remoteId?.let { formState.removedImageIds + it } ?: formState.removedImageIds,
+            imageErrorMessage = null,
+        )
     }
 
     suspend fun saveForm(): AuthActionResult {
@@ -796,16 +895,46 @@ internal class ProductManagementStateHolder(
 
         formState = formState.copy(isSubmitting = true, errorMessage = null)
         return runCatching {
+            val submittedForm = formState
             val saved = if (formState.productId == null) {
                 api.createProduct(request)
             } else {
                 api.updateProduct(formState.productId!!, request)
             }
-            if (saved.published != formState.published) {
+            val publishedProduct = if (saved.published != submittedForm.published) {
                 api.toggleProductPublished(saved.id)
             } else {
                 saved
             }
+
+            submittedForm.removedImageIds.forEach { imageId ->
+                api.deleteProductImage(imageId)
+            }
+
+            val orderedImageIds = mutableListOf<String>()
+            submittedForm.images.forEachIndexed { index, image ->
+                when {
+                    image.remoteId != null && image.remoteId !in submittedForm.removedImageIds -> {
+                        orderedImageIds += image.remoteId
+                    }
+                    image.bytes != null -> {
+                        val uploaded = api.uploadProductImage(
+                            productId = saved.id,
+                            fileName = image.name,
+                            mimeType = image.mimeType,
+                            bytes = image.bytes,
+                            altText = submittedForm.name.trim(),
+                            sortIndex = index,
+                        )
+                        uploaded.id?.let { orderedImageIds += it }
+                    }
+                }
+            }
+            if (orderedImageIds.isNotEmpty()) {
+                api.reorderProductImages(saved.id, orderedImageIds)
+            }
+
+            publishedProduct
         }.fold(
             onSuccess = {
                 refresh()
@@ -874,6 +1003,36 @@ internal class ProductManagementStateHolder(
             formState.gtin.isBlank() || !formState.gtin.all { it.isDigit() } -> "Valid numeric GTIN is required."
             else -> null
         }
+    }
+
+    private fun List<ProductImageResponse>.toProductFormImages(): List<ProductFormImage> {
+        return sortedBy { it.sortIndex }.mapIndexed { index, image ->
+            ProductFormImage(
+                localId = "remote-${image.id ?: image.url}",
+                remoteId = image.id,
+                url = image.url,
+                name = image.altText.ifBlank { "Product image ${index + 1}" },
+                sortIndex = index,
+            )
+        }
+    }
+
+    private fun List<ProductFormImage>.withProductImageSortIndex(): List<ProductFormImage> {
+        return mapIndexed { index, image -> image.copy(sortIndex = index) }
+    }
+
+    private fun guessImageMimeType(name: String): String {
+        return when (name.substringAfterLast('.', "").lowercase()) {
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            "jpg", "jpeg" -> "image/jpeg"
+            else -> "image/jpeg"
+        }
+    }
+
+    private companion object {
+        const val MaxProductImages = 10
+        const val MaxProductImageBytes = 10 * 1024 * 1024
     }
 }
 

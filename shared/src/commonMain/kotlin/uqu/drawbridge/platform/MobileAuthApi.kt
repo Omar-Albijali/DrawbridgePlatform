@@ -18,6 +18,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
@@ -288,6 +289,69 @@ class MobileAuthApi(
         val body = response.bodyAsText()
         ensureSuccess(response.status, body)
         return json.decodeFromString(ProductDTO.serializer(), body)
+    }
+
+    suspend fun uploadProductImage(
+        productId: String,
+        fileName: String,
+        mimeType: String?,
+        bytes: ByteArray,
+        altText: String = "",
+        sortIndex: Int? = null,
+    ): ProductImageResponse {
+        val token = requireBearerToken()
+        val contentType = mimeType?.takeIf { it.isNotBlank() } ?: ContentType.Image.JPEG.toString()
+        val safeName = fileName.ifBlank { "product-image.jpg" }.replace("\"", "")
+        val response = client.post(buildUrl("/products/$productId/images")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append(
+                            key = "file",
+                            value = bytes,
+                            headers = Headers.build {
+                                append(HttpHeaders.ContentDisposition, "filename=\"$safeName\"")
+                                append(HttpHeaders.ContentType, contentType)
+                            },
+                        )
+                        append("altText", altText)
+                        sortIndex?.let { append("sortIndex", it.toString()) }
+                    },
+                ),
+            )
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(ProductImageResponse.serializer(), body)
+    }
+
+    suspend fun fetchProductImages(productId: String): List<ProductImageResponse> {
+        val response = authorizedGet("/products/$productId/images")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun reorderProductImages(productId: String, orderedImageIds: List<String>) {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/products/$productId/images/reorder")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(orderedImageIds)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun deleteProductImage(imageId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/images/$imageId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
     }
 
     suspend fun deleteProduct(productId: String) {

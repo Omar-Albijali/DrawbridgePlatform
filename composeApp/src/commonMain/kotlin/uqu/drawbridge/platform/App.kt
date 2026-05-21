@@ -70,6 +70,8 @@ import uqu.drawbridge.platform.ui.marketplace.WishlistStateHolder
 import uqu.drawbridge.platform.ui.operations.InventoryStateHolder
 import uqu.drawbridge.platform.ui.operations.PosStateHolder
 import uqu.drawbridge.platform.ui.operations.ProductManagementStateHolder
+import uqu.drawbridge.platform.ui.platform.FilePhotoPicker
+import uqu.drawbridge.platform.ui.platform.NativeOptionPicker
 import uqu.drawbridge.platform.ui.platform.rememberPlatformServices
 import uqu.drawbridge.platform.ui.screens.CartMainScreen
 import uqu.drawbridge.platform.ui.screens.CheckoutMainScreen
@@ -250,6 +252,8 @@ fun App() {
                         selectedInventoryItemId = selectedInventoryItemId,
                         isCheckoutOpen = isCheckoutOpen,
                         isProductFormOpen = isProductFormOpen,
+                        filePhotoPicker = platformServices.filePhotoPicker,
+                        optionPicker = platformServices.optionPicker,
                         onActiveMoreDestinationChange = {
                             selectedProductId = null
                             selectedOrderId = null
@@ -513,6 +517,8 @@ private fun MainHost(
     selectedInventoryItemId: String?,
     isCheckoutOpen: Boolean,
     isProductFormOpen: Boolean,
+    filePhotoPicker: FilePhotoPicker,
+    optionPicker: NativeOptionPicker,
     onActiveMoreDestinationChange: (AppDestination?) -> Unit,
     onOpenProduct: (String) -> Unit,
     onCloseProduct: () -> Unit,
@@ -648,6 +654,8 @@ private fun MainHost(
             if (isProductFormOpen) {
                 ProductFormMainScreen(
                     productManagementStateHolder = productManagementStateHolder,
+                    filePhotoPicker = filePhotoPicker,
+                    optionPicker = optionPicker,
                     onBack = { onProductFormOpenChange(false) },
                     onShowMessage = showMessage,
                 )

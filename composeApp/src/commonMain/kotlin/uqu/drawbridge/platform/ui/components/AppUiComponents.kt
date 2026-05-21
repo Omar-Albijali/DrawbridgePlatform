@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import uqu.drawbridge.platform.ui.common.ServerNotFoundMessage
 import uqu.drawbridge.platform.ui.model.AppDestination
 import uqu.drawbridge.platform.ui.model.MainTab
+import uqu.drawbridge.platform.ui.theme.AppDarkLine
 import uqu.drawbridge.platform.ui.theme.AppNavySurfaceHigh
 import uqu.drawbridge.platform.ui.theme.AppMutedText
 import uqu.drawbridge.platform.ui.theme.Primary500
@@ -41,11 +42,17 @@ internal fun GlassCard(
     contentPadding: Dp = 16.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val isDark = MaterialTheme.colorScheme.surface.red < 0.2f
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = shape,
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.075f)),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) AppNavySurfaceHigh.copy(alpha = 0.92f) else Color.White.copy(alpha = 0.075f),
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (isDark) Color.White.copy(alpha = 0.12f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
@@ -249,6 +256,68 @@ internal fun ScreenSection(
 }
 
 @Composable
+internal fun AppPageHeader(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    leading: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    action: (@Composable ColumnScope.() -> Unit)? = null,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = AppNavySurfaceHigh.copy(alpha = 0.92f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                if (leading != null) {
+                    leading()
+                    Spacer(modifier = Modifier.width(14.dp))
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color(0xFFF8FAFC),
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = AppMutedText,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (trailing != null) {
+                    Spacer(modifier = Modifier.width(14.dp))
+                    trailing()
+                }
+            }
+            action?.invoke(this)
+        }
+    }
+}
+
+@Composable
 internal fun AppCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
@@ -259,17 +328,17 @@ internal fun AppCard(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isDark) {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+                AppNavySurfaceHigh.copy(alpha = 0.92f)
             } else {
                 MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
             }
         ),
         border = BorderStroke(
             1.dp, 
-            if (isDark) MaterialTheme.colorScheme.outline.copy(alpha = 0.3f) 
+            if (isDark) AppDarkLine.copy(alpha = 0.7f)
             else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) 0.dp else 2.dp),
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -529,7 +598,7 @@ internal fun ServerErrorContent(
         fontWeight = FontWeight.Black,
     )
     Text(
-        text = "Start the backend server, then try again.",
+        text = "We could not reach the service. Please try again shortly.",
         style = MaterialTheme.typography.bodyLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

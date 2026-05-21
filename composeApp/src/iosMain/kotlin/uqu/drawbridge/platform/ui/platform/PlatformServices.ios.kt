@@ -2,6 +2,8 @@ package uqu.drawbridge.platform.ui.platform
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
@@ -13,6 +15,9 @@ import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
+import platform.Foundation.NSData
+import platform.Foundation.NSURL
+import platform.darwin.NSObject
 import platform.CoreFoundation.CFDataCreate
 import platform.CoreFoundation.CFDataGetBytePtr
 import platform.CoreFoundation.CFDataGetLength
@@ -40,18 +45,160 @@ import platform.Security.kSecMatchLimit
 import platform.Security.kSecMatchLimitOne
 import platform.Security.kSecReturnData
 import platform.Security.kSecValueData
+import platform.UIKit.UIApplication
+import platform.UIKit.UIAlertAction
+import platform.UIKit.UIAlertActionStyleCancel
+import platform.UIKit.UIAlertActionStyleDefault
+import platform.UIKit.UIAlertController
+import platform.UIKit.UIAlertControllerStyleActionSheet
+import platform.UIKit.UIImage
+import platform.UIKit.UIImageJPEGRepresentation
+import platform.UIKit.UIImagePickerController
+import platform.UIKit.UIImagePickerControllerDelegateProtocol
+import platform.UIKit.UIImagePickerControllerImageURL
+import platform.UIKit.UIImagePickerControllerOriginalImage
+import platform.UIKit.UINavigationControllerDelegateProtocol
+import platform.UIKit.UIViewController
+import platform.UIKit.UIWindow
+import kotlin.coroutines.resume
 
 @Composable
 internal actual fun rememberPlatformServices(): PlatformServices {
+    val filePhotoPicker = remember { IosFilePhotoPicker() }
+    val optionPicker = remember { IosNativeOptionPicker() }
     return remember {
         PlatformServices(
             secureTokenStorage = KeychainSecureTokenStorage(),
             urlOpener = NoopUrlOpener,
             haptics = NoopHaptics,
             permissions = NoopPermissionController,
-            filePhotoPicker = NoopFilePhotoPicker,
+            filePhotoPicker = filePhotoPicker,
+            optionPicker = optionPicker,
         )
     }
+}
+
+private class IosFilePhotoPicker : FilePhotoPicker {
+    private var activeDelegate: ImagePickerDelegate? = null
+
+    override suspend fun pickPhoto(): PickedFile? = suspendCancellableCoroutine { continuation ->
+        val presenter = topViewController()
+        if (presenter == null) {
+            continuation.resume(null)
+            return@suspendCancellableCoroutine
+        }
+
+        val picker = UIImagePickerController()
+        val delegate = ImagePickerDelegate(
+            picker = picker,
+            continuation = continuation,
+            onComplete = { activeDelegate = null },
+        )
+        activeDelegate = delegate
+        picker.delegate = delegate
+        continuation.invokeOnCancellation {
+            picker.dismissViewControllerAnimated(true, completion = null)
+            if (activeDelegate === delegate) activeDelegate = null
+        }
+        presenter.presentViewController(picker, animated = true, completion = null)
+    }
+
+    override suspend fun pickFile(): PickedFile? = pickPhoto()
+}
+
+private class ImagePickerDelegate(
+    private val picker: UIImagePickerController,
+    private val continuation: CancellableContinuation<PickedFile?>,
+    private val onComplete: () -> Unit,
+) : NSObject(), UIImagePickerControllerDelegateProtocol, UINavigationControllerDelegateProtocol {
+    override fun imagePickerController(
+        picker: UIImagePickerController,
+        didFinishPickingMediaWithInfo: Map<Any?, *>,
+    ) {
+        val image = didFinishPickingMediaWithInfo[UIImagePickerControllerOriginalImage] as? UIImage
+        val url = didFinishPickingMediaWithInfo[UIImagePickerControllerImageURL] as? NSURL
+        val data = image?.let { UIImageJPEGRepresentation(it, 0.92) }
+        finish(
+            data?.let {
+                PickedFile(
+                    name = url?.lastPathComponent ?: "product-image.jpg",
+                    mimeType = "image/jpeg",
+                    bytes = it.toByteArray(),
+                )
+            },
+        )
+    }
+
+    override fun imagePickerControllerDidCancel(picker: UIImagePickerController) {
+        finish(null)
+    }
+
+    private fun finish(file: PickedFile?) {
+        picker.dismissViewControllerAnimated(true, completion = null)
+        if (continuation.isActive) continuation.resume(file)
+        onComplete()
+    }
+}
+
+private fun topViewController(): UIViewController? {
+    val fallbackWindow = UIApplication.sharedApplication.windows.firstOrNull() as? UIWindow
+    val window = UIApplication.sharedApplication.keyWindow
+        ?: fallbackWindow
+        ?: return null
+    var controller = window.rootViewController ?: return null
+    while (controller.presentedViewController != null) {
+        controller = controller.presentedViewController ?: break
+    }
+    return controller
+}
+
+private class IosNativeOptionPicker : NativeOptionPicker {
+    override suspend fun pickOption(title: String, options: List<String>, selectedIndex: Int): Int? {
+        if (options.isEmpty()) return null
+        return suspendCancellableCoroutine { continuation ->
+            val presenter = topViewController()
+            if (presenter == null) {
+                continuation.resume(null)
+                return@suspendCancellableCoroutine
+            }
+
+            val alert = UIAlertController.alertControllerWithTitle(
+                title = title,
+                message = null,
+                preferredStyle = UIAlertControllerStyleActionSheet,
+            )
+            options.forEachIndexed { index, option ->
+                val label = if (index == selectedIndex) "✓ $option" else option
+                alert.addAction(
+                    UIAlertAction.actionWithTitle(
+                        title = label,
+                        style = UIAlertActionStyleDefault,
+                        handler = {
+                            if (continuation.isActive) continuation.resume(index)
+                        },
+                    ),
+                )
+            }
+            alert.addAction(
+                UIAlertAction.actionWithTitle(
+                    title = "Cancel",
+                    style = UIAlertActionStyleCancel,
+                    handler = {
+                        if (continuation.isActive) continuation.resume(null)
+                    },
+                ),
+            )
+            continuation.invokeOnCancellation { alert.dismissViewControllerAnimated(true, completion = null) }
+            presenter.presentViewController(alert, animated = true, completion = null)
+        }
+    }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun NSData.toByteArray(): ByteArray {
+    val length = length.toInt()
+    if (length <= 0) return ByteArray(0)
+    return bytes?.reinterpret<ByteVar>()?.readBytes(length) ?: ByteArray(0)
 }
 
 @OptIn(ExperimentalForeignApi::class)

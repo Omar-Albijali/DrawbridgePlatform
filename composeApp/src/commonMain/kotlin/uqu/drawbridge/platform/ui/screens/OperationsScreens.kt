@@ -8,13 +8,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,17 +29,24 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -53,8 +64,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -71,6 +85,7 @@ import uqu.drawbridge.platform.InventoryStatus
 import uqu.drawbridge.platform.ProductDTO
 import uqu.drawbridge.platform.ScheduleType
 import uqu.drawbridge.platform.ui.components.AppCard
+import uqu.drawbridge.platform.ui.components.AppPageHeader
 import uqu.drawbridge.platform.ui.components.AppTextField
 import uqu.drawbridge.platform.ui.components.BarcodeScannerView
 import uqu.drawbridge.platform.ui.components.EmptyStateCard
@@ -90,7 +105,11 @@ import uqu.drawbridge.platform.ui.operations.InventoryHistoryUiState
 import uqu.drawbridge.platform.ui.operations.InventoryMode
 import uqu.drawbridge.platform.ui.operations.InventoryStateHolder
 import uqu.drawbridge.platform.ui.operations.PosStateHolder
+import uqu.drawbridge.platform.ui.operations.ProductFormImage
 import uqu.drawbridge.platform.ui.operations.ProductManagementStateHolder
+import uqu.drawbridge.platform.ui.platform.FilePhotoPicker
+import uqu.drawbridge.platform.ui.platform.NativeOptionPicker
+import org.jetbrains.skia.Image as SkiaImage
 
 private val InventoryText = Color(0xFFF8FAFC)
 private val InventoryMuted = Color(0xFFA8B7C7)
@@ -459,6 +478,7 @@ private fun InventoryListContent(
                             CatalogStockCard(
                                 product = product,
                                 isBusy = product.id in state.busyItemIds,
+                                imageLoader = inventoryStateHolder::fetchImageBytes,
                                 onOpenDetail = { onOpenDetail(product.id) },
                             )
                         }
@@ -478,6 +498,7 @@ private fun InventoryListContent(
                             RetailerInventoryCard(
                                 item = item,
                                 isBusy = item.id in state.busyItemIds,
+                                imageLoader = inventoryStateHolder::fetchImageBytes,
                                 onToggleAutoRestock = {
                                     coroutineScope.launch {
                                         val result = inventoryStateHolder.toggleAutoRestock(item)
@@ -1172,40 +1193,14 @@ private fun InventoryCatalogHeader(
     onAddInventory: () -> Unit,
     isRefreshing: Boolean,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = InventoryCardBg,
-        border = BorderStroke(1.dp, InventoryBorder),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 22.dp, vertical = 22.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text(
-                    text = "Inventory",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = InventoryText,
-                    fontWeight = FontWeight.Black,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = if (mode == InventoryMode.CatalogStock) {
-                        "Monitor catalog stock, reorder needs, and product availability"
-                    } else {
-                        "Monitor stock, reorder needs, and automation"
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = InventoryMuted,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
+    AppPageHeader(
+        title = "Inventory",
+        subtitle = if (mode == InventoryMode.CatalogStock) {
+            "Monitor catalog stock, reorder needs, and product availability"
+        } else {
+            "Monitor stock, reorder needs, and automation"
+        },
+        action = {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1239,8 +1234,8 @@ private fun InventoryCatalogHeader(
                     )
                 }
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable
@@ -1726,16 +1721,18 @@ internal fun ProductManagementMainScreen(
         productManagementStateHolder.loadInitial()
     }
 
-    ScreenSection(
-        title = "Products",
-        subtitle = "Manage your wholesaler catalog, stock, and publish state.",
-    ) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        ProductManagementHeader(
+            isRefreshing = state.isRefreshing,
+            onAddProduct = onCreateProduct,
+        )
+
         when {
             state.isLoading -> {
                 repeat(3) {
                     LoadingStateCard(title = "Loading products", message = "Fetching managed catalog data.")
                 }
-                return@ScreenSection
+                return@Column
             }
             state.errorMessage != null && state.products.isEmpty() -> {
                 ErrorStateCard(
@@ -1744,32 +1741,15 @@ internal fun ProductManagementMainScreen(
                     actionText = "Try again",
                     onAction = { coroutineScope.launch { productManagementStateHolder.refresh() } },
                 )
-                return@ScreenSection
+                return@Column
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            StatCard(value = state.products.size.toString(), label = "Total", modifier = Modifier.weight(1f))
-            StatCard(value = state.products.count { it.published }.toString(), label = "Live", modifier = Modifier.weight(1f))
-            StatCard(value = state.products.count { it.stock <= 0 }.toString(), label = "Out", modifier = Modifier.weight(1f))
-        }
-
-        AppCard {
-            AppTextField(
-                value = state.searchInput,
-                onValueChange = productManagementStateHolder::updateSearchInput,
-                label = "Search products",
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                PrimaryButton(text = "Add product", onClick = onCreateProduct, modifier = Modifier.weight(1f))
-                SecondaryButton(
-                    text = if (state.isRefreshing) "Refreshing..." else "Refresh",
-                    onClick = { coroutineScope.launch { productManagementStateHolder.refresh() } },
-                    modifier = Modifier.weight(1f),
-                    enabled = !state.isRefreshing,
-                )
-            }
-        }
+        ProductStatsRow(products = state.products)
+        ProductSearchField(
+            value = state.searchInput,
+            onValueChange = productManagementStateHolder::updateSearchInput,
+        )
 
         if (state.errorMessage != null) {
             ErrorStateCard(title = "Product update needs attention", message = state.errorMessage)
@@ -1783,30 +1763,169 @@ internal fun ProductManagementMainScreen(
                 onAction = if (state.products.isEmpty()) onCreateProduct else null,
             )
         } else {
-            state.filteredProducts.forEach { product ->
-                ManagedProductCard(
-                    product = product,
-                    isBusy = product.id in state.busyProductIds,
-                    confirmDelete = pendingDeleteId == product.id,
-                    onEdit = { onEditProduct(product) },
-                    onTogglePublished = {
+            ManagedProductsList(
+                products = state.filteredProducts,
+                busyProductIds = state.busyProductIds,
+                pendingDeleteId = pendingDeleteId,
+                imageLoader = productManagementStateHolder::fetchImageBytes,
+                onEditProduct = onEditProduct,
+                onTogglePublished = { product ->
+                    coroutineScope.launch {
+                        val result = productManagementStateHolder.togglePublished(product)
+                        result.message?.let(onShowMessage)
+                    }
+                },
+                onDeleteProduct = { product ->
+                    if (pendingDeleteId == product.id) {
                         coroutineScope.launch {
-                            val result = productManagementStateHolder.togglePublished(product)
+                            val result = productManagementStateHolder.deleteProduct(product)
+                            pendingDeleteId = null
                             result.message?.let(onShowMessage)
                         }
-                    },
-                    onDelete = {
-                        if (pendingDeleteId == product.id) {
-                            coroutineScope.launch {
-                                val result = productManagementStateHolder.deleteProduct(product)
-                                pendingDeleteId = null
-                                result.message?.let(onShowMessage)
-                            }
-                        } else {
-                            pendingDeleteId = product.id
-                        }
-                    },
-                    onCancelDelete = { pendingDeleteId = null },
+                    } else {
+                        pendingDeleteId = product.id
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductManagementHeader(
+    isRefreshing: Boolean,
+    onAddProduct: () -> Unit,
+) {
+    AppPageHeader(
+        title = "Manage Products",
+        subtitle = "Create, edit, and publish marketplace listings",
+        action = {
+            ProductAddButton(
+                text = if (isRefreshing) "Refreshing products..." else "Add Product",
+                onClick = onAddProduct,
+                enabled = !isRefreshing,
+            )
+        },
+    )
+}
+
+@Composable
+private fun ProductAddButton(
+    text: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = if (enabled) InventorySuccess else InventorySuccess.copy(alpha = 0.45f),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+            Spacer(modifier = Modifier.width(14.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductStatsRow(products: List<ProductDTO>) {
+    val total = products.size
+    val published = products.count { it.published }
+    val outOfStock = products.count { it.stock <= 0 }
+    val avgRating = productAverageRating(products)
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            InventoryStatTile(
+                value = total.toString(),
+                label = "Total Products",
+                icon = Icons.Default.Inventory2,
+                tint = InventoryMuted,
+                modifier = Modifier.weight(1f),
+            )
+            InventoryStatTile(
+                value = "$published/$total",
+                label = "Published",
+                icon = Icons.Default.CheckCircle,
+                tint = InventorySuccess,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            InventoryStatTile(
+                value = outOfStock.toString(),
+                label = "Out of Stock",
+                icon = Icons.Default.Warning,
+                tint = InventoryDanger,
+                modifier = Modifier.weight(1f),
+            )
+            InventoryStatTile(
+                value = avgRating,
+                label = "Avg Rating",
+                icon = Icons.Default.Star,
+                tint = InventoryWarning,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(58.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(Icons.Default.Search, contentDescription = null, tint = InventoryMuted, modifier = Modifier.size(24.dp))
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (value.isBlank()) {
+                    Text(
+                        text = "Search products by name or category...",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = InventoryMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = InventoryText,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 )
             }
         }
@@ -1814,8 +1933,256 @@ internal fun ProductManagementMainScreen(
 }
 
 @Composable
+private fun ManagedProductsList(
+    products: List<ProductDTO>,
+    busyProductIds: Set<String>,
+    pendingDeleteId: String?,
+    imageLoader: suspend (String) -> ByteArray,
+    onEditProduct: (ProductDTO) -> Unit,
+    onTogglePublished: (ProductDTO) -> Unit,
+    onDeleteProduct: (ProductDTO) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        products.forEach { product ->
+            ManagedProductCard(
+                product = product,
+                isBusy = product.id in busyProductIds,
+                confirmDelete = pendingDeleteId == product.id,
+                imageLoader = imageLoader,
+                onEdit = { onEditProduct(product) },
+                onTogglePublished = { onTogglePublished(product) },
+                onDelete = { onDeleteProduct(product) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ManagedProductCard(
+    product: ProductDTO,
+    isBusy: Boolean,
+    confirmDelete: Boolean,
+    imageLoader: suspend (String) -> ByteArray,
+    onEdit: () -> Unit,
+    onTogglePublished: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+        shadowElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                ProductImageTile(
+                    product = product,
+                    imageLoader = imageLoader,
+                    modifier = Modifier.size(74.dp),
+                )
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text(
+                        text = product.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = InventoryText,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = product.brand.ifBlank { product.supplier.ifBlank { product.category.ifBlank { "Product listing" } } },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = InventoryMuted,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ProductTinyPill(
+                            text = if (product.published) "Published" else "Draft",
+                            tint = if (product.published) InventorySuccess else InventoryMuted,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Star, contentDescription = null, tint = InventoryWarning, modifier = Modifier.size(13.dp))
+                            Text(formatRating(product.rating), style = MaterialTheme.typography.labelSmall, color = InventoryWarning, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                IconButton(onClick = onEdit, enabled = !isBusy, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Edit product", tint = InventoryMuted, modifier = Modifier.size(22.dp))
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    InventoryMetricLine(label = "Price:", value = formatMoney(product.price))
+                    InventoryMetricLine(label = "MOQ:", value = product.minimumOrderQuantity.coerceAtLeast(1).toString())
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    InventoryMetricLine(label = "Stock:", value = product.stock.toString())
+                    InventoryMetricLine(label = "GTIN:", value = product.gtin.ifBlank { shortId(product.id).uppercase() })
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(InventorySoftLine, RoundedCornerShape(999.dp)),
+            )
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = HistoryPanel,
+                border = BorderStroke(1.dp, InventoryBorder),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ProductMetaText(
+                        label = "Category",
+                        value = product.category.ifBlank { "Uncategorized" },
+                        modifier = Modifier.weight(1f),
+                    )
+                    ProductMetaText(
+                        label = "Reviews",
+                        value = product.reviews.toString(),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                ProductCommandButton(
+                    text = if (product.published) "Hide" else "Publish",
+                    icon = if (product.published) Icons.Default.VisibilityOff else Icons.Default.CheckCircle,
+                    tint = if (product.published) InventoryMuted else InventorySuccess,
+                    enabled = !isBusy,
+                    onClick = onTogglePublished,
+                    modifier = Modifier.weight(1f),
+                )
+                ProductCommandButton(
+                    text = "Edit",
+                    icon = Icons.Default.Edit,
+                    tint = Color(0xFF93C5FD),
+                    enabled = !isBusy,
+                    onClick = onEdit,
+                    modifier = Modifier.weight(1f),
+                )
+                ProductCommandButton(
+                    text = if (confirmDelete) "Confirm" else "Delete",
+                    icon = Icons.Default.Delete,
+                    tint = InventoryDanger,
+                    enabled = !isBusy,
+                    emphasized = confirmDelete,
+                    onClick = onDelete,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductMetaText(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = InventoryMuted,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = InventoryText,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun ProductCommandButton(
+    text: String,
+    icon: ImageVector,
+    tint: Color,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+) {
+    Surface(
+        modifier = modifier
+            .height(50.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = tint.copy(alpha = if (emphasized) 0.16f else 0.055f),
+        border = BorderStroke(1.dp, tint.copy(alpha = if (emphasized) 0.42f else 0.22f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(7.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                color = InventoryText,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductTinyPill(
+    text: String,
+    tint: Color,
+) {
+    Surface(
+        shape = RoundedCornerShape(7.dp),
+        color = tint.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.28f)),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = tint,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
 internal fun ProductFormMainScreen(
     productManagementStateHolder: ProductManagementStateHolder,
+    filePhotoPicker: FilePhotoPicker,
+    optionPicker: NativeOptionPicker,
     onBack: () -> Unit,
     onShowMessage: (String) -> Unit,
 ) {
@@ -1823,120 +2190,569 @@ internal fun ProductFormMainScreen(
     val form = productManagementStateHolder.formState
     val categories = productManagementStateHolder.state.categories
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        OperationsHeader(
-            title = if (form.isEditing) "Edit product" else "Create product",
-            subtitle = if (form.isEditing) "Update catalog details and stock." else "Add a new wholesaler product.",
-            onBack = onBack,
+    LaunchedEffect(form.productId) {
+        productManagementStateHolder.loadFormProductImages()
+    }
+
+    fun saveProduct() {
+        coroutineScope.launch {
+            val result = productManagementStateHolder.saveForm()
+            result.message?.let(onShowMessage)
+            if (result.success) onBack()
+        }
+    }
+
+    fun pickImage() {
+        coroutineScope.launch {
+            val picked = filePhotoPicker.pickPhoto()
+            if (picked == null) {
+                onShowMessage("Image picker is not available here.")
+                return@launch
+            }
+            val result = productManagementStateHolder.addPickedProductImage(picked)
+            result.message?.let(onShowMessage)
+        }
+    }
+
+    fun pickCategory() {
+        coroutineScope.launch {
+            if (categories.isEmpty()) {
+                onShowMessage("No categories loaded.")
+                return@launch
+            }
+            val selectedIndex = categories.indexOfFirst { it.id == form.categoryId }
+            val pickedIndex = optionPicker.pickOption(
+                title = "Category",
+                options = categories.map { it.name },
+                selectedIndex = selectedIndex,
+            ) ?: return@launch
+            categories.getOrNull(pickedIndex)?.let { category ->
+                productManagementStateHolder.updateForm { copy(categoryId = category.id) }
+            }
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        AppPageHeader(
+            title = if (form.isEditing) "Edit Product" else "Add Product",
+            subtitle = if (form.isEditing) "Update product details and images" else "Create product details and images",
+            leading = {
+                ProductFormHeaderIconButton(icon = Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
+            },
+            trailing = {
+                ProductFormSaveButton(
+                    text = if (form.isSubmitting) "Saving" else "Save",
+                    enabled = !form.isSubmitting,
+                    onClick = ::saveProduct,
+                )
+            },
         )
 
-        ScreenSection(
-            title = if (form.isEditing) "Product details" else "New product",
-            subtitle = "Images are deferred until the native picker and upload path are wired.",
-        ) {
-            if (form.errorMessage != null) {
-                ErrorStateCard(title = "Product form needs attention", message = form.errorMessage)
-            }
+        form.errorMessage?.let {
+            ErrorStateCard(title = "Product form needs attention", message = it)
+        }
 
-            AppCard {
-                AppTextField(
-                    value = form.name,
-                    onValueChange = { value -> productManagementStateHolder.updateForm { copy(name = value) } },
-                    label = "Product name",
-                )
-                AppTextField(
-                    value = form.description,
-                    onValueChange = { value -> productManagementStateHolder.updateForm { copy(description = value) } },
-                    label = "Description",
-                )
-                CategoryPicker(
-                    categories = categories,
-                    selectedCategoryId = form.categoryId,
-                    onSelected = { categoryId -> productManagementStateHolder.updateForm { copy(categoryId = categoryId) } },
-                )
-            }
+        ProductImagesSection(
+            images = form.images,
+            isLoading = form.isLoadingImages,
+            errorMessage = form.imageErrorMessage,
+            imageLoader = productManagementStateHolder::fetchImageBytes,
+            onAddImage = ::pickImage,
+            onRemoveImage = productManagementStateHolder::removeProductFormImage,
+        )
 
-            AppCard {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    AppTextField(
-                        value = form.price,
-                        onValueChange = { value -> productManagementStateHolder.updateForm { copy(price = decimalInput(value)) } },
-                        label = "Price SAR",
-                        keyboardType = KeyboardType.Decimal,
-                        modifier = Modifier.weight(1f),
-                    )
-                    AppTextField(
-                        value = form.stock,
-                        onValueChange = { value -> productManagementStateHolder.updateForm { copy(stock = digitsOnly(value)) } },
-                        label = "Stock",
-                        keyboardType = KeyboardType.Number,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    AppTextField(
-                        value = form.minimumOrderQuantity,
-                        onValueChange = { value -> productManagementStateHolder.updateForm { copy(minimumOrderQuantity = digitsOnly(value)) } },
-                        label = "MOQ",
-                        keyboardType = KeyboardType.Number,
-                        modifier = Modifier.weight(1f),
-                    )
-                    AppTextField(
-                        value = form.gtin,
-                        onValueChange = { value -> productManagementStateHolder.updateForm { copy(gtin = digitsOnly(value)) } },
-                        label = "GTIN",
-                        keyboardType = KeyboardType.Number,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
+        ProductFormSection(title = "Basic Information", icon = Icons.Default.Inventory2) {
+            ProductFormInput(
+                label = "Product Name *",
+                value = form.name,
+                onValueChange = { value -> productManagementStateHolder.updateForm { copy(name = value) } },
+            )
+            ProductFormInput(
+                label = "Description *",
+                value = form.description,
+                onValueChange = { value -> productManagementStateHolder.updateForm { copy(description = value) } },
+                minHeight = 96.dp,
+                singleLine = false,
+            )
+            ProductFormInput(
+                label = "Brand",
+                value = productManagementStateHolder.brandName,
+                onValueChange = {},
+                placeholder = "Uses your company name",
+                enabled = false,
+            )
+            ProductFormCategoryPicker(
+                categories = categories,
+                selectedCategoryId = form.categoryId,
+                onOpen = ::pickCategory,
+            )
+        }
 
-            AppCard {
-                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Marketplace status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(
-                            if (form.published) "Product will be visible when saved." else "Product will remain unpublished.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    StatusChip(
-                        text = if (form.published) "Published" else "Draft",
-                        tone = if (form.published) StatusTone.Success else StatusTone.Neutral,
-                    )
-                }
-                SecondaryButton(
-                    text = if (form.published) "Set as draft" else "Publish",
-                    onClick = { productManagementStateHolder.updateForm { copy(published = !published) } },
-                )
-            }
-
-            AppCard {
-                StatusChip(text = "Image upload deferred", tone = StatusTone.Warning)
-                Text(
-                    "Product image upload needs the native file/photo picker path. Existing product imagery is preserved by backend product image records.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
+        ProductFormSection(title = "Pricing & Stock", icon = Icons.Default.Settings) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                SecondaryButton(text = "Cancel", onClick = onBack, modifier = Modifier.weight(1f), enabled = !form.isSubmitting)
-                PrimaryButton(
-                    text = if (form.isSubmitting) "Saving..." else "Save product",
-                    onClick = {
-                        coroutineScope.launch {
-                            val result = productManagementStateHolder.saveForm()
-                            result.message?.let(onShowMessage)
-                            if (result.success) onBack()
-                        }
-                    },
+                ProductFormInput(
+                    label = "Price (SAR) *",
+                    value = form.price,
+                    onValueChange = { value -> productManagementStateHolder.updateForm { copy(price = decimalInput(value)) } },
+                    keyboardType = KeyboardType.Decimal,
                     modifier = Modifier.weight(1f),
-                    enabled = !form.isSubmitting,
+                )
+                ProductFormInput(
+                    label = "Stock Quantity *",
+                    value = form.stock,
+                    onValueChange = { value -> productManagementStateHolder.updateForm { copy(stock = digitsOnly(value)) } },
+                    keyboardType = KeyboardType.Number,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                ProductFormInput(
+                    label = "Min. Order Qty",
+                    value = form.minimumOrderQuantity,
+                    onValueChange = { value -> productManagementStateHolder.updateForm { copy(minimumOrderQuantity = digitsOnly(value)) } },
+                    keyboardType = KeyboardType.Number,
+                    modifier = Modifier.weight(1f),
+                )
+                ProductFormInput(
+                    label = "GTIN / Barcode",
+                    value = form.gtin,
+                    onValueChange = { value -> productManagementStateHolder.updateForm { copy(gtin = digitsOnly(value)) } },
+                    placeholder = "e.g. 1234567890",
+                    keyboardType = KeyboardType.Number,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            ProductListedPrice(price = form.price)
+        }
+
+        ProductPerformanceCard(
+            rating = form.rating,
+            reviews = form.reviews,
+            stock = form.stock.toIntOrNull() ?: 0,
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            SecondaryButton(text = "Discard", onClick = onBack, modifier = Modifier.weight(1f), enabled = !form.isSubmitting)
+            PrimaryButton(
+                text = if (form.isSubmitting) "Saving..." else "Save Changes",
+                onClick = ::saveProduct,
+                modifier = Modifier.weight(1f),
+                enabled = !form.isSubmitting,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductFormHeaderIconButton(
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .size(46.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = HistoryPanel,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = "Back", tint = InventoryMuted, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+@Composable
+private fun ProductFormSaveButton(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .height(46.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = if (enabled) InventorySuccess else InventorySuccess.copy(alpha = 0.45f),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Text(text, style = MaterialTheme.typography.labelLarge, color = Color.White, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+private fun ProductImagesSection(
+    images: List<ProductFormImage>,
+    isLoading: Boolean,
+    errorMessage: String?,
+    imageLoader: suspend (String) -> ByteArray,
+    onAddImage: () -> Unit,
+    onRemoveImage: (String) -> Unit,
+) {
+    ProductFormSection(
+        title = "Product Images",
+        icon = Icons.Default.Inventory2,
+        trailing = {
+            Text(
+                text = "${images.size} / 10",
+                style = MaterialTheme.typography.labelLarge,
+                color = InventoryMuted,
+                fontWeight = FontWeight.Black,
+            )
+        },
+    ) {
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            images.forEachIndexed { index, image ->
+                ProductFormImageTile(
+                    image = image,
+                    isMain = index == 0,
+                    imageLoader = imageLoader,
+                    onRemove = { onRemoveImage(image.localId) },
+                )
+            }
+            if (images.size < 10) {
+                ProductAddImageTile(onClick = onAddImage)
+            }
+        }
+        Text(
+            text = if (isLoading) "Loading product images..." else "First image is used as the main marketplace image",
+            style = MaterialTheme.typography.bodyMedium,
+            color = InventoryMuted,
+            fontWeight = FontWeight.SemiBold,
+        )
+        errorMessage?.let {
+            ProductInlineNotice(text = it, tint = InventoryDanger)
+        }
+    }
+}
+
+@Composable
+private fun ProductFormImageTile(
+    image: ProductFormImage,
+    isMain: Boolean,
+    imageLoader: suspend (String) -> ByteArray,
+    onRemove: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.size(width = 118.dp, height = 136.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = HistoryPanel,
+        border = BorderStroke(1.dp, if (isMain) InventorySuccess.copy(alpha = 0.45f) else InventoryBorder),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            ProductFormImagePreview(
+                image = image,
+                imageLoader = imageLoader,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(8.dp),
+            ) {
+                ProductTinyPill(
+                    text = if (isMain) "Main" else "${image.sortIndex + 1}",
+                    tint = if (isMain) InventorySuccess else InventoryMuted,
+                )
+            }
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(32.dp),
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Remove image", tint = InventoryText, modifier = Modifier.size(17.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductFormImagePreview(
+    image: ProductFormImage,
+    imageLoader: suspend (String) -> ByteArray,
+    modifier: Modifier = Modifier,
+) {
+    val localBitmap = remember(image.localId, image.bytes) {
+        image.bytes?.let { bytes ->
+            runCatching { SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+        }
+    }
+    when {
+        localBitmap != null -> Image(
+            bitmap = localBitmap,
+            contentDescription = image.name,
+            modifier = modifier,
+            contentScale = ContentScale.Crop,
+        )
+        image.url != null -> InventoryImageTile(
+            imageUrl = image.url,
+            imageLoader = imageLoader,
+            contentDescription = image.name,
+            modifier = modifier,
+        )
+        else -> InventoryProductTile(modifier = modifier)
+    }
+}
+
+@Composable
+private fun ProductAddImageTile(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .size(width = 118.dp, height = 136.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(10.dp),
+        color = Color.White.copy(alpha = 0.03f),
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, tint = InventoryMuted, modifier = Modifier.size(28.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Add", style = MaterialTheme.typography.labelLarge, color = InventoryMuted, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+private fun ProductFormSection(
+    title: String,
+    icon: ImageVector,
+    trailing: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(shape = RoundedCornerShape(8.dp), color = InventorySuccess.copy(alpha = 0.13f)) {
+                        Box(modifier = Modifier.size(42.dp), contentAlignment = Alignment.Center) {
+                            Icon(icon, contentDescription = null, tint = InventorySuccess, modifier = Modifier.size(22.dp))
+                        }
+                    }
+                    Text(title, style = MaterialTheme.typography.titleMedium, color = InventoryText, fontWeight = FontWeight.Black)
+                }
+                trailing?.invoke()
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(InventorySoftLine),
+            )
+            Column(
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                content = content,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductFormInput(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "",
+    keyboardType: KeyboardType = KeyboardType.Text,
+    singleLine: Boolean = true,
+    minHeight: androidx.compose.ui.unit.Dp = 54.dp,
+    enabled: Boolean = true,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = InventoryMuted,
+            fontWeight = FontWeight.Black,
+        )
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = minHeight),
+            shape = RoundedCornerShape(8.dp),
+            color = Color.White.copy(alpha = if (enabled) 0.045f else 0.028f),
+            border = BorderStroke(1.dp, InventoryBorder),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                if (value.isBlank() && placeholder.isNotBlank()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = InventoryMuted.copy(alpha = 0.75f),
+                    )
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    enabled = enabled,
+                    singleLine = singleLine,
+                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = if (enabled) InventoryText else InventoryMuted,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    cursorBrush = SolidColor(InventorySuccess),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ProductFormCategoryPicker(
+    categories: List<CategoryDTO>,
+    selectedCategoryId: String,
+    onOpen: () -> Unit,
+) {
+    val selectedCategory = categories.firstOrNull { it.id == selectedCategoryId }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Category *", style = MaterialTheme.typography.labelLarge, color = InventoryMuted, fontWeight = FontWeight.Black)
+        if (categories.isEmpty()) {
+            ProductInlineNotice(text = "No categories loaded", tint = InventoryWarning)
+        } else {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(58.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onOpen),
+                shape = RoundedCornerShape(8.dp),
+                color = Color.White.copy(alpha = 0.045f),
+                border = BorderStroke(1.dp, InventoryBorder),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = selectedCategory?.name ?: "Select category",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (selectedCategory == null) InventoryMuted else InventoryText,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Open categories",
+                        tint = InventoryMuted,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductListedPrice(price: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = InventorySuccess.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, InventorySuccess.copy(alpha = 0.28f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Listed price", style = MaterialTheme.typography.bodyMedium, color = InventorySuccess, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = formatMoney(price.toDoubleOrNull() ?: 0.0),
+                style = MaterialTheme.typography.titleSmall,
+                color = InventoryText,
+                fontWeight = FontWeight.Black,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProductPerformanceCard(
+    rating: Double,
+    reviews: Int,
+    stock: Int,
+) {
+    ProductFormSection(title = "Product Performance", icon = Icons.Default.Star) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            ProductPerformanceMetric(icon = Icons.Default.Star, value = formatRating(rating), label = "Rating", tint = InventoryWarning, modifier = Modifier.weight(1f))
+            ProductPerformanceMetric(icon = Icons.Default.CheckCircle, value = reviews.toString(), label = "Reviews", tint = InventoryMuted, modifier = Modifier.weight(1f))
+            ProductPerformanceMetric(icon = Icons.Default.Inventory2, value = stock.toString(), label = "In Stock", tint = InventorySuccess, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun ProductPerformanceMetric(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        Text(value, style = MaterialTheme.typography.titleLarge, color = InventoryText, fontWeight = FontWeight.Black)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = InventoryMuted, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun ProductInlineNotice(
+    text: String,
+    tint: Color,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = tint.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.28f)),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = InventoryText,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -2050,6 +2866,7 @@ internal fun PosMainScreen(
 private fun RetailerInventoryCard(
     item: InventoryItemDTO,
     isBusy: Boolean,
+    imageLoader: suspend (String) -> ByteArray,
     onToggleAutoRestock: () -> Unit,
     onOpenDetail: () -> Unit,
     onOpenHistory: () -> Unit,
@@ -2071,6 +2888,8 @@ private fun RetailerInventoryCard(
                 subtitle = item.supplier,
                 statusText = inventoryStatusLabel(item),
                 statusTone = inventoryStatusTone(item),
+                imageUrl = item.imageUrl,
+                imageLoader = imageLoader,
                 onMore = onOpenDetail,
             )
 
@@ -2154,6 +2973,7 @@ private fun RetailerInventoryCard(
 private fun CatalogStockCard(
     product: ProductDTO,
     isBusy: Boolean,
+    imageLoader: suspend (String) -> ByteArray,
     onOpenDetail: () -> Unit,
 ) {
     Surface(
@@ -2174,6 +2994,8 @@ private fun CatalogStockCard(
                 subtitle = product.brand.ifBlank { product.category.ifBlank { "Catalog product" } },
                 statusText = stockStatusLabel(product),
                 statusTone = stockStatusTone(product),
+                imageUrl = productPrimaryImageUrl(product),
+                imageLoader = imageLoader,
                 onMore = onOpenDetail,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxWidth()) {
@@ -2204,10 +3026,17 @@ private fun InventoryCardTop(
     subtitle: String,
     statusText: String,
     statusTone: StatusTone,
+    imageUrl: String? = null,
+    imageLoader: (suspend (String) -> ByteArray)? = null,
     onMore: () -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
-        InventoryProductTile(modifier = Modifier.size(74.dp))
+        InventoryImageTile(
+            imageUrl = imageUrl,
+            imageLoader = imageLoader,
+            contentDescription = title,
+            modifier = Modifier.size(74.dp),
+        )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Text(
                 text = title,
@@ -2253,6 +3082,78 @@ private fun InventoryProductTile(modifier: Modifier = Modifier) {
             modifier = Modifier.size(34.dp),
         )
     }
+}
+
+@Composable
+private fun ProductImageTile(
+    product: ProductDTO,
+    imageLoader: suspend (String) -> ByteArray,
+    modifier: Modifier = Modifier,
+) {
+    InventoryImageTile(
+        imageUrl = productPrimaryImageUrl(product),
+        imageLoader = imageLoader,
+        contentDescription = product.name,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun InventoryImageTile(
+    imageUrl: String?,
+    imageLoader: (suspend (String) -> ByteArray)?,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    val imageState by produceState<OperationsImageLoadState>(
+        initialValue = if (!imageUrl.isNullOrBlank() && imageLoader != null) {
+            OperationsImageLoadState.Loading
+        } else {
+            OperationsImageLoadState.Unavailable
+        },
+        key1 = imageUrl,
+        key2 = imageLoader,
+    ) {
+        value = if (imageUrl.isNullOrBlank() || imageLoader == null) {
+            OperationsImageLoadState.Unavailable
+        } else {
+            runCatching {
+                SkiaImage.makeFromEncoded(imageLoader(imageUrl)).toComposeImageBitmap()
+            }.fold(
+                onSuccess = { OperationsImageLoadState.Loaded(it) },
+                onFailure = { OperationsImageLoadState.Unavailable },
+            )
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(InventoryIconBg),
+        contentAlignment = Alignment.Center,
+    ) {
+        when (val state = imageState) {
+            is OperationsImageLoadState.Loaded -> Image(
+                bitmap = state.bitmap,
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            OperationsImageLoadState.Loading,
+            OperationsImageLoadState.Unavailable -> Icon(
+                imageVector = Icons.Default.Inventory2,
+                contentDescription = null,
+                tint = InventoryMuted,
+                modifier = Modifier.size(34.dp),
+            )
+        }
+    }
+}
+
+private sealed interface OperationsImageLoadState {
+    data object Loading : OperationsImageLoadState
+    data object Unavailable : OperationsImageLoadState
+    data class Loaded(val bitmap: ImageBitmap) : OperationsImageLoadState
 }
 
 @Composable
@@ -2452,55 +3353,6 @@ private fun InventoryDetailContent(
 }
 
 @Composable
-private fun ManagedProductCard(
-    product: ProductDTO,
-    isBusy: Boolean,
-    confirmDelete: Boolean,
-    onEdit: () -> Unit,
-    onTogglePublished: () -> Unit,
-    onDelete: () -> Unit,
-    onCancelDelete: () -> Unit,
-) {
-    AppCard {
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
-            ProductTile(label = product.category.ifBlank { "Product" }, modifier = Modifier.size(72.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(product.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    StatusChip(text = if (product.published) "Published" else "Draft", tone = if (product.published) StatusTone.Success else StatusTone.Neutral)
-                    StatusChip(text = stockStatusLabel(product), tone = stockStatusTone(product))
-                }
-            }
-        }
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Text(formatMoney(product.price), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Black)
-            Text("MOQ ${product.minimumOrderQuantity.coerceAtLeast(1)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            SecondaryButton(text = "Edit", onClick = onEdit, modifier = Modifier.weight(1f), enabled = !isBusy)
-            SecondaryButton(
-                text = if (product.published) "Unpublish" else "Publish",
-                onClick = onTogglePublished,
-                modifier = Modifier.weight(1f),
-                enabled = !isBusy,
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            SecondaryButton(
-                text = if (confirmDelete) "Confirm delete" else "Delete",
-                onClick = onDelete,
-                modifier = Modifier.weight(1f),
-                enabled = !isBusy,
-            )
-            if (confirmDelete) {
-                SecondaryButton(text = "Cancel", onClick = onCancelDelete, modifier = Modifier.weight(1f), enabled = !isBusy)
-            }
-        }
-    }
-}
-
-@Composable
 private fun CategoryPicker(
     categories: List<CategoryDTO>,
     selectedCategoryId: String,
@@ -2640,6 +3492,18 @@ private fun stockStatusTone(product: ProductDTO): StatusTone {
     }
 }
 
+private fun productAverageRating(products: List<ProductDTO>): String {
+    val ratedProducts = products.map { it.rating }.filter { it > 0.0 }
+    if (ratedProducts.isEmpty()) return "0.0"
+    return formatRating(ratedProducts.average())
+}
+
+private fun formatRating(value: Double): String {
+    val rounded = kotlin.math.round(value * 10.0) / 10.0
+    val text = rounded.toString()
+    return if ('.' in text) text else "$text.0"
+}
+
 private fun formatMoney(value: Double): String {
     val rounded = kotlin.math.round(value * 100.0) / 100.0
     val text = rounded.toString()
@@ -2652,6 +3516,10 @@ private fun formatMoney(value: Double): String {
 }
 
 private fun shortId(id: String): String = id.take(8).ifBlank { "pending" }
+
+private fun productPrimaryImageUrl(product: ProductDTO): String? {
+    return product.images.firstOrNull { it.isNotBlank() } ?: product.image.takeIf { it.isNotBlank() }
+}
 
 private fun digitsOnly(value: String): String = value.filter { it.isDigit() }
 

@@ -68,6 +68,7 @@ import org.jetbrains.skia.Image as SkiaImage
 import uqu.drawbridge.platform.CategoryDTO
 import uqu.drawbridge.platform.ProductDTO
 import uqu.drawbridge.platform.ui.components.AppCard
+import uqu.drawbridge.platform.ui.components.AppPageHeader
 import uqu.drawbridge.platform.ui.components.EmptyStateCard
 import uqu.drawbridge.platform.ui.components.ErrorStateCard
 import uqu.drawbridge.platform.ui.components.GlassCard
@@ -84,11 +85,16 @@ import uqu.drawbridge.platform.ui.marketplace.MarketplaceStateHolder
 import uqu.drawbridge.platform.ui.marketplace.ProductDetailStateHolder
 import uqu.drawbridge.platform.ui.marketplace.WishlistProductItem
 import uqu.drawbridge.platform.ui.marketplace.WishlistStateHolder
+import uqu.drawbridge.platform.ui.theme.AppNavyBase
+import uqu.drawbridge.platform.ui.theme.AppNavySurfaceHigh
+import uqu.drawbridge.platform.ui.theme.AppMutedText
 
 private val MarketText = Color(0xFFF8FAFC)
-private val MarketMuted = Color(0xFFA8B7C7)
-private val MarketNavy = Color(0xFF03111F)
-private val MarketNavyHigh = Color(0xFF102A3D)
+private val MarketMuted = AppMutedText
+private val MarketNavy = AppNavyBase
+private val MarketNavyHigh = AppNavySurfaceHigh
+private val MarketPanel = AppNavySurfaceHigh.copy(alpha = 0.92f)
+private val MarketBorder = Color.White.copy(alpha = 0.12f)
 
 @Composable
 internal fun MarketplaceMainScreen(
@@ -219,37 +225,20 @@ private fun MarketplaceCatalogHeader(
     cartEnabled: Boolean,
     onOpenCart: () -> Unit,
 ) {
-    GlassCard(contentPadding = 16.dp) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(
-                    text = "Marketplace",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MarketText,
-                    fontWeight = FontWeight.Black,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = "Browse verified supplier products",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MarketMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (cartEnabled) {
+    AppPageHeader(
+        title = "Marketplace",
+        subtitle = "Browse verified supplier products",
+        trailing = if (cartEnabled) {
+            {
                 MarketplaceCartButton(
                     itemCount = cartItemCount,
                     onClick = onOpenCart,
                 )
             }
-        }
-    }
+        } else {
+            null
+        },
+    )
 }
 
 @Composable
@@ -263,8 +252,8 @@ private fun MarketplaceCartButton(
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        color = Color.White.copy(alpha = 0.065f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+        color = MarketNavyHigh.copy(alpha = 0.96f),
+        border = BorderStroke(1.dp, MarketBorder),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
@@ -350,10 +339,10 @@ private fun MarketplaceFilterIconButton(
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        color = Color.White.copy(alpha = 0.065f),
+        color = MarketPanel,
         border = BorderStroke(
             1.dp,
-            if (activeFilterCount > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.34f) else Color.White.copy(alpha = 0.1f),
+            if (activeFilterCount > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.34f) else MarketBorder,
         ),
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -426,10 +415,10 @@ private fun MarketplaceCategoryChip(
             .clip(RoundedCornerShape(999.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(999.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.055f),
+        color = if (selected) MaterialTheme.colorScheme.primary else MarketPanel,
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.34f) else Color.White.copy(alpha = 0.1f),
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.34f) else MarketBorder,
         ),
     ) {
         Box(
@@ -516,8 +505,8 @@ private fun MarketplaceSearchField(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = Color.White.copy(alpha = 0.065f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+        color = MarketPanel,
+        border = BorderStroke(1.dp, MarketBorder),
     ) {
         Row(
             modifier = Modifier
@@ -593,7 +582,7 @@ private fun MarketplaceToolbarButton(
     primary: Boolean,
     enabled: Boolean = true,
 ) {
-    val container = if (primary) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.045f)
+    val container = if (primary) MaterialTheme.colorScheme.primary else MarketPanel
     val content = if (primary) MaterialTheme.colorScheme.onPrimary else MarketText
     Surface(
         modifier = modifier
@@ -601,10 +590,10 @@ private fun MarketplaceToolbarButton(
             .clip(RoundedCornerShape(8.dp))
             .clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(8.dp),
-        color = if (enabled) container else Color.White.copy(alpha = 0.035f),
+        color = if (enabled) container else MarketPanel.copy(alpha = 0.55f),
         border = BorderStroke(
             1.dp,
-            if (primary) MaterialTheme.colorScheme.primary.copy(alpha = 0.32f) else Color.White.copy(alpha = 0.09f),
+            if (primary) MaterialTheme.colorScheme.primary.copy(alpha = 0.32f) else MarketBorder,
         ),
     ) {
         Row(
@@ -791,12 +780,12 @@ private fun FilterOptionButton(
         modifier = modifier.height(40.dp),
         shape = RoundedCornerShape(999.dp),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.13f) else Color.White.copy(alpha = 0.035f),
+            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.13f) else MarketPanel,
             contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
         ),
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.1f),
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MarketBorder,
         ),
     ) {
         Text(
@@ -870,7 +859,7 @@ private fun ProductSkeletonCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(132.dp)
-                .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp)),
+                .background(MarketNavyHigh.copy(alpha = 0.96f), RoundedCornerShape(8.dp)),
         )
         Box(
             modifier = Modifier
@@ -958,8 +947,8 @@ private fun MarketplaceProductCard(
         modifier = modifier
             .clickable(onClick = onOpenProduct),
         shape = RoundedCornerShape(12.dp),
-        color = Color.White.copy(alpha = 0.075f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+        color = MarketPanel,
+        border = BorderStroke(1.dp, MarketBorder),
     ) {
         Column {
             ProductImageSurface(
@@ -1157,7 +1146,7 @@ private fun ProductImageSurface(
                 modifier = Modifier.align(Alignment.BottomStart),
                 shape = RoundedCornerShape(999.dp),
                 color = MarketNavyHigh.copy(alpha = 0.78f),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                border = BorderStroke(1.dp, MarketBorder),
             ) {
                 Text(
                     text = category,
@@ -1185,7 +1174,7 @@ private fun ProductImageFallbackContent(product: ProductDTO) {
             modifier = Modifier
                 .size(58.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color.White.copy(alpha = 0.075f)),
+                .background(MarketNavyHigh.copy(alpha = 0.96f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -1203,8 +1192,8 @@ private fun productImageBrush(): Brush {
     return Brush.linearGradient(
         listOf(
             MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-            Color(0xFF102A3D).copy(alpha = 0.88f),
-            Color(0xFF03111F),
+            MarketNavyHigh.copy(alpha = 0.88f),
+            MarketNavy,
         ),
     )
 }
@@ -1223,8 +1212,8 @@ private fun ProductMetaChip(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(999.dp),
-        color = Color.White.copy(alpha = 0.055f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.09f)),
+        color = MarketPanel,
+        border = BorderStroke(1.dp, MarketBorder),
     ) {
         Text(
             text = text,
@@ -1279,12 +1268,12 @@ private fun ProductCompactButton(
     val borderColor = if (primary) {
         MaterialTheme.colorScheme.primary.copy(alpha = 0.32f)
     } else {
-        Color.White.copy(alpha = 0.1f)
+        MarketBorder
     }
     val containerColor = when {
-        !enabled -> Color.White.copy(alpha = 0.04f)
+        !enabled -> MarketPanel.copy(alpha = 0.55f)
         primary -> MaterialTheme.colorScheme.primary
-        else -> Color.White.copy(alpha = 0.055f)
+        else -> MarketPanel
     }
     val contentColor = when {
         !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
@@ -1332,10 +1321,10 @@ private fun ProductAddButton(
             .clip(RoundedCornerShape(10.dp))
             .clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(10.dp),
-        color = if (enabled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.045f),
+        color = if (enabled) MaterialTheme.colorScheme.primary else MarketPanel.copy(alpha = 0.55f),
         border = BorderStroke(
             1.dp,
-            if (enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.34f) else Color.White.copy(alpha = 0.09f),
+            if (enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.34f) else MarketBorder,
         ),
     ) {
         Row(
@@ -1593,8 +1582,8 @@ private fun QuantityPicker(
         }
         Surface(
             shape = RoundedCornerShape(999.dp),
-            color = Color.White.copy(alpha = 0.055f),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+            color = MarketPanel,
+            border = BorderStroke(1.dp, MarketBorder),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
@@ -1642,8 +1631,8 @@ private fun ProductDetailHeader(
         Surface(
             modifier = Modifier.size(40.dp),
             shape = RoundedCornerShape(999.dp),
-            color = Color.White.copy(alpha = 0.06f),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+            color = MarketPanel,
+            border = BorderStroke(1.dp, MarketBorder),
         ) {
             IconButton(onClick = onBack, modifier = Modifier.fillMaxSize()) {
                 Icon(

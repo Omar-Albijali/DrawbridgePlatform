@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import uqu.drawbridge.platform.MobileApiConfig
 import uqu.drawbridge.platform.ui.components.AppCard
+import uqu.drawbridge.platform.ui.components.AppPageHeader
 import uqu.drawbridge.platform.ui.components.DeferredFeatureCard
 import uqu.drawbridge.platform.ui.components.EmptyStateCard
 import uqu.drawbridge.platform.ui.components.PrimaryButton
@@ -37,6 +38,7 @@ import uqu.drawbridge.platform.ui.components.SecondaryButton
 import uqu.drawbridge.platform.ui.model.AppDestination
 import uqu.drawbridge.platform.ui.model.MoreDestination
 import uqu.drawbridge.platform.ui.model.SessionState
+import uqu.drawbridge.platform.ui.theme.AppNavySurfaceHigh
 
 @Composable
 internal fun HomeMainScreen(
@@ -169,35 +171,10 @@ internal fun MoreMainScreen(
 
 @Composable
 private fun MoreHeaderCard() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(118.dp),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF102A3D).copy(alpha = 0.92f)),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = "More",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.ExtraBold,
-            )
-            Text(
-                text = "Account, tools, and support",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-    }
+    AppPageHeader(
+        title = "More",
+        subtitle = "Account, tools, and support",
+    )
 }
 
 @Composable
@@ -211,10 +188,10 @@ private fun MoreMenuCard(
         onClick = onClick,
         modifier = modifier.height(154.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.045f)),
+        colors = CardDefaults.cardColors(containerColor = AppNavySurfaceHigh.copy(alpha = 0.92f)),
         border = BorderStroke(
             width = 1.dp,
-            color = Color.White.copy(alpha = 0.1f),
+            color = Color.White.copy(alpha = 0.12f),
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {

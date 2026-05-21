@@ -51,12 +51,17 @@ internal interface FilePhotoPicker {
     suspend fun pickFile(): PickedFile?
 }
 
+internal interface NativeOptionPicker {
+    suspend fun pickOption(title: String, options: List<String>, selectedIndex: Int = -1): Int?
+}
+
 internal data class PlatformServices(
     val secureTokenStorage: SecureTokenStorage,
     val urlOpener: UrlOpener,
     val haptics: Haptics,
     val permissions: PermissionController,
     val filePhotoPicker: FilePhotoPicker,
+    val optionPicker: NativeOptionPicker,
 )
 
 @Composable
@@ -94,4 +99,8 @@ internal object NoopFilePhotoPicker : FilePhotoPicker {
     override suspend fun pickPhoto(): PickedFile? = null
 
     override suspend fun pickFile(): PickedFile? = null
+}
+
+internal object NoopNativeOptionPicker : NativeOptionPicker {
+    override suspend fun pickOption(title: String, options: List<String>, selectedIndex: Int): Int? = null
 }

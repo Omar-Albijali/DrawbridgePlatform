@@ -12,6 +12,7 @@ internal actual fun rememberPlatformServices(): PlatformServices {
             haptics = NoopHaptics,
             permissions = NoopPermissionController,
             filePhotoPicker = NoopFilePhotoPicker,
+            optionPicker = NoopNativeOptionPicker,
         )
     }
 }

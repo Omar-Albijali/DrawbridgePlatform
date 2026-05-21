@@ -54,13 +54,13 @@ private val DarkScheme = darkColorScheme(
     onPrimaryContainer = Primary100,
     secondary = Color(0xFF7DD3FC),
     onSecondary = Color(0xFF082F49),
-    background = Color(0xFF020617),
+    background = AppNavyBase,
     onBackground = Color(0xFFF8FAFC),
-    surface = Color(0xFF0F172A),
+    surface = AppNavySurface,
     onSurface = Color(0xFFF8FAFC),
-    surfaceVariant = Color(0xFF1E293B),
-    onSurfaceVariant = Color(0xFF94A3B8),
-    outline = Color(0xFF334155),
+    surfaceVariant = AppNavySurfaceHigh,
+    onSurfaceVariant = AppMutedText,
+    outline = AppDarkLine,
     error = ErrorColor,
 )
 
