@@ -1,13 +1,17 @@
 package uqu.drawbridge.platform.model
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
+import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Index
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import java.time.LocalDateTime
@@ -63,7 +67,12 @@ class PosIntegration(
     var createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(name = "rotated_at", nullable = true)
-    var rotatedAt: LocalDateTime? = null
+    var rotatedAt: LocalDateTime? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "retailer_id", insertable = false, updatable = false)
+    var retailer: User? = null
 )
 
 @Entity
@@ -97,7 +106,12 @@ class PosEventReceipt(
     var status: PosEventReceiptStatus = PosEventReceiptStatus.PROCESSING,
 
     @Column(name = "processed_at", nullable = false)
-    var processedAt: LocalDateTime = LocalDateTime.now()
+    var processedAt: LocalDateTime = LocalDateTime.now(),
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "retailer_id", insertable = false, updatable = false)
+    var retailer: User? = null
 )
 
 @Entity
@@ -179,5 +193,20 @@ class PosOutboundInventoryEvent(
     var createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(name = "updated_at", nullable = false)
-    var updatedAt: LocalDateTime = LocalDateTime.now()
+    var updatedAt: LocalDateTime = LocalDateTime.now(),
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "retailer_id", insertable = false, updatable = false)
+    var retailer: User? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", insertable = false, updatable = false)
+    var product: Product? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "inventory_item_id", insertable = false, updatable = false)
+    var inventoryItem: InventoryItem? = null
 )

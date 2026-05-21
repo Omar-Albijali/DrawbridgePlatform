@@ -1,5 +1,6 @@
 package uqu.drawbridge.platform.model
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 
 import jakarta.persistence.*
 
@@ -34,7 +35,22 @@ class Payment(
     var transactionRef: String,
 
     @Column(nullable = false)
-    var completedAt: LocalDateTime
+    var completedAt: LocalDateTime,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "orderId", insertable = false, updatable = false)
+    var order: Order? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ownerId", insertable = false, updatable = false)
+    var owner: User? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "paymentMethodId", insertable = false, updatable = false)
+    var paymentMethod: PaymentMethod? = null
 )
 
 @Entity
@@ -59,7 +75,12 @@ class Invoice(
     var totalAmount: BigDecimal,
 
     @Column(nullable = false)
-    var currency: String
+    var currency: String,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "orderId", insertable = false, updatable = false)
+    var order: Order? = null
 )
 
 @Entity
@@ -79,5 +100,10 @@ class PaymentMethod(
     var maskedDetails: String,
 
     @Column(nullable = false)
-    var isDefault: Boolean = false
+    var isDefault: Boolean = false,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ownerId", insertable = false, updatable = false)
+    var owner: User? = null
 )

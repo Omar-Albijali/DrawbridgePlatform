@@ -1,6 +1,6 @@
 package uqu.drawbridge.platform.model
 
-
+import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.persistence.*
 import java.time.LocalDateTime
 import uqu.drawbridge.platform.ScheduleType
@@ -13,7 +13,7 @@ class InventoryItem(
 
     @Column(nullable = false)
     var retailerId: String,
-    
+
     @Column(nullable = false)
     var productId: String,
 
@@ -24,7 +24,17 @@ class InventoryItem(
     var lastUpdated: LocalDateTime = LocalDateTime.now(),
 
     @Embedded
-    var autoOrderConfig: AutoOrderConfig
+    var autoOrderConfig: AutoOrderConfig,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "retailerId", insertable = false, updatable = false)
+    var retailer: User? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "productId", insertable = false, updatable = false)
+    var product: Product? = null
 )
 
 

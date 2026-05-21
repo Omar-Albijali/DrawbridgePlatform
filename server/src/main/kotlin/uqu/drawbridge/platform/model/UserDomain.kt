@@ -98,7 +98,12 @@ class Address(
     var country: String,
 
     @Column(name = "user_id", insertable = false, updatable = false, nullable = false)
-    var userId: String? = null
+    var userId: String? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    var user: User? = null
 )
 
 @Embeddable

@@ -33,7 +33,12 @@ class OrderGroup(
 
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
     @JoinColumn(name = "order_group_id", nullable = false)
-    var orders: MutableList<Order> = mutableListOf()
+    var orders: MutableList<Order> = mutableListOf(),
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "retailerId", insertable = false, updatable = false)
+    var retailer: User? = null
 )
 
 
@@ -87,7 +92,22 @@ class Order(
 
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
     @JoinColumn(name = "order_id", nullable = false)
-    var orderItems: MutableList<OrderItem> = mutableListOf()
+    var orderItems: MutableList<OrderItem> = mutableListOf(),
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_group_id", insertable = false, updatable = false)
+    var orderGroup: OrderGroup? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "retailerId", insertable = false, updatable = false)
+    var retailer: User? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "wholesalerId", insertable = false, updatable = false)
+    var wholesaler: User? = null
 )
 
 
@@ -109,5 +129,15 @@ class OrderItem(
     var quantity: Int,
 
     @Column(nullable = false)
-    var unitPrice: BigDecimal
+    var unitPrice: BigDecimal,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", insertable = false, updatable = false)
+    var order: Order? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "productId", insertable = false, updatable = false)
+    var product: Product? = null
 )

@@ -21,7 +21,12 @@ class ShoppingCart(
 
     @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
     @JoinColumn(name = "cart_id", nullable = false)
-    var items: MutableList<CartItem> = mutableListOf()
+    var items: MutableList<CartItem> = mutableListOf(),
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "retailerId", insertable = false, updatable = false)
+    var retailer: User? = null
 )
 
 
@@ -42,7 +47,6 @@ class CartItem(
     @Column(nullable = false)
     var productId: String,
 
-    // Denormalized for easier grouping during checkout
     @Column(nullable = false)
     var wholesalerId: String,
 
@@ -50,5 +54,20 @@ class CartItem(
     var quantity: Int,
 
     @Column(nullable = false)
-    var addedAt: LocalDateTime = LocalDateTime.now()
+    var addedAt: LocalDateTime = LocalDateTime.now(),
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cart_id", insertable = false, updatable = false)
+    var cart: ShoppingCart? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "productId", insertable = false, updatable = false)
+    var product: Product? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "wholesalerId", insertable = false, updatable = false)
+    var wholesaler: User? = null
 )

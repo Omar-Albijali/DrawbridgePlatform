@@ -1,5 +1,6 @@
 package uqu.drawbridge.platform.model
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -19,6 +20,10 @@ class EmailVerificationToken(
     var expiresAt: LocalDateTime,
 
     @Column(nullable = false)
-    var used: Boolean = false
-)
+    var used: Boolean = false,
 
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "userId", insertable = false, updatable = false)
+    var user: User? = null
+)

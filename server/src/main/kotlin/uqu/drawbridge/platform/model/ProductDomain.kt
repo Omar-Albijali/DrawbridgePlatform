@@ -1,5 +1,6 @@
 package uqu.drawbridge.platform.model
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 
 import jakarta.persistence.*
 
@@ -16,7 +17,12 @@ class Category(
     var name: String,
 
     @Column(nullable = true)
-    var parentCategoryId: String? = null
+    var parentCategoryId: String? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parentCategoryId", insertable = false, updatable = false)
+    var parentCategory: Category? = null
 )
 
 @Entity
@@ -63,7 +69,12 @@ class Product(
     var averageRating: BigDecimal = BigDecimal.ZERO,
 
     @Column(nullable = false)
-    var ratingCount: Int = 0
+    var ratingCount: Int = 0,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "categoryId", insertable = false, updatable = false)
+    var category: Category? = null
 )
 
 
@@ -83,7 +94,12 @@ class ProductImage(
     var sortIndex: Int = 0,
 
     @Column(name = "productId", insertable = false, updatable = false, nullable = false)
-    var productId: String? = null
+    var productId: String? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "productId", insertable = false, updatable = false)
+    var product: Product? = null
 )
 
 
@@ -114,5 +130,15 @@ class ProductRating(
     var createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(nullable = false)
-    var updatedAt: LocalDateTime = LocalDateTime.now()
+    var updatedAt: LocalDateTime = LocalDateTime.now(),
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "productId", insertable = false, updatable = false)
+    var product: Product? = null,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "userId", insertable = false, updatable = false)
+    var user: User? = null
 )
