@@ -17,7 +17,7 @@ import uqu.drawbridge.platform.ScheduleType
 import uqu.drawbridge.platform.UpdateAutoOrderConfigRequest
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.ui.auth.AuthActionResult
-import uqu.drawbridge.platform.ui.commerce.userReadableMessage
+import uqu.drawbridge.platform.ui.common.userReadableMessage
 import uqu.drawbridge.platform.ui.model.SessionState
 
 internal enum class InventoryMode {

@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.vector.ImageVector
+import uqu.drawbridge.platform.ui.common.ServerNotFoundMessage
 import uqu.drawbridge.platform.ui.model.AppDestination
 import uqu.drawbridge.platform.ui.model.MainTab
 import uqu.drawbridge.platform.ui.theme.AppNavySurfaceHigh
@@ -490,13 +491,50 @@ internal fun ErrorStateCard(
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
-    AppCard {
-        StatusChip(text = "Needs attention", tone = StatusTone.Error)
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (actionText != null && onAction != null) {
-            SecondaryButton(text = actionText, onClick = onAction)
+    val isServerNotFound = message == ServerNotFoundMessage
+    if (isServerNotFound) {
+        ServerErrorCard(actionText = actionText, onAction = onAction)
+    } else {
+        AppCard {
+            StatusChip(text = "Needs attention", tone = StatusTone.Error)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (actionText != null && onAction != null) {
+                SecondaryButton(text = actionText, onClick = onAction)
+            }
         }
+    }
+}
+
+@Composable
+internal fun ServerErrorCard(
+    actionText: String? = "Try again",
+    onAction: (() -> Unit)? = null,
+) {
+    AppCard {
+        ServerErrorContent(actionText = actionText, onAction = onAction)
+    }
+}
+
+@Composable
+internal fun ServerErrorContent(
+    actionText: String? = "Try again",
+    onAction: (() -> Unit)? = null,
+) {
+    StatusChip(text = "Offline", tone = StatusTone.Error)
+    Text(
+        text = ServerNotFoundMessage,
+        style = MaterialTheme.typography.headlineSmall,
+        color = MaterialTheme.colorScheme.onSurface,
+        fontWeight = FontWeight.Black,
+    )
+    Text(
+        text = "Start the backend server, then try again.",
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (actionText != null && onAction != null) {
+        PrimaryButton(text = actionText, onClick = onAction)
     }
 }
 

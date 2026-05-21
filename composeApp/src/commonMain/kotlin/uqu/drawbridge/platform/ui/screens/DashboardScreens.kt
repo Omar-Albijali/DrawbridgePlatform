@@ -53,8 +53,10 @@ import uqu.drawbridge.platform.ui.components.GlassCard
 import uqu.drawbridge.platform.ui.components.GlassIconLabelRow
 import uqu.drawbridge.platform.ui.components.GlassIconTile
 import uqu.drawbridge.platform.ui.components.GlassPill
+import uqu.drawbridge.platform.ui.components.ServerErrorCard
 import uqu.drawbridge.platform.ui.components.StatusChip
 import uqu.drawbridge.platform.ui.components.StatusTone
+import uqu.drawbridge.platform.ui.common.ServerNotFoundMessage
 import uqu.drawbridge.platform.ui.engagement.NotificationsStateHolder
 import uqu.drawbridge.platform.ui.model.SessionState
 import uqu.drawbridge.platform.ui.theme.AppDarkLine
@@ -1052,6 +1054,11 @@ private fun DashboardSegmentedBar(
 
 @Composable
 private fun DashboardEmptyLine(message: String) {
+    if (message == ServerNotFoundMessage) {
+        ServerErrorCard(actionText = null, onAction = null)
+        return
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),

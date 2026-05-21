@@ -26,7 +26,7 @@ import uqu.drawbridge.platform.UpdateUserProfileRequest
 import uqu.drawbridge.platform.UserDTO
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.UpsertNotificationPreferenceRequest
-import uqu.drawbridge.platform.ui.commerce.userReadableMessage
+import uqu.drawbridge.platform.ui.common.userReadableMessage
 import uqu.drawbridge.platform.ui.model.SessionState
 
 internal data class ReportsUiState(

@@ -79,9 +79,11 @@ import uqu.drawbridge.platform.ui.components.LoadingStateCard
 import uqu.drawbridge.platform.ui.components.PrimaryButton
 import uqu.drawbridge.platform.ui.components.ScreenSection
 import uqu.drawbridge.platform.ui.components.SecondaryButton
+import uqu.drawbridge.platform.ui.components.ServerErrorCard
 import uqu.drawbridge.platform.ui.components.StatCard
 import uqu.drawbridge.platform.ui.components.StatusChip
 import uqu.drawbridge.platform.ui.components.StatusTone
+import uqu.drawbridge.platform.ui.common.ServerNotFoundMessage
 import uqu.drawbridge.platform.ui.operations.AutoRestockUiState
 import uqu.drawbridge.platform.ui.operations.InventoryDetailUiState
 import uqu.drawbridge.platform.ui.operations.InventoryHistoryUiState
@@ -871,6 +873,12 @@ private fun InventoryHistoryStateCard(
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
+    val isServerNotFound = message == ServerNotFoundMessage
+    if (isServerNotFound) {
+        ServerErrorCard(actionText = actionText, onAction = onAction)
+        return
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -1369,6 +1377,12 @@ private fun InventoryStatePanel(
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
+    val isServerNotFound = message == ServerNotFoundMessage
+    if (isServerNotFound) {
+        ServerErrorCard(actionText = actionText, onAction = onAction)
+        return
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),

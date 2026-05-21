@@ -5,12 +5,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import uqu.drawbridge.platform.CategoryDTO
 import uqu.drawbridge.platform.MarketplaceProductQuery
-import uqu.drawbridge.platform.MobileApiException
 import uqu.drawbridge.platform.MobileAuthApi
 import uqu.drawbridge.platform.ProductDTO
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.WishlistDTO
 import uqu.drawbridge.platform.ui.auth.AuthActionResult
+import uqu.drawbridge.platform.ui.common.userReadableMessage
 import uqu.drawbridge.platform.ui.model.SessionState
 
 internal enum class MarketplaceSortOption(
@@ -353,11 +353,4 @@ internal class ProductDetailStateHolder(
     suspend fun fetchImageBytes(imageUrl: String): ByteArray {
         return api.fetchImageBytes(imageUrl)
     }
-}
-
-private fun userReadableMessage(error: Throwable, fallback: String): String {
-    val apiError = error as? MobileApiException
-    return apiError?.message?.takeIf { it.isNotBlank() }
-        ?: error.message?.takeIf { it.isNotBlank() }
-        ?: fallback
 }

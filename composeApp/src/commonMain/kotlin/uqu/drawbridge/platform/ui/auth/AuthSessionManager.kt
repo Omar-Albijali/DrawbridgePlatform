@@ -12,6 +12,7 @@ import uqu.drawbridge.platform.DashboardSummary
 import uqu.drawbridge.platform.MobileApiException
 import uqu.drawbridge.platform.MobileAuthApi
 import uqu.drawbridge.platform.RegisterRequest
+import uqu.drawbridge.platform.ui.common.userReadableMessage
 import uqu.drawbridge.platform.ui.model.SessionState
 import uqu.drawbridge.platform.ui.platform.SecureTokenStorage
 
@@ -184,9 +185,6 @@ internal class AuthSessionManager(
         }
     }
 
-    private fun userReadableMessage(error: Throwable, fallback: String): String {
-        return error.message?.takeIf { it.isNotBlank() } ?: fallback
-    }
 }
 
 @OptIn(ExperimentalEncodingApi::class)

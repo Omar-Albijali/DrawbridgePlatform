@@ -89,6 +89,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.ui.components.AppTextField
+import uqu.drawbridge.platform.ui.components.ServerErrorCard
+import uqu.drawbridge.platform.ui.common.ServerNotFoundMessage
 import uqu.drawbridge.platform.ui.model.SignupFormState
 import uqu.drawbridge.platform.ui.theme.Primary500
 
@@ -1070,6 +1072,11 @@ private fun AuthInlineMessage(message: String?) {
         enter = fadeIn(animationSpec = tween(160)) + expandVertically(animationSpec = tween(180)),
         exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(animationSpec = tween(140)),
     ) {
+        if (message == ServerNotFoundMessage) {
+            ServerErrorCard(actionText = null, onAction = null)
+            return@AnimatedVisibility
+        }
+
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),

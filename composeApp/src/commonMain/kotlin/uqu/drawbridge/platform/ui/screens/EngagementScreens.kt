@@ -38,9 +38,11 @@ import uqu.drawbridge.platform.ui.components.LoadingStateCard
 import uqu.drawbridge.platform.ui.components.PrimaryButton
 import uqu.drawbridge.platform.ui.components.ScreenSection
 import uqu.drawbridge.platform.ui.components.SecondaryButton
+import uqu.drawbridge.platform.ui.components.ServerErrorCard
 import uqu.drawbridge.platform.ui.components.StatCard
 import uqu.drawbridge.platform.ui.components.StatusChip
 import uqu.drawbridge.platform.ui.components.StatusTone
+import uqu.drawbridge.platform.ui.common.ServerNotFoundMessage
 import uqu.drawbridge.platform.ui.engagement.AddressFormState
 import uqu.drawbridge.platform.ui.engagement.NotificationsStateHolder
 import uqu.drawbridge.platform.ui.engagement.PaymentMethodFormState
@@ -530,9 +532,15 @@ private fun PasswordField(label: String, value: String, onChange: (String) -> Un
 
 @Composable
 private fun ErrorCard(message: String, onRetry: () -> Unit) {
-    AppCard {
-        Text(message, color = MaterialTheme.colorScheme.error)
-        SecondaryButton(text = "Retry", onClick = onRetry)
+    val isServerNotFound = message == ServerNotFoundMessage
+    if (isServerNotFound) {
+        ServerErrorCard(actionText = "Retry", onAction = onRetry)
+    } else {
+        AppCard {
+            StatusChip(text = "Needs attention", tone = StatusTone.Error)
+            Text(message, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+            SecondaryButton(text = "Retry", onClick = onRetry)
+        }
     }
 }
 

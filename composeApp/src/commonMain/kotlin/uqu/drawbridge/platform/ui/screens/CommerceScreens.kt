@@ -80,8 +80,10 @@ import uqu.drawbridge.platform.ui.components.LoadingStateCard
 import uqu.drawbridge.platform.ui.components.PrimaryButton
 import uqu.drawbridge.platform.ui.components.ScreenSection
 import uqu.drawbridge.platform.ui.components.SecondaryButton
+import uqu.drawbridge.platform.ui.components.ServerErrorCard
 import uqu.drawbridge.platform.ui.components.StatusChip
 import uqu.drawbridge.platform.ui.components.StatusTone
+import uqu.drawbridge.platform.ui.common.ServerNotFoundMessage
 import uqu.drawbridge.platform.ui.model.SessionState
 
 private val CommerceText = Color(0xFFF8FAFC)
@@ -890,6 +892,12 @@ private fun OrdersEmptyPanel(
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
+    val isServerNotFound = message == ServerNotFoundMessage
+    if (isServerNotFound) {
+        ServerErrorCard(actionText = actionText, onAction = onAction)
+        return
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),

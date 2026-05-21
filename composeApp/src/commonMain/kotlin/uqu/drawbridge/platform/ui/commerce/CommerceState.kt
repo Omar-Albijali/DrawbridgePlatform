@@ -13,6 +13,7 @@ import uqu.drawbridge.platform.OrderStatus
 import uqu.drawbridge.platform.ProductDTO
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.ui.auth.AuthActionResult
+import uqu.drawbridge.platform.ui.common.userReadableMessage
 import uqu.drawbridge.platform.ui.model.SessionState
 
 internal data class CartProductItem(
@@ -518,11 +519,4 @@ internal class OrdersStateHolder(
             UserRole.WHOLESALER -> api.fetchOrdersByWholesaler(session.user.id)
         }
     }
-}
-
-internal fun userReadableMessage(error: Throwable, fallback: String): String {
-    val apiError = error as? MobileApiException
-    return apiError?.message?.takeIf { it.isNotBlank() }
-        ?: error.message?.takeIf { it.isNotBlank() }
-        ?: fallback
 }
