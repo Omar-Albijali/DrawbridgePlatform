@@ -1,28 +1,63 @@
 package uqu.drawbridge.platform.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import uqu.drawbridge.platform.AddressResponseDto
 import uqu.drawbridge.platform.NotificationChannel
 import uqu.drawbridge.platform.NotificationDTO
 import uqu.drawbridge.platform.NotificationPreferenceKey
+import uqu.drawbridge.platform.NotificationType
 import uqu.drawbridge.platform.OrderStatus
 import uqu.drawbridge.platform.PaymentMethodDTO
 import uqu.drawbridge.platform.PaymentMethodType
@@ -52,6 +87,15 @@ import uqu.drawbridge.platform.ui.engagement.ReportsStateHolder
 import uqu.drawbridge.platform.ui.engagement.SettingsSection
 import uqu.drawbridge.platform.ui.engagement.SettingsStateHolder
 import uqu.drawbridge.platform.ui.engagement.SupportStateHolder
+import uqu.drawbridge.platform.ui.theme.AppMutedText
+import uqu.drawbridge.platform.ui.theme.AppNavySurfaceHigh
+import uqu.drawbridge.platform.ui.theme.ErrorColor
+import uqu.drawbridge.platform.ui.theme.Primary500
+import uqu.drawbridge.platform.ui.theme.WarningColor
+
+private val NotificationsText = Color(0xFFF8FAFC)
+private val NotificationsPanel = AppNavySurfaceHigh.copy(alpha = 0.92f)
+private val NotificationsBorder = Color.White.copy(alpha = 0.12f)
 
 @Composable
 internal fun ReportsMainScreen(
@@ -183,42 +227,338 @@ internal fun SupportMainScreen(
 @Composable
 internal fun NotificationsMainScreen(
     notificationsStateHolder: NotificationsStateHolder,
+    onBack: (() -> Unit)? = null,
 ) {
     val state = notificationsStateHolder.state
     val scope = rememberCoroutineScope()
+    var selectedFilter by remember { mutableStateOf(NotificationInboxFilter.All) }
 
     LaunchedEffect(notificationsStateHolder) {
         notificationsStateHolder.load()
     }
 
-    ScreenSection(title = "Notifications", subtitle = "Review in-app platform updates.") {
-        state.errorMessage?.let { ErrorCard(it) { scope.launch { notificationsStateHolder.load() } } }
-        state.successMessage?.let { SuccessCard(it) }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatCard(modifier = Modifier.weight(1f), value = "${state.notifications.size}", label = "Total")
-            StatCard(modifier = Modifier.weight(1f), value = "${state.unreadCount}", label = "Unread")
+    val filters = remember(state.notifications, state.unreadCount) {
+        NotificationInboxFilter.entries.map { filter ->
+            filter to filter.count(state.notifications, state.unreadCount)
         }
-        SecondaryButton(
-            text = if (state.isMutating) "Updating..." else "Mark all as read",
-            enabled = !state.isMutating && state.unreadCount > 0,
-            onClick = { scope.launch { notificationsStateHolder.markAllRead() } },
+    }
+    val visibleNotifications = remember(state.notifications, selectedFilter) {
+        selectedFilter.apply(state.notifications)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        NotificationsHeader(
+            totalCount = state.notifications.size,
+            unreadCount = state.unreadCount,
+            isUpdating = state.isMutating,
+            onBack = onBack,
+            onMarkAllRead = { scope.launch { notificationsStateHolder.markAllRead() } },
         )
+        NotificationsFilterRow(
+            filters = filters,
+            selectedFilter = selectedFilter,
+            onSelect = { selectedFilter = it },
+        )
+        state.errorMessage?.let { ErrorCard(it) { scope.launch { notificationsStateHolder.load() } } }
         when {
             state.isLoading -> LoadingStateCard(title = "Loading inbox", message = "Fetching notifications.")
-            state.errorMessage != null -> Text("Resolve the error above, then retry.")
-            state.notifications.isEmpty() -> EmptyStateCard(title = "No notifications", message = "Platform updates will appear here.")
-            else -> state.notifications.forEach { notification ->
-                NotificationCard(notification = notification) {
-                    scope.launch { notificationsStateHolder.markAsRead(notification) }
-                }
+            state.errorMessage != null -> Unit
+            state.notifications.isEmpty() -> NotificationsEmptyState()
+            visibleNotifications.isEmpty() -> EmptyStateCard(
+                title = "No ${selectedFilter.label.lowercase()} notifications",
+                message = "New updates will appear here when available.",
+            )
+            else -> visibleNotifications.forEach { notification ->
+                NotificationCard(
+                    notification = notification,
+                    onMarkRead = { scope.launch { notificationsStateHolder.markAsRead(notification) } },
+                    onDelete = { scope.launch { notificationsStateHolder.delete(notification) } },
+                )
             }
         }
-        DeferredFeatureCard(
-            destination = uqu.drawbridge.platform.ui.model.AppDestination.Notifications,
-            title = "iOS push deferred",
-            message = "The backend currently supports web push subscriptions. Native APNs setup is not implemented in this phase.",
+    }
+}
+
+private enum class NotificationInboxFilter(val label: String) {
+    All("All"),
+    Unread("Unread"),
+    Orders("Orders"),
+    Stock("Stock"),
+    Payments("Payments"),
+    System("System");
+
+    fun apply(notifications: List<NotificationDTO>): List<NotificationDTO> = when (this) {
+        All -> notifications
+        Unread -> notifications.filterNot { it.read }
+        Orders -> notifications.filter { it.type == NotificationType.ORDER }
+        Stock -> notifications.filter { it.type == NotificationType.STOCK }
+        Payments -> notifications.filter { it.type == NotificationType.PAYMENT }
+        System -> notifications.filter { it.type == NotificationType.SYSTEM }
+    }
+
+    fun count(notifications: List<NotificationDTO>, unreadCount: Int): Int = when (this) {
+        All -> notifications.size
+        Unread -> unreadCount
+        else -> apply(notifications).size
+    }
+}
+
+@Composable
+private fun NotificationsHeader(
+    totalCount: Int,
+    unreadCount: Int,
+    isUpdating: Boolean,
+    onBack: (() -> Unit)?,
+    onMarkAllRead: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = NotificationsPanel,
+        border = BorderStroke(1.dp, NotificationsBorder),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onBack != null) {
+                NotificationsBackSquare(onClick = onBack)
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Notifications",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = NotificationsText,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (unreadCount > 0) {
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = ErrorColor,
+                        ) {
+                            Text(
+                                unreadCount.toString(),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Black,
+                            )
+                        }
+                    }
+                }
+                Text(
+                    "$totalCount total notifications",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppMutedText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            NotificationsMarkAllButton(
+                enabled = unreadCount > 0 && !isUpdating,
+                loading = isUpdating,
+                onClick = onMarkAllRead,
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotificationsBackSquare(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.size(48.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = NotificationsPanel,
+        border = BorderStroke(1.dp, NotificationsBorder),
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = NotificationsText,
+                modifier = Modifier.size(21.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotificationsMarkAllButton(
+    enabled: Boolean,
+    loading: Boolean,
+    onClick: () -> Unit,
+) {
+    val tint = if (enabled) Primary500 else AppMutedText
+    Surface(
+        modifier = Modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = tint.copy(alpha = if (enabled) 0.14f else 0.08f),
+        border = BorderStroke(1.dp, tint.copy(alpha = if (enabled) 0.34f else 0.16f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = tint, modifier = Modifier.size(17.dp))
+            Text(
+                if (loading) "Updating" else "Mark all read",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (enabled) Color(0xFFB8F7D8) else AppMutedText,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotificationsFilterRow(
+    filters: List<Pair<NotificationInboxFilter, Int>>,
+    selectedFilter: NotificationInboxFilter,
+    onSelect: (NotificationInboxFilter) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        filters.forEach { (filter, count) ->
+            NotificationFilterChip(
+                label = filter.label,
+                count = count,
+                selected = filter == selectedFilter,
+                onClick = { onSelect(filter) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotificationFilterChip(
+    label: String,
+    count: Int,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val background by animateColorAsState(if (selected) Primary500 else NotificationsPanel)
+    val border by animateColorAsState(if (selected) Primary500 else NotificationsBorder)
+    Surface(
+        modifier = Modifier
+            .height(40.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(10.dp),
+        color = background,
+        border = BorderStroke(1.dp, border),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (selected) Color.White else NotificationsText,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+            )
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = Color.White.copy(alpha = if (selected) 0.18f else 0.10f),
+            ) {
+                Text(
+                    count.toString(),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (selected) Color.White else AppMutedText,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationsEmptyState() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(420.dp)
+            .padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(104.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Primary500.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.Notifications, contentDescription = null, tint = Primary500, modifier = Modifier.size(50.dp))
+        }
+        Spacer(Modifier.height(28.dp))
+        Text(
+            "No notifications",
+            style = MaterialTheme.typography.titleLarge,
+            color = NotificationsText,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Order, stock, payment, and system updates will appear here.",
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodyLarge,
+            color = AppMutedText,
+            textAlign = TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+private fun notificationTypeLabel(type: NotificationType): String = when (type) {
+    NotificationType.ORDER -> "Orders"
+    NotificationType.STOCK -> "Stock"
+    NotificationType.PAYMENT -> "Payment"
+    NotificationType.SYSTEM -> "System"
+}
+
+private fun notificationTint(type: NotificationType): Color = when (type) {
+    NotificationType.ORDER -> Color(0xFF60A5FA)
+    NotificationType.STOCK -> WarningColor
+    NotificationType.PAYMENT -> Primary500
+    NotificationType.SYSTEM -> AppMutedText
+}
+
+private fun notificationIcon(type: NotificationType): ImageVector = when (type) {
+    NotificationType.ORDER -> Icons.Default.ShoppingCart
+    NotificationType.STOCK -> Icons.Default.Inventory2
+    NotificationType.PAYMENT -> Icons.Default.CreditCard
+    NotificationType.SYSTEM -> Icons.Default.Notifications
 }
 
 @Composable
@@ -436,16 +776,100 @@ private fun TicketCard(ticket: SupportTicketDTO, selected: Boolean, onClick: () 
 }
 
 @Composable
-private fun NotificationCard(notification: NotificationDTO, onMarkRead: () -> Unit) {
-    AppCard {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(notification.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            StatusChip(text = if (notification.read) "Read" else "Unread", tone = if (notification.read) StatusTone.Neutral else StatusTone.Warning)
-        }
-        Text(notification.message)
-        Text(notification.time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (!notification.read) {
-            SecondaryButton(text = "Mark as read", onClick = onMarkRead)
+private fun NotificationCard(
+    notification: NotificationDTO,
+    onMarkRead: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val tint = notificationTint(notification.type)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = !notification.read, onClick = onMarkRead),
+        shape = RoundedCornerShape(8.dp),
+        color = if (notification.read) NotificationsPanel else tint.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, if (notification.read) NotificationsBorder else tint.copy(alpha = 0.32f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(tint.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(notificationIcon(notification.type), contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        notification.title,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = NotificationsText,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (!notification.read) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(tint),
+                        )
+                    }
+                }
+                Text(
+                    notification.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppMutedText,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = tint.copy(alpha = 0.14f),
+                    ) {
+                        Text(
+                            notificationTypeLabel(notification.type),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = tint,
+                            fontWeight = FontWeight.Black,
+                        )
+                    }
+                    Text(
+                        notification.time,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppMutedText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete notification", tint = AppMutedText.copy(alpha = 0.72f), modifier = Modifier.size(18.dp))
+            }
         }
     }
 }

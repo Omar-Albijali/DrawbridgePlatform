@@ -789,6 +789,15 @@ class MobileAuthApi(
         return json.decodeFromString(UnreadCountDTO.serializer(), body).count
     }
 
+    suspend fun deleteNotification(notificationId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/notifications/$notificationId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
     suspend fun fetchNotificationPreferences(userId: String): List<NotificationPreferenceDTO> {
         val response = authorizedGet("/notifications/preferences/$userId")
         val body = response.bodyAsText()

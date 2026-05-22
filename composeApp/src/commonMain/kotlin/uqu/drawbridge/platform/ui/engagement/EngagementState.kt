@@ -256,6 +256,22 @@ internal class NotificationsStateHolder(
             },
         )
     }
+
+    suspend fun delete(notification: NotificationDTO) {
+        state = state.copy(isMutating = true, errorMessage = null)
+        runCatching { api.deleteNotification(notification.id) }.fold(
+            onSuccess = {
+                state = state.copy(
+                    isMutating = false,
+                    notifications = state.notifications.filterNot { it.id == notification.id },
+                    unreadCount = if (notification.read) state.unreadCount else (state.unreadCount - 1).coerceAtLeast(0),
+                )
+            },
+            onFailure = { error ->
+                state = state.copy(isMutating = false, errorMessage = userReadableMessage(error, "Unable to remove notification."))
+            },
+        )
+    }
 }
 
 internal enum class SettingsSection {

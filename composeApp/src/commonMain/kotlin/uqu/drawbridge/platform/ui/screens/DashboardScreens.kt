@@ -83,6 +83,7 @@ internal fun DashboardMainScreen(
     notificationsStateHolder: NotificationsStateHolder,
     onRefresh: () -> Unit,
     onOpenOrders: () -> Unit,
+    onOpenNotifications: () -> Unit,
     onOpenOrder: (String) -> Unit,
 ) {
     val ordersState = ordersStateHolder.state
@@ -153,6 +154,7 @@ internal fun DashboardMainScreen(
             fallbackOrders = orders.take(4),
             isLoading = notificationsState.isLoading,
             errorMessage = notificationsState.errorMessage,
+            onViewAll = onOpenNotifications,
         )
     }
 }
@@ -485,11 +487,13 @@ private fun RecentActivityCard(
     fallbackOrders: List<OrderDTO>,
     isLoading: Boolean,
     errorMessage: String?,
+    onViewAll: () -> Unit,
 ) {
     DashboardSectionCard(
         title = "Recent Activity",
-        actionLabel = "Timeline",
+        actionLabel = "View all",
         icon = Icons.Default.Notifications,
+        onAction = onViewAll,
         modifier = Modifier.heightIn(min = 164.dp),
     ) {
         val hasActivityContent = notifications.isNotEmpty() || fallbackOrders.isNotEmpty()

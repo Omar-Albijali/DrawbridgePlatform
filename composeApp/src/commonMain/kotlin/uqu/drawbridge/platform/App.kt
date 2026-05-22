@@ -662,6 +662,14 @@ private fun MainHost(
                 return@MobileScrollColumn
             }
 
+            if (activeMoreDestination == AppDestination.Notifications) {
+                NotificationsMainScreen(
+                    notificationsStateHolder = notificationsStateHolder,
+                    onBack = { onActiveMoreDestinationChange(null) },
+                )
+                return@MobileScrollColumn
+            }
+
             if (activeMoreDestination == AppDestination.Cart) {
                 if (isCheckoutOpen) {
                     CheckoutMainScreen(
@@ -719,6 +727,7 @@ private fun MainHost(
                             }
                         },
                         onOpenOrders = { openTab(AppDestination.Orders) },
+                        onOpenNotifications = { onActiveMoreDestinationChange(AppDestination.Notifications) },
                         onOpenOrder = onOpenOrder,
                     )
                 }
@@ -832,7 +841,10 @@ private fun MainHost(
                                 SupportMainScreen(supportStateHolder = supportStateHolder)
                             },
                             notificationsContent = {
-                                NotificationsMainScreen(notificationsStateHolder = notificationsStateHolder)
+                                NotificationsMainScreen(
+                                    notificationsStateHolder = notificationsStateHolder,
+                                    onBack = { onActiveMoreDestinationChange(null) },
+                                )
                             },
                             settingsContent = {
                                 SettingsMainScreen(
