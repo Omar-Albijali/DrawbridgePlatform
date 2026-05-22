@@ -419,7 +419,7 @@ class MobileAuthApi(
     }
 
     suspend fun fetchImageBytes(imageUrl: String): ByteArray {
-        val resolvedUrl = resolveResourceUrl(imageUrl)
+        val resolvedUrl = MobileApiConfig.resolveResourceUrl(imageUrl)
         val response = client.get(resolvedUrl)
         if (!response.status.isSuccess()) {
             ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
@@ -813,21 +813,6 @@ class MobileAuthApi(
     }
 
     private fun buildUrl(path: String): String = "${MobileApiConfig.baseUrl}${path}"
-
-    private fun resolveResourceUrl(resourceUrl: String): String {
-        val trimmed = resourceUrl.trim()
-        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-            return trimmed
-        }
-
-        val apiBase = MobileApiConfig.baseUrl.trimEnd('/')
-        val origin = apiBase.removeSuffix("/api")
-        val path = when {
-            trimmed.startsWith("/") -> trimmed
-            else -> "/$trimmed"
-        }
-        return origin + path
-    }
 
     private suspend fun authorizedGet(path: String, tokenOverride: String? = null): HttpResponse {
         val token = requireBearerToken(tokenOverride)

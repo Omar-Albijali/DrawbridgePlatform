@@ -1,12 +1,12 @@
 package uqu.drawbridge.platform.ui.screens
 
+import coil3.compose.AsyncImage
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -47,7 +47,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -56,16 +55,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import org.jetbrains.skia.Image as SkiaImage
 import uqu.drawbridge.platform.CategoryDTO
+import uqu.drawbridge.platform.MobileApiConfig
 import uqu.drawbridge.platform.ProductDTO
 import uqu.drawbridge.platform.ui.components.AppCard
 import uqu.drawbridge.platform.ui.components.AppPageHeader
@@ -204,7 +201,6 @@ internal fun MarketplaceMainScreen(
                 products = state.products,
                 wishlistStateHolder = wishlistStateHolder,
                 cartStateHolder = cartStateHolder,
-                imageLoader = marketplaceStateHolder::fetchImageBytes,
                 onOpenProduct = onOpenProduct,
                 onShowMessage = onShowMessage,
             )
@@ -882,7 +878,6 @@ private fun MarketplaceProductGrid(
     products: List<ProductDTO>,
     wishlistStateHolder: WishlistStateHolder,
     cartStateHolder: CartStateHolder,
-    imageLoader: suspend (String) -> ByteArray,
     onOpenProduct: (String) -> Unit,
     onShowMessage: (String) -> Unit,
 ) {
@@ -902,7 +897,6 @@ private fun MarketplaceProductGrid(
                         isWishlistBusy = product.id in wishlistStateHolder.state.busyProductIds,
                         cartEnabled = cartStateHolder.isEnabled,
                         isCartBusy = product.id in cartStateHolder.state.busyProductIds,
-                        imageLoader = imageLoader,
                         onOpenProduct = { onOpenProduct(product.id) },
                         onToggleWishlist = {
                             coroutineScope.launch {
@@ -935,7 +929,6 @@ private fun MarketplaceProductCard(
     isWishlistBusy: Boolean,
     cartEnabled: Boolean,
     isCartBusy: Boolean,
-    imageLoader: suspend (String) -> ByteArray,
     onOpenProduct: () -> Unit,
     onToggleWishlist: () -> Unit,
     onAddToCart: () -> Unit,
@@ -954,7 +947,6 @@ private fun MarketplaceProductCard(
         Column {
             ProductImageSurface(
                 product = product,
-                imageLoader = imageLoader,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(132.dp),
@@ -1085,28 +1077,14 @@ private fun MarketplaceProductCard(
 private fun ProductImageSurface(
     product: ProductDTO,
     modifier: Modifier = Modifier,
-    imageLoader: (suspend (String) -> ByteArray)? = null,
     showCategoryLabel: Boolean = true,
 ) {
     val category = product.category.ifBlank { "Product" }
     val imageUrl = remember(product.id, product.image, product.images.contentHashCode()) {
         primaryImageUrl(product)
     }
-    val imageState by produceState<ProductImageLoadState>(
-        initialValue = if (imageUrl != null && imageLoader != null) ProductImageLoadState.Loading else ProductImageLoadState.Unavailable,
-        key1 = imageUrl,
-        key2 = imageLoader,
-    ) {
-        value = if (imageUrl == null || imageLoader == null) {
-            ProductImageLoadState.Unavailable
-        } else {
-            runCatching {
-                SkiaImage.makeFromEncoded(imageLoader(imageUrl)).toComposeImageBitmap()
-            }.fold(
-                onSuccess = { ProductImageLoadState.Loaded(it) },
-                onFailure = { ProductImageLoadState.Unavailable },
-            )
-        }
+    val resolvedImageUrl = remember(imageUrl) {
+        imageUrl?.let(MobileApiConfig::resolveResourceUrl)
     }
 
     Box(
@@ -1114,32 +1092,27 @@ private fun ProductImageSurface(
             .clip(RoundedCornerShape(8.dp))
             .background(productImageBrush()),
     ) {
-        when (val state = imageState) {
-            is ProductImageLoadState.Loaded -> {
-                Image(
-                    bitmap = state.bitmap,
-                    contentDescription = product.name,
-                    modifier = Modifier.fillMaxWidth().matchParentSize(),
-                    contentScale = ContentScale.Crop,
-                )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Transparent,
-                                    MarketNavy.copy(alpha = 0.34f),
-                                ),
+        ProductImageFallbackContent(product = product)
+
+        if (resolvedImageUrl != null) {
+            AsyncImage(
+                model = resolvedImageUrl,
+                contentDescription = product.name,
+                modifier = Modifier.matchParentSize(),
+                contentScale = ContentScale.Crop,
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Transparent,
+                                MarketNavy.copy(alpha = 0.22f),
                             ),
                         ),
-                )
-            }
-
-            ProductImageLoadState.Loading,
-            ProductImageLoadState.Unavailable -> {
-                ProductImageFallbackContent(product = product)
-            }
+                    ),
+            )
         }
 
         if (showCategoryLabel) {
@@ -1197,12 +1170,6 @@ private fun productImageBrush(): Brush {
             MarketNavy,
         ),
     )
-}
-
-private sealed interface ProductImageLoadState {
-    data object Loading : ProductImageLoadState
-    data object Unavailable : ProductImageLoadState
-    data class Loaded(val bitmap: ImageBitmap) : ProductImageLoadState
 }
 
 @Composable
@@ -1393,7 +1360,6 @@ internal fun ProductDetailMainScreen(
                     product = state.product,
                     wishlistStateHolder = wishlistStateHolder,
                     cartStateHolder = cartStateHolder,
-                    imageLoader = detailStateHolder::fetchImageBytes,
                     onShowMessage = onShowMessage,
                 )
             }
@@ -1406,7 +1372,6 @@ private fun ProductDetailContent(
     product: ProductDTO,
     wishlistStateHolder: WishlistStateHolder,
     cartStateHolder: CartStateHolder,
-    imageLoader: suspend (String) -> ByteArray,
     onShowMessage: (String) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -1421,7 +1386,6 @@ private fun ProductDetailContent(
         GlassCard(contentPadding = 10.dp) {
             ProductImageSurface(
                 product = product,
-                imageLoader = imageLoader,
                 showCategoryLabel = false,
                 modifier = Modifier
                     .fillMaxWidth()

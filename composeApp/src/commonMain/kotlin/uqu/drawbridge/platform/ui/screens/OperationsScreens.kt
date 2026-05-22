@@ -1,5 +1,6 @@
 package uqu.drawbridge.platform.ui.screens
 
+import coil3.compose.AsyncImage
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -56,7 +57,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -82,6 +82,7 @@ import uqu.drawbridge.platform.CategoryDTO
 import uqu.drawbridge.platform.InventoryAuditLogDTO
 import uqu.drawbridge.platform.InventoryItemDTO
 import uqu.drawbridge.platform.InventoryStatus
+import uqu.drawbridge.platform.MobileApiConfig
 import uqu.drawbridge.platform.ProductDTO
 import uqu.drawbridge.platform.ScheduleType
 import uqu.drawbridge.platform.ui.components.AppCard
@@ -478,7 +479,6 @@ private fun InventoryListContent(
                             CatalogStockCard(
                                 product = product,
                                 isBusy = product.id in state.busyItemIds,
-                                imageLoader = inventoryStateHolder::fetchImageBytes,
                                 onOpenDetail = { onOpenDetail(product.id) },
                             )
                         }
@@ -498,7 +498,6 @@ private fun InventoryListContent(
                             RetailerInventoryCard(
                                 item = item,
                                 isBusy = item.id in state.busyItemIds,
-                                imageLoader = inventoryStateHolder::fetchImageBytes,
                                 onToggleAutoRestock = {
                                     coroutineScope.launch {
                                         val result = inventoryStateHolder.toggleAutoRestock(item)
@@ -1767,7 +1766,6 @@ internal fun ProductManagementMainScreen(
                 products = state.filteredProducts,
                 busyProductIds = state.busyProductIds,
                 pendingDeleteId = pendingDeleteId,
-                imageLoader = productManagementStateHolder::fetchImageBytes,
                 onEditProduct = onEditProduct,
                 onTogglePublished = { product ->
                     coroutineScope.launch {
@@ -1937,7 +1935,6 @@ private fun ManagedProductsList(
     products: List<ProductDTO>,
     busyProductIds: Set<String>,
     pendingDeleteId: String?,
-    imageLoader: suspend (String) -> ByteArray,
     onEditProduct: (ProductDTO) -> Unit,
     onTogglePublished: (ProductDTO) -> Unit,
     onDeleteProduct: (ProductDTO) -> Unit,
@@ -1948,7 +1945,6 @@ private fun ManagedProductsList(
                 product = product,
                 isBusy = product.id in busyProductIds,
                 confirmDelete = pendingDeleteId == product.id,
-                imageLoader = imageLoader,
                 onEdit = { onEditProduct(product) },
                 onTogglePublished = { onTogglePublished(product) },
                 onDelete = { onDeleteProduct(product) },
@@ -1962,7 +1958,6 @@ private fun ManagedProductCard(
     product: ProductDTO,
     isBusy: Boolean,
     confirmDelete: Boolean,
-    imageLoader: suspend (String) -> ByteArray,
     onEdit: () -> Unit,
     onTogglePublished: () -> Unit,
     onDelete: () -> Unit,
@@ -1985,7 +1980,6 @@ private fun ManagedProductCard(
             ) {
                 ProductImageTile(
                     product = product,
-                    imageLoader = imageLoader,
                     modifier = Modifier.size(74.dp),
                 )
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -2256,7 +2250,6 @@ internal fun ProductFormMainScreen(
             images = form.images,
             isLoading = form.isLoadingImages,
             errorMessage = form.imageErrorMessage,
-            imageLoader = productManagementStateHolder::fetchImageBytes,
             onAddImage = ::pickImage,
             onRemoveImage = productManagementStateHolder::removeProductFormImage,
         )
@@ -2393,7 +2386,6 @@ private fun ProductImagesSection(
     images: List<ProductFormImage>,
     isLoading: Boolean,
     errorMessage: String?,
-    imageLoader: suspend (String) -> ByteArray,
     onAddImage: () -> Unit,
     onRemoveImage: (String) -> Unit,
 ) {
@@ -2418,7 +2410,6 @@ private fun ProductImagesSection(
                 ProductFormImageTile(
                     image = image,
                     isMain = index == 0,
-                    imageLoader = imageLoader,
                     onRemove = { onRemoveImage(image.localId) },
                 )
             }
@@ -2442,7 +2433,6 @@ private fun ProductImagesSection(
 private fun ProductFormImageTile(
     image: ProductFormImage,
     isMain: Boolean,
-    imageLoader: suspend (String) -> ByteArray,
     onRemove: () -> Unit,
 ) {
     Surface(
@@ -2454,7 +2444,6 @@ private fun ProductFormImageTile(
         Box(modifier = Modifier.fillMaxSize()) {
             ProductFormImagePreview(
                 image = image,
-                imageLoader = imageLoader,
                 modifier = Modifier.fillMaxSize(),
             )
             Box(
@@ -2482,7 +2471,6 @@ private fun ProductFormImageTile(
 @Composable
 private fun ProductFormImagePreview(
     image: ProductFormImage,
-    imageLoader: suspend (String) -> ByteArray,
     modifier: Modifier = Modifier,
 ) {
     val localBitmap = remember(image.localId, image.bytes) {
@@ -2499,7 +2487,6 @@ private fun ProductFormImagePreview(
         )
         image.url != null -> InventoryImageTile(
             imageUrl = image.url,
-            imageLoader = imageLoader,
             contentDescription = image.name,
             modifier = modifier,
         )
@@ -2866,7 +2853,6 @@ internal fun PosMainScreen(
 private fun RetailerInventoryCard(
     item: InventoryItemDTO,
     isBusy: Boolean,
-    imageLoader: suspend (String) -> ByteArray,
     onToggleAutoRestock: () -> Unit,
     onOpenDetail: () -> Unit,
     onOpenHistory: () -> Unit,
@@ -2889,7 +2875,6 @@ private fun RetailerInventoryCard(
                 statusText = inventoryStatusLabel(item),
                 statusTone = inventoryStatusTone(item),
                 imageUrl = item.imageUrl,
-                imageLoader = imageLoader,
                 onMore = onOpenDetail,
             )
 
@@ -2973,7 +2958,6 @@ private fun RetailerInventoryCard(
 private fun CatalogStockCard(
     product: ProductDTO,
     isBusy: Boolean,
-    imageLoader: suspend (String) -> ByteArray,
     onOpenDetail: () -> Unit,
 ) {
     Surface(
@@ -2995,7 +2979,6 @@ private fun CatalogStockCard(
                 statusText = stockStatusLabel(product),
                 statusTone = stockStatusTone(product),
                 imageUrl = productPrimaryImageUrl(product),
-                imageLoader = imageLoader,
                 onMore = onOpenDetail,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxWidth()) {
@@ -3027,13 +3010,11 @@ private fun InventoryCardTop(
     statusText: String,
     statusTone: StatusTone,
     imageUrl: String? = null,
-    imageLoader: (suspend (String) -> ByteArray)? = null,
     onMore: () -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
         InventoryImageTile(
             imageUrl = imageUrl,
-            imageLoader = imageLoader,
             contentDescription = title,
             modifier = Modifier.size(74.dp),
         )
@@ -3087,12 +3068,10 @@ private fun InventoryProductTile(modifier: Modifier = Modifier) {
 @Composable
 private fun ProductImageTile(
     product: ProductDTO,
-    imageLoader: suspend (String) -> ByteArray,
     modifier: Modifier = Modifier,
 ) {
     InventoryImageTile(
         imageUrl = productPrimaryImageUrl(product),
-        imageLoader = imageLoader,
         contentDescription = product.name,
         modifier = modifier,
     )
@@ -3101,29 +3080,13 @@ private fun ProductImageTile(
 @Composable
 private fun InventoryImageTile(
     imageUrl: String?,
-    imageLoader: (suspend (String) -> ByteArray)?,
     contentDescription: String,
     modifier: Modifier = Modifier,
 ) {
-    val imageState by produceState<OperationsImageLoadState>(
-        initialValue = if (!imageUrl.isNullOrBlank() && imageLoader != null) {
-            OperationsImageLoadState.Loading
-        } else {
-            OperationsImageLoadState.Unavailable
-        },
-        key1 = imageUrl,
-        key2 = imageLoader,
-    ) {
-        value = if (imageUrl.isNullOrBlank() || imageLoader == null) {
-            OperationsImageLoadState.Unavailable
-        } else {
-            runCatching {
-                SkiaImage.makeFromEncoded(imageLoader(imageUrl)).toComposeImageBitmap()
-            }.fold(
-                onSuccess = { OperationsImageLoadState.Loaded(it) },
-                onFailure = { OperationsImageLoadState.Unavailable },
-            )
-        }
+    val resolvedImageUrl = remember(imageUrl) {
+        imageUrl
+            ?.takeIf { it.isNotBlank() }
+            ?.let(MobileApiConfig::resolveResourceUrl)
     }
 
     Box(
@@ -3132,28 +3095,21 @@ private fun InventoryImageTile(
             .background(InventoryIconBg),
         contentAlignment = Alignment.Center,
     ) {
-        when (val state = imageState) {
-            is OperationsImageLoadState.Loaded -> Image(
-                bitmap = state.bitmap,
+        Icon(
+            imageVector = Icons.Default.Inventory2,
+            contentDescription = null,
+            tint = InventoryMuted,
+            modifier = Modifier.size(34.dp),
+        )
+        if (resolvedImageUrl != null) {
+            AsyncImage(
+                model = resolvedImageUrl,
                 contentDescription = contentDescription,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-            OperationsImageLoadState.Loading,
-            OperationsImageLoadState.Unavailable -> Icon(
-                imageVector = Icons.Default.Inventory2,
-                contentDescription = null,
-                tint = InventoryMuted,
-                modifier = Modifier.size(34.dp),
-            )
         }
     }
-}
-
-private sealed interface OperationsImageLoadState {
-    data object Loading : OperationsImageLoadState
-    data object Unavailable : OperationsImageLoadState
-    data class Loaded(val bitmap: ImageBitmap) : OperationsImageLoadState
 }
 
 @Composable

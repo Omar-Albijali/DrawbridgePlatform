@@ -7,6 +7,21 @@ object MobileApiConfig {
         set(value) {
             field = value.trim().trimEnd('/')
         }
+
+    fun resolveResourceUrl(resourceUrl: String): String {
+        val trimmed = resourceUrl.trim()
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            return trimmed
+        }
+
+        val apiBase = baseUrl.trimEnd('/')
+        val origin = apiBase.removeSuffix("/api")
+        val path = when {
+            trimmed.startsWith("/") -> trimmed
+            else -> "/$trimmed"
+        }
+        return origin + path
+    }
 }
 
 internal expect fun platformDefaultApiBaseUrl(): String

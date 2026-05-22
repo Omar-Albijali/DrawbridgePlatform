@@ -1,5 +1,6 @@
 package uqu.drawbridge.platform.ui.screens
 
+import coil3.compose.AsyncImage
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -10,7 +11,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -57,7 +57,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -66,9 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -76,9 +73,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import org.jetbrains.skia.Image as SkiaImage
 import uqu.drawbridge.platform.AddressResponseDto
 import uqu.drawbridge.platform.InvoiceDTO
+import uqu.drawbridge.platform.MobileApiConfig
 import uqu.drawbridge.platform.OrderDTO
 import uqu.drawbridge.platform.OrderGroupDTO
 import uqu.drawbridge.platform.OrderItemDTO
@@ -215,7 +212,6 @@ internal fun CartMainScreen(
                     CartItemCard(
                         item = item,
                         isBusy = item.productId in state.busyProductIds,
-                        imageLoader = cartStateHolder::fetchImageBytes,
                         onDecrease = {
                             coroutineScope.launch {
                                 val result = cartStateHolder.updateQuantity(item, item.quantity - 1)
@@ -344,7 +340,6 @@ private fun CommerceStatePanel(
 private fun CartItemCard(
     item: CartProductItem,
     isBusy: Boolean,
-    imageLoader: suspend (String) -> ByteArray,
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
     onRemove: () -> Unit,
@@ -363,7 +358,6 @@ private fun CartItemCard(
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
                 CartProductImageSurface(
                     product = product,
-                    imageLoader = imageLoader,
                     modifier = Modifier.size(112.dp),
                 )
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -526,27 +520,13 @@ private fun CartItemIssue(item: CartProductItem) {
 @Composable
 private fun CartProductImageSurface(
     product: ProductDTO?,
-    imageLoader: suspend (String) -> ByteArray,
     modifier: Modifier = Modifier,
 ) {
     val imageUrl = remember(product?.id, product?.image, product?.images?.contentHashCode()) {
         product?.let(::primaryProductImageUrl)
     }
-    val imageState by produceState<CartProductImageLoadState>(
-        initialValue = if (imageUrl != null) CartProductImageLoadState.Loading else CartProductImageLoadState.Unavailable,
-        key1 = imageUrl,
-        key2 = imageLoader,
-    ) {
-        value = if (imageUrl == null) {
-            CartProductImageLoadState.Unavailable
-        } else {
-            runCatching {
-                SkiaImage.makeFromEncoded(imageLoader(imageUrl)).toComposeImageBitmap()
-            }.fold(
-                onSuccess = { CartProductImageLoadState.Loaded(it) },
-                onFailure = { CartProductImageLoadState.Unavailable },
-            )
-        }
+    val resolvedImageUrl = remember(imageUrl) {
+        imageUrl?.let(MobileApiConfig::resolveResourceUrl)
     }
 
     Box(
@@ -555,15 +535,14 @@ private fun CartProductImageSurface(
             .background(cartImageBrush()),
         contentAlignment = Alignment.Center,
     ) {
-        when (val state = imageState) {
-            is CartProductImageLoadState.Loaded -> Image(
-                bitmap = state.bitmap,
+        ProductTile(product = product, modifier = Modifier.fillMaxSize())
+        if (resolvedImageUrl != null) {
+            AsyncImage(
+                model = resolvedImageUrl,
                 contentDescription = product?.name,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-            CartProductImageLoadState.Loading,
-            CartProductImageLoadState.Unavailable -> ProductTile(product = product, modifier = Modifier.fillMaxSize())
         }
     }
 }
@@ -577,12 +556,6 @@ private fun cartImageBrush(): Brush {
             CommerceNavy,
         ),
     )
-}
-
-private sealed interface CartProductImageLoadState {
-    data object Loading : CartProductImageLoadState
-    data object Unavailable : CartProductImageLoadState
-    data class Loaded(val bitmap: ImageBitmap) : CartProductImageLoadState
 }
 
 @Composable
@@ -2083,7 +2056,6 @@ internal fun OrderDetailMainScreen(
                 session = session,
                 invoice = state.invoice,
                 isActionInProgress = state.isActionInProgress,
-                imageLoader = ordersStateHolder::fetchImageBytes,
                 onAction = { action ->
                     if (action.requiresConfirmation) {
                         pendingAction = action
@@ -2125,7 +2097,6 @@ private fun OrderDetailContent(
     session: SessionState,
     invoice: InvoiceDTO?,
     isActionInProgress: Boolean,
-    imageLoader: suspend (String) -> ByteArray,
     onAction: (OrderActionSpec) -> Unit,
 ) {
     val actions = orderActionsFor(order = order, role = session.user.role)
@@ -2164,7 +2135,7 @@ private fun OrderDetailContent(
         GlassCard(contentPadding = 16.dp) {
             Text("Items", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = CommerceText)
             order.items.forEach { item ->
-                OrderItemRow(item = item, imageLoader = imageLoader)
+                OrderItemRow(item = item)
             }
         }
 
@@ -2304,10 +2275,9 @@ private fun InvoicePreviewCard(order: OrderDTO, invoice: InvoiceDTO?) {
 @Composable
 private fun OrderItemRow(
     item: OrderItemDTO,
-    imageLoader: suspend (String) -> ByteArray,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        OrderItemImageSurface(item = item, imageLoader = imageLoader)
+        OrderItemImageSurface(item = item)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 item.productName,
@@ -2334,24 +2304,10 @@ private fun OrderItemRow(
 @Composable
 private fun OrderItemImageSurface(
     item: OrderItemDTO,
-    imageLoader: suspend (String) -> ByteArray,
 ) {
     val imageUrl = item.productImageUrl?.takeIf { it.isNotBlank() }
-    val imageState by produceState<CartProductImageLoadState>(
-        initialValue = if (imageUrl != null) CartProductImageLoadState.Loading else CartProductImageLoadState.Unavailable,
-        key1 = imageUrl,
-        key2 = imageLoader,
-    ) {
-        value = if (imageUrl == null) {
-            CartProductImageLoadState.Unavailable
-        } else {
-            runCatching {
-                SkiaImage.makeFromEncoded(imageLoader(imageUrl)).toComposeImageBitmap()
-            }.fold(
-                onSuccess = { CartProductImageLoadState.Loaded(it) },
-                onFailure = { CartProductImageLoadState.Unavailable },
-            )
-        }
+    val resolvedImageUrl = remember(imageUrl) {
+        imageUrl?.let(MobileApiConfig::resolveResourceUrl)
     }
 
     Box(
@@ -2361,22 +2317,19 @@ private fun OrderItemImageSurface(
             .background(cartImageBrush()),
         contentAlignment = Alignment.Center,
     ) {
-        when (val state = imageState) {
-            is CartProductImageLoadState.Loaded -> Image(
-                bitmap = state.bitmap,
+        Text(
+            text = item.productName.split(' ').mapNotNull { it.firstOrNull()?.uppercase() }.take(2).joinToString(""),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Black,
+        )
+        if (resolvedImageUrl != null) {
+            AsyncImage(
+                model = resolvedImageUrl,
                 contentDescription = item.productName,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-            CartProductImageLoadState.Loading,
-            CartProductImageLoadState.Unavailable -> {
-                Text(
-                    text = item.productName.split(' ').mapNotNull { it.firstOrNull()?.uppercase() }.take(2).joinToString(""),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Black,
-                )
-            }
         }
     }
 }
