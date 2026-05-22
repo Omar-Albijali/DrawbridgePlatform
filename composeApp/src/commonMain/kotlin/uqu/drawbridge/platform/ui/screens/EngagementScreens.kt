@@ -234,7 +234,7 @@ internal fun NotificationsMainScreen(
     var selectedFilter by remember { mutableStateOf(NotificationInboxFilter.All) }
 
     LaunchedEffect(notificationsStateHolder) {
-        notificationsStateHolder.load()
+        notificationsStateHolder.loadIfNeeded()
     }
 
     val filters = remember(state.notifications, state.unreadCount) {

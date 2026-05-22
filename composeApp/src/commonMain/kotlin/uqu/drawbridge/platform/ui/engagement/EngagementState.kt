@@ -186,8 +186,9 @@ internal class SupportStateHolder(
 }
 
 internal data class NotificationsUiState(
-    val isLoading: Boolean = true,
+    val isLoading: Boolean = false,
     val isMutating: Boolean = false,
+    val hasLoaded: Boolean = false,
     val notifications: List<NotificationDTO> = emptyList(),
     val unreadCount: Int = 0,
     val errorMessage: String? = null,
@@ -201,7 +202,14 @@ internal class NotificationsStateHolder(
     var state: NotificationsUiState by mutableStateOf(NotificationsUiState())
         private set
 
+    suspend fun loadIfNeeded() {
+        if (!state.hasLoaded) {
+            load()
+        }
+    }
+
     suspend fun load() {
+        if (state.isLoading) return
         state = state.copy(isLoading = true, errorMessage = null)
         runCatching {
             val notifications = api.fetchNotifications(session.user.id)
@@ -209,11 +217,17 @@ internal class NotificationsStateHolder(
             notifications to unread
         }.fold(
             onSuccess = { (notifications, unread) ->
-                state = state.copy(isLoading = false, notifications = notifications, unreadCount = unread)
+                state = state.copy(
+                    isLoading = false,
+                    hasLoaded = true,
+                    notifications = notifications,
+                    unreadCount = unread,
+                )
             },
             onFailure = { error ->
                 state = state.copy(
                     isLoading = false,
+                    hasLoaded = true,
                     notifications = emptyList(),
                     unreadCount = 0,
                     errorMessage = userReadableMessage(error, "Unable to load notifications."),

@@ -101,7 +101,7 @@ internal fun DashboardMainScreen(
         ordersStateHolder.loadInitial()
     }
     LaunchedEffect(notificationsStateHolder) {
-        notificationsStateHolder.load()
+        notificationsStateHolder.loadIfNeeded()
     }
 
     Column(
