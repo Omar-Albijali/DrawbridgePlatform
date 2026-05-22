@@ -855,7 +855,7 @@ private fun ProductSkeletonCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(132.dp)
+                .aspectRatio(1f)
                 .background(MarketNavyHigh.copy(alpha = 0.96f), RoundedCornerShape(8.dp)),
         )
         Box(
@@ -949,7 +949,7 @@ private fun MarketplaceProductCard(
                 product = product,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(132.dp),
+                    .aspectRatio(1f),
                 showCategoryLabel = false,
             )
 
@@ -1389,7 +1389,7 @@ private fun ProductDetailContent(
                 showCategoryLabel = false,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(176.dp),
+                    .aspectRatio(1f),
             )
 
             Row(
@@ -1595,7 +1595,7 @@ private fun ProductDetailHeader(
     ) {
         Surface(
             modifier = Modifier.size(40.dp),
-            shape = RoundedCornerShape(999.dp),
+            shape = RoundedCornerShape(12.dp),
             color = MarketPanel,
             border = BorderStroke(1.dp, MarketBorder),
         ) {
