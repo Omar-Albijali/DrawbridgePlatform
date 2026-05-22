@@ -812,6 +812,12 @@ private fun MainHost(
                             wishlistContent = {
                                 WishlistMainScreen(
                                     wishlistStateHolder = wishlistStateHolder,
+                                    cartStateHolder = cartStateHolder,
+                                    onBack = { onActiveMoreDestinationChange(null) },
+                                    onOpenMarketplace = {
+                                        onActiveMoreDestinationChange(null)
+                                        openTab(AppDestination.Marketplace)
+                                    },
                                     onOpenProduct = onOpenProduct,
                                     onShowMessage = showMessage,
                                 )

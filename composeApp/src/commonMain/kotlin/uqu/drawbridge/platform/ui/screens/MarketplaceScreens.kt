@@ -29,6 +29,8 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Inventory2
@@ -497,6 +499,7 @@ private fun MarketplaceSearchField(
     onClear: () -> Unit,
     onSearch: () -> Unit,
     isBusy: Boolean,
+    placeholder: String = "Search products",
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -522,7 +525,7 @@ private fun MarketplaceSearchField(
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 if (value.isBlank()) {
                     Text(
-                        text = "Search products",
+                        text = placeholder,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MarketMuted,
                         maxLines = 1,
@@ -1627,20 +1630,76 @@ private fun ProductDetailHeader(
 @Composable
 internal fun WishlistMainScreen(
     wishlistStateHolder: WishlistStateHolder,
+    cartStateHolder: CartStateHolder,
+    onBack: () -> Unit,
+    onOpenMarketplace: () -> Unit,
     onOpenProduct: (String) -> Unit,
     onShowMessage: (String) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val state = wishlistStateHolder.state
+    var searchQuery by remember { mutableStateOf("") }
+    var sortMode by remember { mutableStateOf(WishlistSortMode.Saved) }
+    var isAddingAll by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         wishlistStateHolder.refresh()
     }
 
-    ScreenSection(
-        title = "Wishlist",
-        subtitle = if (state.productIds.isEmpty()) "Saved products will appear here." else "${state.productIds.size} saved products",
-    ) {
+    val filteredItems = remember(state.items, searchQuery, sortMode) {
+        val query = searchQuery.trim().lowercase()
+        state.items
+            .filter { item ->
+                if (query.isBlank()) {
+                    true
+                } else {
+                    val product = item.product
+                    listOf(
+                        product?.name,
+                        product?.brand,
+                        product?.supplier,
+                        product?.category,
+                        item.wishlistItem.productName,
+                    ).any { value -> value.orEmpty().lowercase().contains(query) }
+                }
+            }
+            .let { items ->
+                when (sortMode) {
+                    WishlistSortMode.Saved -> items
+                    WishlistSortMode.Price -> items.sortedByDescending { it.product?.price ?: it.wishlistItem.productPrice }
+                    WishlistSortMode.Rating -> items.sortedByDescending { it.product?.rating ?: 0.0 }
+                }
+            }
+    }
+    val addableProducts = filteredItems.mapNotNull { it.product }
+        .filter { product -> product.stock >= product.minimumOrderQuantity.coerceAtLeast(1) }
+    val onAddAll: () -> Unit = {
+        if (addableProducts.isEmpty()) {
+            onShowMessage("No in-stock wishlist products to add.")
+        } else {
+            coroutineScope.launch {
+                isAddingAll = true
+                var added = 0
+                addableProducts.forEach { product ->
+                    if (cartStateHolder.addProduct(product).success) {
+                        added += 1
+                    }
+                }
+                isAddingAll = false
+                onShowMessage("$added wishlist products added to cart.")
+            }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        WishlistHeader(
+            savedCount = state.productIds.size,
+            isAddingAll = isAddingAll,
+            canAddAll = addableProducts.isNotEmpty(),
+            onBack = onBack,
+            onAddAll = onAddAll,
+        )
+
         when {
             state.isLoading -> LoadingStateCard(
                 title = "Loading wishlist",
@@ -1654,24 +1713,224 @@ internal fun WishlistMainScreen(
                 onAction = { coroutineScope.launch { wishlistStateHolder.refresh() } },
             )
 
-            state.items.isEmpty() -> EmptyStateCard(
-                title = "Your wishlist is empty",
-                message = "Save products from the marketplace and come back to them later.",
-            )
+            state.items.isEmpty() -> WishlistEmptyState(onBrowseMarketplace = onOpenMarketplace)
 
-            else -> state.items.forEach { item ->
-                WishlistProductCard(
-                    item = item,
-                    isBusy = item.wishlistItem.productId in state.busyProductIds,
-                    onOpenProduct = { onOpenProduct(item.wishlistItem.productId) },
-                    onRemove = {
-                        coroutineScope.launch {
-                            val result = wishlistStateHolder.remove(item.wishlistItem.productId)
-                            result.message?.let(onShowMessage)
-                        }
-                    },
+            else -> {
+                WishlistToolbar(
+                    searchQuery = searchQuery,
+                    sortMode = sortMode,
+                    onSearchChanged = { searchQuery = it },
+                    onClearSearch = { searchQuery = "" },
+                    onNextSort = { sortMode = sortMode.next() },
                 )
+                WishlistStatsRow(items = state.items)
+
+                if (filteredItems.isEmpty()) {
+                    EmptyStateCard(
+                        title = "No saved products found",
+                        message = "Try another search or sort option.",
+                        actionText = "Clear search",
+                        onAction = { searchQuery = "" },
+                    )
+                } else {
+                    filteredItems.forEach { item ->
+                        WishlistProductCard(
+                            item = item,
+                            isBusy = item.wishlistItem.productId in state.busyProductIds,
+                            isCartBusy = item.product?.id in cartStateHolder.state.busyProductIds,
+                            onOpenProduct = { onOpenProduct(item.wishlistItem.productId) },
+                            onAddToCart = { product ->
+                                coroutineScope.launch {
+                                    val result = cartStateHolder.addProduct(product)
+                                    result.message?.let(onShowMessage)
+                                }
+                            },
+                            onRemove = {
+                                coroutineScope.launch {
+                                    val result = wishlistStateHolder.remove(item.wishlistItem.productId)
+                                    result.message?.let(onShowMessage)
+                                }
+                            },
+                        )
+                    }
+                    WishlistBrowseMoreButton(onClick = onOpenMarketplace)
+                }
             }
+        }
+    }
+}
+
+private enum class WishlistSortMode(val label: String) {
+    Saved("Saved"),
+    Price("Price"),
+    Rating("Rating");
+
+    fun next(): WishlistSortMode = when (this) {
+        Saved -> Price
+        Price -> Rating
+        Rating -> Saved
+    }
+}
+
+@Composable
+private fun WishlistEmptyState(
+    onBrowseMarketplace: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(560.dp)
+            .padding(horizontal = 26.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(112.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xFFFF5A8A).copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Favorite,
+                contentDescription = null,
+                tint = Color(0xFFFF9AAD),
+                modifier = Modifier.size(54.dp),
+            )
+        }
+        Spacer(Modifier.height(34.dp))
+        Text(
+            "No saved products",
+            style = MaterialTheme.typography.titleLarge,
+            color = MarketText,
+            fontWeight = FontWeight.Black,
+        )
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Browse the marketplace and tap the heart icon to save products here.",
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MarketMuted,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(32.dp))
+        MarketplaceToolbarButton(
+            text = "Browse Marketplace",
+            icon = Icons.Default.Inventory2,
+            onClick = onBrowseMarketplace,
+            primary = true,
+            modifier = Modifier.width(250.dp),
+        )
+    }
+}
+
+@Composable
+private fun WishlistHeader(
+    savedCount: Int,
+    isAddingAll: Boolean,
+    canAddAll: Boolean,
+    onBack: () -> Unit,
+    onAddAll: () -> Unit,
+) {
+    AppPageHeader(
+        title = "Wishlist",
+        subtitle = if (savedCount == 0) "Saved marketplace products" else "$savedCount saved products",
+        leading = { MarketplaceBackSquare(onClick = onBack) },
+        action = {
+            MarketplaceToolbarButton(
+                text = if (isAddingAll) "Adding" else "Add All",
+                icon = Icons.Default.ShoppingCart,
+                onClick = onAddAll,
+                primary = true,
+                enabled = !isAddingAll && canAddAll,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+    )
+}
+
+@Composable
+private fun WishlistToolbar(
+    searchQuery: String,
+    sortMode: WishlistSortMode,
+    onSearchChanged: (String) -> Unit,
+    onClearSearch: () -> Unit,
+    onNextSort: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MarketplaceSearchField(
+            value = searchQuery,
+            onValueChange = onSearchChanged,
+            onClear = onClearSearch,
+            onSearch = {},
+            isBusy = false,
+            placeholder = "Search saved products",
+            modifier = Modifier.weight(1f),
+        )
+        Surface(
+            modifier = Modifier
+                .height(50.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onNextSort),
+            shape = RoundedCornerShape(12.dp),
+            color = MarketPanel,
+            border = BorderStroke(1.dp, MarketBorder),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null, tint = MarketMuted, modifier = Modifier.size(18.dp))
+                Text(sortMode.label, style = MaterialTheme.typography.labelLarge, color = MarketText, fontWeight = FontWeight.Black)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WishlistStatsRow(items: List<WishlistProductItem>) {
+    val saved = items.size
+    val inStock = items.count { item ->
+        val product = item.product
+        product != null && product.stock >= product.minimumOrderQuantity.coerceAtLeast(1)
+    }
+    val estimated = items.sumOf { item -> item.product?.price ?: item.wishlistItem.productPrice }
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        WishlistMetricCard(icon = Icons.Default.Favorite, value = saved.toString(), label = "Saved", tint = Color(0xFFFF5A8A), modifier = Modifier.weight(1f))
+        WishlistMetricCard(icon = Icons.Default.CheckCircle, value = inStock.toString(), label = "In stock", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        WishlistMetricCard(icon = Icons.Default.ShoppingCart, value = formatMoneyAmount(estimated), label = "Est. SAR", tint = Color(0xFFFFB020), modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun WishlistMetricCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    label: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.height(118.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MarketPanel,
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.24f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(21.dp))
+            Text(value, style = MaterialTheme.typography.titleLarge, color = MarketText, fontWeight = FontWeight.Black, maxLines = 1)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MarketMuted, maxLines = 1)
         }
     }
 }
@@ -1680,47 +1939,168 @@ internal fun WishlistMainScreen(
 private fun WishlistProductCard(
     item: WishlistProductItem,
     isBusy: Boolean,
+    isCartBusy: Boolean,
     onOpenProduct: () -> Unit,
+    onAddToCart: (ProductDTO) -> Unit,
     onRemove: () -> Unit,
 ) {
     val product = item.product
-    AppCard {
-        if (product != null) {
-            ProductImageFallback(product = product, modifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f))
-        } else {
-            Box(
+    val title = product?.name ?: item.wishlistItem.productName.ifBlank { "Product unavailable" }
+    val supplier = product?.supplier?.ifBlank { product.brand } ?: "Marketplace product"
+    val price = product?.price ?: item.wishlistItem.productPrice
+    val moq = product?.minimumOrderQuantity?.coerceAtLeast(1) ?: 1
+    val canAdd = product != null && product.stock >= moq && !isCartBusy
+    val category = product?.category?.ifBlank { "Product" } ?: "Unavailable"
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenProduct),
+        shape = RoundedCornerShape(14.dp),
+        color = MarketPanel,
+        border = BorderStroke(1.dp, MarketBorder),
+    ) {
+        Column {
+            Box(modifier = Modifier.fillMaxWidth().padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    if (product != null) {
+                        ProductImageSurface(product = product, showCategoryLabel = false, modifier = Modifier.size(90.dp))
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(90.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MarketNavyHigh),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Default.Inventory2, contentDescription = null, tint = MarketMuted, modifier = Modifier.size(34.dp))
+                        }
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 30.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(title, style = MaterialTheme.typography.titleMedium, color = MarketText, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(supplier, style = MaterialTheme.typography.bodyMedium, color = MarketMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("★ ${formatRating(product?.rating ?: 0.0)}", style = MaterialTheme.typography.labelLarge, color = Color(0xFFFFB020), fontWeight = FontWeight.Black)
+                            Text("•", color = MarketMuted)
+                            Text(
+                                category,
+                                modifier = Modifier.weight(1f, fill = false),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MarketMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (product != null && product.stock < moq) {
+                            GlassPill(text = "Low stock · ${product.stock} left", tint = Color(0xFFFFB020))
+                        }
+                    }
+                }
+                IconButton(
+                    onClick = onRemove,
+                    enabled = !isBusy,
+                    modifier = Modifier.align(Alignment.TopEnd).size(34.dp),
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = "Remove from wishlist", tint = Color(0xFFFF5A6B), modifier = Modifier.size(19.dp))
+                }
+            }
+
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MarketBorder))
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(4f / 3f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center,
+                    .height(82.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(formatPrice(price), style = MaterialTheme.typography.titleLarge, color = MarketText, fontWeight = FontWeight.Black)
+                    Text("MOQ: $moq units", style = MaterialTheme.typography.bodySmall, color = MarketMuted)
+                }
+                WishlistAddToCartButton(
+                    text = if (isCartBusy) "Adding" else "Add to Cart",
+                    enabled = canAdd,
+                    onClick = { product?.let(onAddToCart) },
+                )
             }
         }
+    }
+}
 
-        Text(
-            text = product?.name ?: item.wishlistItem.productName.ifBlank { "Product unavailable" },
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = formatPrice(product?.price ?: item.wishlistItem.productPrice),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Black,
-        )
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            SecondaryButton(text = "Details", onClick = onOpenProduct, modifier = Modifier.weight(1f))
-            SecondaryButton(
-                text = if (isBusy) "Removing..." else "Remove",
-                onClick = onRemove,
-                modifier = Modifier.weight(1f),
-                enabled = !isBusy,
+@Composable
+private fun WishlistAddToCartButton(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .width(158.dp)
+            .height(46.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(10.dp),
+        color = if (enabled) MaterialTheme.colorScheme.primary else MarketNavyHigh.copy(alpha = 0.72f),
+        border = BorderStroke(1.dp, if (enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.32f) else MarketBorder),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = if (enabled) MaterialTheme.colorScheme.onPrimary else MarketMuted, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (enabled) MaterialTheme.colorScheme.onPrimary else MarketMuted,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+@Composable
+private fun MarketplaceBackSquare(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.size(50.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MarketPanel,
+        border = BorderStroke(1.dp, MarketBorder),
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MarketText, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+@Composable
+private fun WishlistBrowseMoreButton(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(58.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = MarketPanel,
+        border = BorderStroke(1.dp, MarketBorder),
+    ) {
+        Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Inventory2, contentDescription = null, tint = MarketMuted, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Browse More Products", style = MaterialTheme.typography.labelLarge, color = MarketMuted, fontWeight = FontWeight.Black)
         }
     }
 }
@@ -1810,6 +2190,12 @@ private fun formatMoneyAmount(value: Double): String {
     val whole = cents / 100
     val fraction = (cents % 100).toString().padStart(2, '0')
     return "$whole.$fraction"
+}
+
+private fun formatRating(value: Double): String {
+    val rounded = kotlin.math.round(value * 10.0) / 10.0
+    val text = rounded.toString()
+    return if ('.' in text) text else "$text.0"
 }
 
 private fun activeFilterCount(

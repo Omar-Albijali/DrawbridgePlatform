@@ -307,10 +307,7 @@ internal fun MoreDestinationScreen(
             }
         }
         AppDestination.Wishlist -> {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SecondaryButton(text = "Back to More", onClick = onBack)
-                wishlistContent()
-            }
+            wishlistContent()
         }
         AppDestination.POS -> {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
