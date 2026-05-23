@@ -327,6 +327,38 @@ class MobileAuthApi(
         return json.decodeFromString(ProductImageResponse.serializer(), body)
     }
 
+    suspend fun uploadProfileImage(
+        userId: String,
+        fileName: String,
+        mimeType: String?,
+        bytes: ByteArray,
+    ): ImageUploadResponse {
+        val token = requireBearerToken()
+        val contentType = mimeType?.takeIf { it.isNotBlank() } ?: ContentType.Image.JPEG.toString()
+        val safeName = fileName.ifBlank { "profile-image.jpg" }.replace("\"", "")
+        val response = client.post(buildUrl("/users/$userId/profile-image")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append(
+                            key = "file",
+                            value = bytes,
+                            headers = Headers.build {
+                                append(HttpHeaders.ContentDisposition, "filename=\"$safeName\"")
+                                append(HttpHeaders.ContentType, contentType)
+                            },
+                        )
+                    },
+                ),
+            )
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(ImageUploadResponse.serializer(), body)
+    }
+
     suspend fun fetchProductImages(productId: String): List<ProductImageResponse> {
         val response = authorizedGet("/products/$productId/images")
         val body = response.bodyAsText()

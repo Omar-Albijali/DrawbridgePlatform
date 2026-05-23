@@ -1122,19 +1122,37 @@ internal fun SettingsMainScreen(
 ) {
     val state = settingsStateHolder.state
     val scope = rememberCoroutineScope()
+    val availableSections = remember(state.user.role) {
+        SettingsSection.entries.filter { section ->
+            state.user.role == UserRole.RETAILER ||
+                section !in listOf(SettingsSection.Addresses, SettingsSection.Payments)
+        }
+    }
+    val selectedSection = if (state.selectedSection in availableSections) {
+        state.selectedSection
+    } else {
+        SettingsSection.Profile
+    }
 
     LaunchedEffect(settingsStateHolder) {
         settingsStateHolder.load()
     }
 
-    ScreenSection(title = "Settings", subtitle = "Manage profile, security, addresses, payments, and preferences.") {
+    ScreenSection(
+        title = "Settings",
+        subtitle = if (state.user.role == UserRole.RETAILER) {
+            "Manage profile, security, addresses, payments, and preferences."
+        } else {
+            "Manage profile, security, and notification preferences."
+        },
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SettingsSection.entries.chunked(2).forEach { row ->
+            availableSections.chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     row.forEach { section ->
                         FilterChip(
                             modifier = Modifier.weight(1f),
-                            selected = state.selectedSection == section,
+                            selected = selectedSection == section,
                             onClick = { settingsStateHolder.selectSection(section) },
                             label = { Text(section.name) },
                         )
@@ -1155,7 +1173,7 @@ internal fun SettingsMainScreen(
             SecondaryButton(text = "Retry settings", onClick = { scope.launch { settingsStateHolder.load() } })
             return@ScreenSection
         }
-        when (state.selectedSection) {
+        when (selectedSection) {
             SettingsSection.Profile -> ProfileSettingsSection(settingsStateHolder)
             SettingsSection.Security -> SecuritySettingsSection(settingsStateHolder)
             SettingsSection.Addresses -> AddressesSettingsSection(settingsStateHolder)

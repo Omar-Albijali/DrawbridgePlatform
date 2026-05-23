@@ -73,6 +73,7 @@ import uqu.drawbridge.platform.ui.operations.ProductManagementStateHolder
 import uqu.drawbridge.platform.ui.platform.FilePhotoPicker
 import uqu.drawbridge.platform.ui.platform.NativeOptionPicker
 import uqu.drawbridge.platform.ui.platform.rememberPlatformServices
+import uqu.drawbridge.platform.ui.screens.AccountMainScreen
 import uqu.drawbridge.platform.ui.screens.CartMainScreen
 import uqu.drawbridge.platform.ui.screens.CheckoutMainScreen
 import uqu.drawbridge.platform.ui.screens.DashboardMainScreen
@@ -818,6 +819,18 @@ private fun MainHost(
                             destination = selectedDestination,
                             onBack = { onActiveMoreDestinationChange(null) },
                             onLogout = onLogout,
+                            accountContent = {
+                                AccountMainScreen(
+                                    settingsStateHolder = settingsStateHolder,
+                                    filePhotoPicker = filePhotoPicker,
+                                    onBack = { onActiveMoreDestinationChange(null) },
+                                    onLogout = onLogout,
+                                    onOpenSettingsSection = { section ->
+                                        settingsStateHolder.selectSection(section)
+                                        onActiveMoreDestinationChange(AppDestination.Settings)
+                                    },
+                                )
+                            },
                             wishlistContent = {
                                 WishlistMainScreen(
                                     wishlistStateHolder = wishlistStateHolder,

@@ -366,7 +366,9 @@ internal data class PaymentMethodFormState(
 
 internal data class SettingsUiState(
     val isLoading: Boolean = true,
+    val hasLoaded: Boolean = false,
     val isSaving: Boolean = false,
+    val isUploadingAvatar: Boolean = false,
     val selectedSection: SettingsSection = SettingsSection.Profile,
     val user: UserDTO,
     val profileForm: ProfileFormState = ProfileFormState(),
@@ -387,8 +389,18 @@ internal class SettingsStateHolder(
     private val api: MobileAuthApi,
     private val session: SessionState,
 ) {
-    var state: SettingsUiState by mutableStateOf(SettingsUiState(user = session.user))
+    var state: SettingsUiState by mutableStateOf(
+        SettingsUiState(
+            user = session.user,
+            profileForm = session.user.toProfileForm(),
+        ),
+    )
         private set
+
+    suspend fun loadIfNeeded() {
+        if (state.hasLoaded || state.isLoading.not()) return
+        load()
+    }
 
     suspend fun load() {
         state = state.copy(isLoading = true, errorMessage = null)
@@ -396,14 +408,15 @@ internal class SettingsStateHolder(
             val user = api.fetchUserById(session.user.id)
             SettingsLoadResult(
                 user = user,
-                addresses = api.fetchAddresses(),
-                payments = api.fetchPaymentMethods(session.user.id),
+                addresses = if (user.role == UserRole.RETAILER) api.fetchAddresses() else emptyList(),
+                payments = if (user.role == UserRole.RETAILER) api.fetchPaymentMethods(session.user.id) else emptyList(),
                 preferences = api.fetchNotificationPreferences(session.user.id),
             )
         }.fold(
             onSuccess = { result ->
                 state = state.copy(
                     isLoading = false,
+                    hasLoaded = true,
                     user = result.user,
                     profileForm = result.user.toProfileForm(),
                     addresses = result.addresses,
@@ -414,6 +427,7 @@ internal class SettingsStateHolder(
             onFailure = { error ->
                 state = state.copy(
                     isLoading = false,
+                    hasLoaded = true,
                     errorMessage = userReadableMessage(error, "Unable to load settings."),
                 )
             },
@@ -451,6 +465,44 @@ internal class SettingsStateHolder(
             )
             state = state.copy(user = updated, profileForm = updated.toProfileForm())
         }
+    }
+
+    suspend fun uploadProfileImage(file: PickedFile) {
+        val mimeType = file.mimeType.orEmpty()
+        when {
+            file.bytes.isEmpty() -> {
+                state = state.copy(errorMessage = "Choose an image file.")
+                return
+            }
+            mimeType.isNotBlank() && !mimeType.startsWith("image/") -> {
+                state = state.copy(errorMessage = "Only image files are supported.")
+                return
+            }
+        }
+
+        state = state.copy(isUploadingAvatar = true, errorMessage = null, successMessage = null)
+        runCatching {
+            api.uploadProfileImage(
+                userId = session.user.id,
+                fileName = file.name,
+                mimeType = file.mimeType,
+                bytes = file.bytes,
+            )
+        }.fold(
+            onSuccess = { uploaded ->
+                state = state.copy(
+                    isUploadingAvatar = false,
+                    user = state.user.copy(avatar = uploaded.url),
+                    successMessage = uploaded.message.ifBlank { "Profile image updated." },
+                )
+            },
+            onFailure = { error ->
+                state = state.copy(
+                    isUploadingAvatar = false,
+                    errorMessage = userReadableMessage(error, "Unable to upload profile image."),
+                )
+            },
+        )
     }
 
     fun updatePassword(form: PasswordFormState) {
