@@ -40,6 +40,7 @@ class SecurityConfig(
                     .requestMatchers("/api/auth/logout").authenticated()
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers("/api/pos/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/products/wholesaler/**").authenticated()
                     .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
                     .requestMatchers("/api/uploads/**").permitAll()
                     .requestMatchers("/", "/main", "/templates/**").permitAll()

@@ -2,17 +2,21 @@ package uqu.drawbridge.platform.controller
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.AccessDeniedException
+import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
 import uqu.drawbridge.platform.*
 import uqu.drawbridge.platform.dto.PaginatedResponse
 import uqu.drawbridge.platform.model.Category
 import uqu.drawbridge.platform.model.Product
 import uqu.drawbridge.platform.service.ProductService
+import uqu.drawbridge.platform.service.UserService
 
 @RestController
 @RequestMapping("/api/products")
 class ProductController(
-    private val productService: ProductService
+    private val productService: ProductService,
+    private val userService: UserService
 ) {
 
     // ==================== PRODUCTS ====================
@@ -58,7 +62,11 @@ class ProductController(
     }
 
     @GetMapping("/wholesaler/{wholesalerId}")
-    fun getProductsByWholesaler(@PathVariable wholesalerId: String): ResponseEntity<List<ProductDTO>> {
+    fun getProductsByWholesaler(
+        authentication: Authentication,
+        @PathVariable wholesalerId: String
+    ): ResponseEntity<List<ProductDTO>> {
+        requireWholesalerOwner(authentication, wholesalerId)
         return ResponseEntity.ok(productService.getProductsDTOByWholesaler(wholesalerId))
     }
 
@@ -73,12 +81,23 @@ class ProductController(
     }
 
     @PostMapping
-    fun createProduct(@RequestBody request: CreateProductRequest): ResponseEntity<ProductDTO> {
+    fun createProduct(
+        authentication: Authentication,
+        @RequestBody request: CreateProductRequest
+    ): ResponseEntity<ProductDTO> {
+        requireWholesalerOwner(authentication, request.wholesalerId)
         return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProductFromRequest(request))
     }
 
     @PutMapping("/{id}")
-    fun updateProduct(@PathVariable id: String, @RequestBody request: CreateProductRequest): ResponseEntity<ProductDTO> {
+    fun updateProduct(
+        authentication: Authentication,
+        @PathVariable id: String,
+        @RequestBody request: CreateProductRequest
+    ): ResponseEntity<ProductDTO> {
+        val existing = productService.getProductById(id) ?: return ResponseEntity.notFound().build()
+        requireProductOwner(authentication, existing)
+        requireWholesalerOwner(authentication, request.wholesalerId)
         val updated = productService.updateProductFromRequest(id, request)
         return if (updated != null) {
             ResponseEntity.ok(updated)
@@ -88,7 +107,12 @@ class ProductController(
     }
 
     @DeleteMapping("/{id}")
-    fun deleteProduct(@PathVariable id: String): ResponseEntity<Void> {
+    fun deleteProduct(
+        authentication: Authentication,
+        @PathVariable id: String
+    ): ResponseEntity<Void> {
+        val existing = productService.getProductById(id) ?: return ResponseEntity.notFound().build()
+        requireProductOwner(authentication, existing)
         return if (productService.deleteProduct(id)) {
             ResponseEntity.ok().build()
         } else {
@@ -97,7 +121,12 @@ class ProductController(
     }
 
     @PatchMapping("/{id}/toggle-published")
-    fun togglePublished(@PathVariable id: String): ResponseEntity<ProductDTO> {
+    fun togglePublished(
+        authentication: Authentication,
+        @PathVariable id: String
+    ): ResponseEntity<ProductDTO> {
+        val existing = productService.getProductById(id) ?: return ResponseEntity.notFound().build()
+        requireProductOwner(authentication, existing)
         val updated = productService.togglePublished(id)
         return if (updated != null) {
             ResponseEntity.ok(updated)
@@ -144,6 +173,25 @@ class ProductController(
             ResponseEntity.ok().build()
         } else {
             ResponseEntity.notFound().build()
+        }
+    }
+
+    private fun currentUser(authentication: Authentication): uqu.drawbridge.platform.model.User {
+        return userService.getUserByEmail(authentication.name)
+            ?: throw AccessDeniedException("Access denied")
+    }
+
+    private fun requireWholesalerOwner(authentication: Authentication, wholesalerId: String) {
+        val user = currentUser(authentication)
+        if (user.role != UserRole.WHOLESALER || user.id != wholesalerId) {
+            throw AccessDeniedException("Access denied")
+        }
+    }
+
+    private fun requireProductOwner(authentication: Authentication, product: Product) {
+        val user = currentUser(authentication)
+        if (user.role != UserRole.WHOLESALER || product.wholesaler.id != user.id) {
+            throw AccessDeniedException("Access denied")
         }
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.security.crypto.password.PasswordEncoder
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.OrderStatus
+import uqu.drawbridge.platform.PaymentMethodType
 import uqu.drawbridge.platform.PaymentStatus
 import uqu.drawbridge.platform.model.*
 import uqu.drawbridge.platform.repository.*
@@ -23,6 +24,7 @@ class DataSeeder(
     private val orderItemRepository: OrderItemRepository,
     private val categoryRepository: CategoryRepository,
     private val paymentMethodRepository: PaymentMethodRepository,
+    private val addressRepository: AddressRepository,
     private val productRatingRepository: ProductRatingRepository,
 ) {
 
@@ -49,6 +51,8 @@ class DataSeeder(
                     categoryRepository.save(Category(name = categoryName))
                 }
             }
+
+            ensureDemoRetailerCheckoutData()
 
             if (userRepository.count() > 0) return@CommandLineRunner
 
@@ -100,7 +104,7 @@ class DataSeeder(
             )
             
             retailer.addresses.add(Address(
-                street = "Riyadh Blvd",
+                street = "King Fahd Road, Al Olaya",
                 city = "Riyadh",
                 state = "Riyadh",
                 zipCode = "11564",
@@ -112,7 +116,7 @@ class DataSeeder(
             // Seed Payment Methods
             paymentMethodRepository.save(PaymentMethod(
                 ownerId = savedRetailer.id!!,
-                type = uqu.drawbridge.platform.PaymentMethodType.CREDIT_CARD,
+                type = PaymentMethodType.CREDIT_CARD,
                 maskedDetails = "Visa **** 4444 (Exp: 12/28)",
                 isDefault = true
             ))
@@ -237,6 +241,38 @@ class DataSeeder(
             orderGroupRepository.save(orderGroup)
 
             println("DATA SEEDING COMPLETED.")
+        }
+    }
+
+    private fun ensureDemoRetailerCheckoutData() {
+        val retailer = userRepository.findByEmail("retailer@test.com") ?: return
+        val retailerId = retailer.id ?: return
+
+        if (addressRepository.findByUserId(retailerId).isEmpty()) {
+            retailer.addresses.add(
+                Address(
+                    street = "King Fahd Road, Al Olaya",
+                    city = "Riyadh",
+                    state = "Riyadh",
+                    zipCode = "11564",
+                    country = "Saudi Arabia"
+                )
+            )
+            userRepository.save(retailer)
+        }
+
+        val hasCard =
+            paymentMethodRepository.findByOwnerIdAndType(retailerId, PaymentMethodType.CREDIT_CARD).isNotEmpty() ||
+                paymentMethodRepository.findByOwnerIdAndType(retailerId, PaymentMethodType.DEBIT_CARD).isNotEmpty()
+        if (!hasCard) {
+            paymentMethodRepository.save(
+                PaymentMethod(
+                    ownerId = retailerId,
+                    type = PaymentMethodType.CREDIT_CARD,
+                    maskedDetails = "Visa **** 4444 (Exp: 12/28)",
+                    isDefault = true
+                )
+            )
         }
     }
 }

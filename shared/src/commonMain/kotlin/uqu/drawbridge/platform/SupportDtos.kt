@@ -2,9 +2,11 @@ package uqu.drawbridge.platform
 
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlinx.serialization.Serializable
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 enum class SupportTicketCategory {
     ORDER,
     POS,
@@ -14,6 +16,7 @@ enum class SupportTicketCategory {
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 enum class SupportTicketStatus {
     OPEN,
     IN_PROGRESS,
@@ -22,6 +25,7 @@ enum class SupportTicketStatus {
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class SupportTicketDTO(
     val id: String,
     val ticketNumber: String,
@@ -37,6 +41,7 @@ data class SupportTicketDTO(
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
+@Serializable
 data class CreateTicketRequest(
     val subject: String,
     val category: SupportTicketCategory,
