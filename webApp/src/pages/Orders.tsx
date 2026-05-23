@@ -25,7 +25,7 @@ import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { orderService } from '../services/orderService';
 import { reorderOrderToCart } from '../utils/reorderOrder';
-import { formatCurrency, formatDate, orderStatusLabel } from '../i18n/display';
+import { enumToken, formatCurrency, formatDate, orderStatusLabel } from '../i18n/display';
 import { OrderStatus, UserRole, type Order, type OrderItem } from '../types';
 
 type SortField = 'id' | 'placedAt' | 'subtotal' | 'status' | 'retailerName';
@@ -40,7 +40,9 @@ export default function Orders(): JSX.Element {
   const { i18n, t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const isWholesaler = user?.role === UserRole.WHOLESALER;
+  const roleName = enumToken(user?.role);
+  const isWholesaler = roleName === UserRole.WHOLESALER.name;
+  const isRetailer = roleName === UserRole.RETAILER.name;
   const isRtl = i18n.resolvedLanguage === 'ar';
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -52,6 +54,7 @@ export default function Orders(): JSX.Element {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [reorderingOrderId, setReorderingOrderId] = useState<string | null>(null);
+  const [confirmingDeliveryOrderId, setConfirmingDeliveryOrderId] = useState<string | null>(null);
   const { addToCart } = useCart();
 
   useEffect(() => {
@@ -72,8 +75,10 @@ export default function Orders(): JSX.Element {
 
       try {
         const data = isWholesaler
-          ? await orderService.getByWholesaler(user.id)
-          : await orderService.getByRetailer(user.id);
+            ? await orderService.getByWholesaler(user.id)
+            : isRetailer
+                ? await orderService.getByRetailer(user.id)
+                : [];
         setOrders(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Failed to fetch orders', error);
@@ -84,7 +89,7 @@ export default function Orders(): JSX.Element {
     };
 
     fetchOrders();
-  }, [isWholesaler, user?.id]);
+  }, [isRetailer, isWholesaler, user?.id]);
 
   const handleAction = async (action: OrderStatus | 'cancel', orderId: string, e: MouseEvent) => {
     e.stopPropagation();
@@ -115,7 +120,7 @@ export default function Orders(): JSX.Element {
             [OrderStatus.CONFIRMED.name]: OrderStatus.CONFIRMED,
             [OrderStatus.PROCESSING.name]: OrderStatus.PROCESSING,
             [OrderStatus.SHIPPED.name]: OrderStatus.SHIPPED,
-            [OrderStatus.DELIVERED.name]: OrderStatus.DELIVERED,
+
           };
 
           const newStatus = statusMap[actionName];
@@ -130,7 +135,7 @@ export default function Orders(): JSX.Element {
 
   const handleReorder = async (order: Order, e: MouseEvent): Promise<void> => {
     e.stopPropagation();
-    if (isWholesaler || !user?.id) return;
+    if (!isRetailer || !user?.id) return;
 
     if (reorderingOrderId === order.id) {
       return;
@@ -165,6 +170,27 @@ export default function Orders(): JSX.Element {
       alert(t('orders.reorderFailed'));
     } finally {
       setReorderingOrderId(null);
+      setOpenMenuId(null);
+    }
+  };
+  const handleConfirmDelivery = async (orderId: string, e: MouseEvent): Promise<void> => {
+    e.stopPropagation();
+    if (!isRetailer || confirmingDeliveryOrderId === orderId) return;
+
+    if (!window.confirm(t('orders.confirmDeliveryPrompt'))) {
+      return;
+    }
+
+    setConfirmingDeliveryOrderId(orderId);
+    try {
+      const updatedOrder = await orderService.confirmDelivery(orderId);
+      setOrders((prev) => prev.map((order) => (order.id === orderId ? updatedOrder : order)));
+      alert(t('orders.deliveryConfirmed'));
+    } catch (error) {
+      console.error('Failed to confirm delivery', error);
+      alert(t('orders.confirmDeliveryFailed'));
+    } finally {
+      setConfirmingDeliveryOrderId(null);
       setOpenMenuId(null);
     }
   };
@@ -430,27 +456,31 @@ export default function Orders(): JSX.Element {
                                 {t('orders.ship')}
                               </button>
                             )}
-                            {status === 'SHIPPED' && (
-                              <button
-                                className="px-3 py-1 bg-green-50 text-green-600 rounded-lg text-xs font-medium hover:bg-green-100"
-                                onClick={(e) => handleAction(OrderStatus.DELIVERED, order.id, e)}
-                              >
-                                {t('orders.deliver')}
-                              </button>
-                            )}
                           </>
                         ) : (
-                          !['DELIVERED', 'SHIPPED', 'CANCELLED'].includes(status) && (
-                            <button
-                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                              title={t('orders.cancelOrder')}
-                              onClick={(e) => handleAction('cancel', order.id, e)}
-                            >
-                              <XCircle className="w-4 h-4" />
-                            </button>
-                          )
-                        )}
-
+                            <>
+                              {isRetailer && status === 'SHIPPED' && (
+                                  <button
+                                      className="px-3 py-1 bg-green-50 text-green-600 rounded-lg text-xs font-medium hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                      disabled={confirmingDeliveryOrderId === order.id}
+                                      onClick={(e) => {
+                                        void handleConfirmDelivery(order.id, e);
+                                      }}
+                                  >
+                                    {confirmingDeliveryOrderId === order.id ? t('orders.confirmingDelivery') : t('orders.confirmDelivery')}
+                                  </button>
+                              )}
+                              {isRetailer && !['DELIVERED', 'SHIPPED', 'CANCELLED'].includes(status) && (
+                                  <button
+                                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                      title={t('orders.cancelOrder')}
+                                      onClick={(e) => handleAction('cancel', order.id, e)}
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </button>
+                              )}
+                            </>
+                            )}
                         <div className="relative">
                           <button
                             className={`p-2 rounded-lg transition-colors ${openMenuId === order.id ? 'bg-gray-100 text-navy-800' : 'text-navy-500 hover:text-navy-700 hover:bg-gray-100'}`}
@@ -483,7 +513,7 @@ export default function Orders(): JSX.Element {
                                   <Eye className="w-4 h-4 text-navy-400 dark:text-slate-400" />
                                   {t('orders.viewDetails')}
                                 </button>
-                                {!isWholesaler && (
+                                {isRetailer && (
                                   <button
                                     disabled={reorderingOrderId === order.id}
                                     className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors dark:hover:bg-slate-800 ${
@@ -519,7 +549,7 @@ export default function Orders(): JSX.Element {
                                   <MessageSquare className="w-4 h-4 text-navy-400 dark:text-slate-400" />
                                   {t('orders.contactSupport')}
                                 </button>
-                                {!isWholesaler && !['DELIVERED', 'SHIPPED', 'CANCELLED'].includes(status) && (
+                                {isRetailer && !['DELIVERED', 'SHIPPED', 'CANCELLED'].includes(status) && (
                                   <button
                                     className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-gray-50 mt-1 dark:border-white/10 dark:hover:bg-red-500/15"
                                     onClick={(e) => {
