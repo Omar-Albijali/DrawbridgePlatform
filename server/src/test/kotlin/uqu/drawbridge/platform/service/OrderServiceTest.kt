@@ -172,8 +172,8 @@ class OrderServiceTest {
         val item = orderItem(quantity = 5)
         val inventoryItem = InventoryItem(
             id = "inventory-1",
-            retailerId = retailer.id!!,
-            productId = item.productId,
+            retailer = retailer,
+            product = Product(id = item.productId ?: "", name = "Test Product", description = "", category = uqu.drawbridge.platform.model.Category(id = "cat-1", name = "category"), price = java.math.BigDecimal.ZERO, stockQuantity = 0, minimumOrderQuantity = 1, wholesaler = user(id = "wholesaler-1", email = "w@w.com", role = UserRole.WHOLESALER), published = true),
             currentQuantity = 3,
             autoOrderConfig = AutoOrderConfig()
         )
@@ -184,7 +184,7 @@ class OrderServiceTest {
         stubInventorySave()
         stubOrderSave()
         stubDtoMapping(order, retailer, item)
-        `when`(inventoryItemRepository.findByRetailerIdAndProductId(retailer.id!!, item.productId)).thenReturn(inventoryItem)
+        `when`(inventoryItemRepository.findByRetailer_IdAndProduct_Id(retailer.id!!, item.productId ?: "")).thenReturn(inventoryItem)
 
         val result = service.confirmDeliveryForRetailer(order.id!!, retailer.email)
 
@@ -205,7 +205,7 @@ class OrderServiceTest {
             deepLink = "/orders/order-1"
         )
         verify(notificationService).sendEventNotification(
-            recipientId = order.wholesalerId,
+            recipientId = order.wholesalerId ?: "",
             type = NotificationType.ORDER,
             eventKey = NotificationEventKey.ORDER_STATUS_UPDATED,
             entityType = NotificationEntityType.ORDER,
@@ -229,7 +229,7 @@ class OrderServiceTest {
         stubInventorySave()
         stubOrderSave()
         stubDtoMapping(order, retailer, item)
-        `when`(inventoryItemRepository.findByRetailerIdAndProductId(retailer.id!!, item.productId)).thenReturn(null)
+        `when`(inventoryItemRepository.findByRetailer_IdAndProduct_Id(retailer.id!!, item.productId ?: "")).thenReturn(null)
 
         service.confirmDeliveryForRetailer(order.id!!, retailer.email)
 
@@ -318,12 +318,15 @@ class OrderServiceTest {
     }
 
     private fun stubOrderItems(orderId: String, items: List<OrderItem>) {
-        `when`(orderItemRepository.findByOrderId(orderId)).thenReturn(items)
+        `when`(orderItemRepository.findByOrder_Id(orderId)).thenReturn(items)
     }
 
     private fun stubInventorySave() {
         `when`(inventoryItemRepository.save(any(InventoryItem::class.java))).thenAnswer {
             it.arguments[0] as InventoryItem
+        }
+        `when`(productRepository.getReferenceById(org.mockito.Mockito.anyString())).thenAnswer {
+            product(it.arguments[0] as String)
         }
     }
 
@@ -334,11 +337,11 @@ class OrderServiceTest {
     }
 
     private fun stubDtoMapping(order: Order, retailer: User, item: OrderItem) {
-        val product = product(item.productId)
+        val product = product(item.productId ?: "")
         val category = Category(id = product.categoryId, name = "Beverages")
         val orderGroup = OrderGroup(
             id = order.orderGroupId!!,
-            retailerId = retailer.id!!,
+            retailer = retailer,
             groupTotal = order.subtotal,
             paymentStatus = PaymentStatus.COMPLETED
         )
@@ -364,11 +367,13 @@ class OrderServiceTest {
         retailerId: String,
         deliveredAt: LocalDateTime? = null
     ): Order {
+        val retailer = user(id = retailerId, email = "ret@test.com", role = UserRole.RETAILER)
+        val wholesaler = user(id = "wholesaler-1", email = "wh@test.com", role = UserRole.WHOLESALER)
         return Order(
             id = id,
-            orderGroupId = "group-1",
-            retailerId = retailerId,
-            wholesalerId = "wholesaler-1",
+            orderGroup = OrderGroup(id = "group-1", groupTotal = BigDecimal("50.00")),
+            retailer = retailer,
+            wholesaler = wholesaler,
             status = status,
             subtotal = BigDecimal("50.00"),
             deliveredAt = deliveredAt
@@ -376,10 +381,12 @@ class OrderServiceTest {
     }
 
     private fun orderItem(quantity: Int): OrderItem {
+        val o = Order(status = OrderStatus.PENDING, subtotal = BigDecimal.ZERO)
+        o.id = "order-1"
         return OrderItem(
             id = "item-1",
-            orderId = "order-1",
-            productId = "product-1",
+            order = o,
+            product = product("product-1"),
             quantity = quantity,
             unitPrice = BigDecimal("10.00")
         )
@@ -391,7 +398,7 @@ class OrderServiceTest {
             wholesaler = user(id = "wholesaler-1", email = "wh@test.com", role = UserRole.WHOLESALER),
             name = "Canned Juice",
             description = "Case of juice cans",
-            categoryId = "category-1",
+            category = uqu.drawbridge.platform.model.Category(id = "category-1", name = "category"),
             price = BigDecimal("10.00"),
             stockQuantity = 20,
             published = true

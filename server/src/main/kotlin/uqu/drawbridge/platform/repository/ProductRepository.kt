@@ -13,8 +13,8 @@ interface ProductRepository : JpaRepository<Product, String>, JpaSpecificationEx
     @EntityGraph(attributePaths = ["wholesaler"])
     override fun findAll(spec: Specification<Product>, pageable: Pageable): Page<Product>
 
-    fun findByWholesalerId(wholesalerId: String): List<Product>
-    fun findByCategoryId(categoryId: String): List<Product>
+    fun findByWholesaler_Id(wholesalerId: String): List<Product>
+    fun findByCategory_Id(categoryId: String): List<Product>
     fun findByPublishedTrue(): List<Product>
     fun findByNameContainingIgnoreCase(name: String): List<Product>
     fun findByGtin(gtin: String): Product?

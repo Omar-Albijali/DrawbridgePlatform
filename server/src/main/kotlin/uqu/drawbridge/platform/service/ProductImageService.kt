@@ -28,7 +28,8 @@ class ProductImageService(
         val productImage = ProductImage(
             url = imageUrl,
             altText = altText,
-            sortIndex = nextIndex
+            sortIndex = nextIndex,
+            product = product
         )
 
         // Add through parent collection so JPA sets the FK column
@@ -50,7 +51,7 @@ class ProductImageService(
     }
 
     fun getProductImages(productId: String): List<ProductImage> {
-        return productImageRepository.findByProductId(productId)
+        return productImageRepository.findByProduct_Id(productId)
     }
 
     @Transactional

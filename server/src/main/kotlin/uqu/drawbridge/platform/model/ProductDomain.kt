@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 
 import jakarta.persistence.*
 
+import org.hibernate.annotations.OnDelete
+import org.hibernate.annotations.OnDeleteAction
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -16,14 +18,15 @@ class Category(
     @Column(nullable = false)
     var name: String,
 
-    @Column(nullable = true)
-    var parentCategoryId: String? = null,
-
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parentCategoryId", insertable = false, updatable = false)
+    @JoinColumn(name = "parentCategoryId", nullable = true)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     var parentCategory: Category? = null
-)
+) {
+    val parentCategoryId: String?
+        get() = parentCategory?.id
+}
 
 @Entity
 @Table(name = "products")
@@ -32,8 +35,9 @@ class Product(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: String? = null,
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "wholesalerId", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     var wholesaler: User,
 
     @Column(nullable = false)
@@ -42,8 +46,11 @@ class Product(
     @Column(nullable = false, columnDefinition = "TEXT")
     var description: String,
 
-    @Column(nullable = false)
-    var categoryId: String,
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "categoryId", nullable = false)
+    // No @OnDelete for Category (RESTRICT by default)
+    var category: Category,
 
     @Column(nullable = false)
     var price: BigDecimal,
@@ -60,8 +67,7 @@ class Product(
     @Column(nullable = false)
     var published: Boolean,
 
-    @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
-    @JoinColumn(name = "productId", nullable = false)
+    @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true, mappedBy = "product")
     var images: MutableList<ProductImage> = mutableListOf(),
 
     // Rating summary fields - auto-calculated by service layer
@@ -69,13 +75,11 @@ class Product(
     var averageRating: BigDecimal = BigDecimal.ZERO,
 
     @Column(nullable = false)
-    var ratingCount: Int = 0,
-
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "categoryId", insertable = false, updatable = false)
-    var category: Category? = null
-)
+    var ratingCount: Int = 0
+) {
+    val categoryId: String
+        get() = category.id ?: ""
+}
 
 
 @Entity
@@ -93,14 +97,15 @@ class ProductImage(
     @Column(nullable = false)
     var sortIndex: Int = 0,
 
-    @Column(name = "productId", insertable = false, updatable = false, nullable = false)
-    var productId: String? = null,
-
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "productId", insertable = false, updatable = false)
-    var product: Product? = null
-)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "productId", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var product: Product
+) {
+    val productId: String?
+        get() = product.id
+}
 
 
 // ===================== PRODUCT RATING =====================
@@ -115,12 +120,6 @@ class ProductRating(
     var id: String? = null,
 
     @Column(nullable = false)
-    var productId: String,
-
-    @Column(nullable = false)
-    var userId: String,
-
-    @Column(nullable = false)
     var rating: Int,  // 1-5 stars
 
     @Column(nullable = true, columnDefinition = "TEXT")
@@ -133,12 +132,20 @@ class ProductRating(
     var updatedAt: LocalDateTime = LocalDateTime.now(),
 
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "productId", insertable = false, updatable = false)
-    var product: Product? = null,
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "productId", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var product: Product,
 
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "userId", insertable = false, updatable = false)
-    var user: User? = null
-)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "userId", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var user: User
+) {
+    val productId: String
+        get() = product.id ?: ""
+
+    val userId: String
+        get() = user.id ?: ""
+}

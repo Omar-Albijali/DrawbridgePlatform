@@ -18,18 +18,21 @@ import uqu.drawbridge.platform.model.User
 import uqu.drawbridge.platform.repository.CartItemRepository
 import uqu.drawbridge.platform.repository.ProductRepository
 import uqu.drawbridge.platform.repository.ShoppingCartRepository
+import uqu.drawbridge.platform.repository.UserRepository
 
 class CartServiceTest {
     private val shoppingCartRepository = mock(ShoppingCartRepository::class.java)
     private val cartItemRepository = mock(CartItemRepository::class.java)
     private val productRepository = mock(ProductRepository::class.java)
     private val orderService = mock(OrderService::class.java)
+    private val userRepository = mock(UserRepository::class.java)
 
     private val service = CartService(
         shoppingCartRepository = shoppingCartRepository,
         cartItemRepository = cartItemRepository,
         productRepository = productRepository,
-        orderService = orderService
+        orderService = orderService,
+        userRepository = userRepository
     )
 
     @Test
@@ -48,8 +51,8 @@ class CartServiceTest {
     fun `update cart quantity below MOQ fails`() {
         val cart = cart()
         val item = cartItem(quantity = 12)
-        `when`(shoppingCartRepository.findByRetailerId("retailer-1")).thenReturn(Optional.of(cart))
-        `when`(cartItemRepository.findByCartIdAndProductId("cart-1", "prod-1")).thenReturn(item)
+        `when`(shoppingCartRepository.findByRetailer_Id("retailer-1")).thenReturn(Optional.of(cart))
+        `when`(cartItemRepository.findByCart_IdAndProduct_Id("cart-1", "prod-1")).thenReturn(item)
         `when`(productRepository.findById("prod-1")).thenReturn(Optional.of(product()))
 
         val exception = assertThrows(IllegalArgumentException::class.java) {
@@ -64,8 +67,8 @@ class CartServiceTest {
     fun `checkout fails when cart item is below MOQ`() {
         val cart = cart()
         val item = cartItem(quantity = 6)
-        `when`(shoppingCartRepository.findByRetailerId("retailer-1")).thenReturn(Optional.of(cart))
-        `when`(cartItemRepository.findByCartId("cart-1")).thenReturn(listOf(item))
+        `when`(shoppingCartRepository.findByRetailer_Id("retailer-1")).thenReturn(Optional.of(cart))
+        `when`(cartItemRepository.findByCart_Id("cart-1")).thenReturn(listOf(item))
         `when`(productRepository.findById("prod-1")).thenReturn(Optional.of(product()))
 
         val exception = assertThrows(IllegalArgumentException::class.java) {
@@ -79,7 +82,7 @@ class CartServiceTest {
     private fun cart(): ShoppingCart {
         return ShoppingCart(
             id = "cart-1",
-            retailerId = "retailer-1",
+            retailer = retailerUser(),
             updatedAt = LocalDateTime.now()
         )
     }
@@ -87,10 +90,23 @@ class CartServiceTest {
     private fun cartItem(quantity: Int): CartItem {
         return CartItem(
             id = "cart-item-1",
-            cartId = "cart-1",
-            productId = "prod-1",
-            wholesalerId = "wh-1",
+            cart = ShoppingCart(id = "cart-1", retailer = retailerUser()),
+            product = product(),
+            wholesaler = wholesalerUser(),
             quantity = quantity
+        )
+    }
+
+    private fun retailerUser(): User {
+        return User(
+            id = "retailer-1",
+            email = "rt@test.com",
+            passwordHash = "hash",
+            phoneNumber = "0500000000",
+            role = UserRole.RETAILER,
+            businessName = "Retailer",
+            verificationStatus = true,
+            commercialRegistrationNumber = "CR2"
         )
     }
 
@@ -100,7 +116,7 @@ class CartServiceTest {
             wholesaler = wholesalerUser(),
             name = "Coca Cola",
             description = "Case of cans",
-            categoryId = "cat-1",
+            category = uqu.drawbridge.platform.model.Category(id = "cat-1", name = "category"),
             price = BigDecimal("20.00"),
             stockQuantity = 20,
             minimumOrderQuantity = 12,

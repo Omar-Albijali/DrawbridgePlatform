@@ -2,6 +2,8 @@ package uqu.drawbridge.platform.model
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.persistence.*
+import org.hibernate.annotations.OnDelete
+import org.hibernate.annotations.OnDeleteAction
 import java.time.LocalDateTime
 
 @Entity
@@ -14,16 +16,17 @@ class PasswordResetToken(
     var token: String,
 
     @Column(nullable = false)
-    var userId: String,
-
-    @Column(nullable = false)
     var expiresAt: LocalDateTime,
 
     @Column(nullable = false)
     var used: Boolean = false,
 
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "userId", insertable = false, updatable = false)
-    var user: User? = null
-)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "userId", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var user: User
+) {
+    val userId: String
+        get() = user.id ?: ""
+}

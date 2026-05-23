@@ -172,12 +172,12 @@ class UserService(
         val user = userRepository.findByEmail(RequestValidation.requireEmail(email)) ?: return
 
         // Invalidate any existing tokens for this user
-        passwordResetTokenRepository.deleteAllByUserId(user.id!!)
+        passwordResetTokenRepository.deleteAllByUser_Id(user.id!!)
 
         // Create a new 1-hour token
         val token = PasswordResetToken(
             token = UUID.randomUUID().toString(),
-            userId = user.id!!,
+            user = user,
             expiresAt = LocalDateTime.now().plusHours(1)
         )
         passwordResetTokenRepository.save(token)
@@ -250,11 +250,11 @@ class UserService(
 
     @Transactional
     private fun initiateEmailVerification(user: User) {
-        emailVerificationTokenRepository.deleteAllByUserId(user.id!!)
+        emailVerificationTokenRepository.deleteAllByUser_Id(user.id!!)
 
         val token = EmailVerificationToken(
             token = UUID.randomUUID().toString(),
-            userId = user.id!!,
+            user = user,
             expiresAt = LocalDateTime.now().plusHours(24)
         )
         emailVerificationTokenRepository.save(token)

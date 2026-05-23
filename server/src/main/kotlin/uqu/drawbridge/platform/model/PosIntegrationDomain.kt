@@ -14,6 +14,8 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import org.hibernate.annotations.OnDelete
+import org.hibernate.annotations.OnDeleteAction
 import java.time.LocalDateTime
 import uqu.drawbridge.platform.dto.PosOutboundEventStatus
 import uqu.drawbridge.platform.dto.InventoryAuditSourceType
@@ -41,9 +43,6 @@ class PosIntegration(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: String? = null,
 
-    @Column(name = "retailer_id", nullable = false)
-    var retailerId: String,
-
     @Column(name = "api_key_hash", nullable = false, length = 64)
     var apiKeyHash: String,
 
@@ -70,10 +69,14 @@ class PosIntegration(
     var rotatedAt: LocalDateTime? = null,
 
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "retailer_id", insertable = false, updatable = false)
-    var retailer: User? = null
-)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "retailer_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var retailer: User
+) {
+    val retailerId: String
+        get() = retailer.id ?: ""
+}
 
 @Entity
 @Table(
@@ -92,9 +95,6 @@ class PosEventReceipt(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: String? = null,
 
-    @Column(name = "retailer_id", nullable = false)
-    var retailerId: String,
-
     @Column(name = "event_id", nullable = false, length = 128)
     var eventId: String,
 
@@ -109,10 +109,14 @@ class PosEventReceipt(
     var processedAt: LocalDateTime = LocalDateTime.now(),
 
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "retailer_id", insertable = false, updatable = false)
-    var retailer: User? = null
-)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "retailer_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var retailer: User
+) {
+    val retailerId: String
+        get() = retailer.id ?: ""
+}
 
 @Entity
 @Table(
@@ -133,9 +137,6 @@ class PosOutboundInventoryEvent(
     @Column(name = "event_type", nullable = false, length = 64)
     var eventType: String = "inventory.changed",
 
-    @Column(name = "retailer_id", nullable = false)
-    var retailerId: String,
-
     @Enumerated(EnumType.STRING)
     @Column(name = "source_type", nullable = false)
     var sourceType: InventoryAuditSourceType,
@@ -143,14 +144,8 @@ class PosOutboundInventoryEvent(
     @Column(name = "source_id", nullable = true)
     var sourceId: String? = null,
 
-    @Column(name = "product_id", nullable = false)
-    var productId: String,
-
     @Column(name = "gtin", nullable = false)
     var gtin: String,
-
-    @Column(name = "inventory_item_id", nullable = false)
-    var inventoryItemId: String,
 
     @Column(name = "quantity_before", nullable = false)
     var quantityBefore: Int,
@@ -196,17 +191,29 @@ class PosOutboundInventoryEvent(
     var updatedAt: LocalDateTime = LocalDateTime.now(),
 
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "retailer_id", insertable = false, updatable = false)
-    var retailer: User? = null,
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "retailer_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var retailer: User,
 
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", insertable = false, updatable = false)
-    var product: Product? = null,
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "product_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var product: Product,
 
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "inventory_item_id", insertable = false, updatable = false)
-    var inventoryItem: InventoryItem? = null
-)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "inventory_item_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var inventoryItem: InventoryItem
+) {
+    val retailerId: String
+        get() = retailer.id ?: ""
+
+    val productId: String
+        get() = product.id ?: ""
+        
+    val inventoryItemId: String
+        get() = inventoryItem.id ?: ""
+}

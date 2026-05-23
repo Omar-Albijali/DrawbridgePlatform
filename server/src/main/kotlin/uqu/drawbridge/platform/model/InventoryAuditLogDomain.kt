@@ -13,6 +13,8 @@ import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import org.hibernate.annotations.OnDelete
+import org.hibernate.annotations.OnDeleteAction
 import java.time.LocalDateTime
 import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 
@@ -41,11 +43,17 @@ class InventoryAuditLog(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: String? = null,
 
-    @Column(name = "product_id", nullable = false)
-    var productId: String,
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", nullable = true)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    var product: Product? = null,
 
-    @Column(name = "inventory_item_id", nullable = true)
-    var inventoryItemId: String? = null,
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "inventory_item_id", nullable = true)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    var inventoryItem: InventoryItem? = null,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "stock_target_type", nullable = false)
@@ -80,18 +88,10 @@ class InventoryAuditLog(
     @Column(name = "created_at", nullable = false, updatable = false)
     var createdAt: LocalDateTime = LocalDateTime.now(),
 
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", insertable = false, updatable = false)
-    var product: Product? = null,
+) {
+    val productId: String?
+        get() = product?.id
 
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "inventory_item_id", insertable = false, updatable = false)
-    var inventoryItem: InventoryItem? = null,
-
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "changed_by", insertable = false, updatable = false)
-    var changedByUser: User? = null
-)
+    val inventoryItemId: String?
+        get() = inventoryItem?.id
+}

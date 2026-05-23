@@ -7,6 +7,8 @@ import java.time.LocalDateTime
 import uqu.drawbridge.platform.OrderStatus
 import uqu.drawbridge.platform.ShippingMethod
 import uqu.drawbridge.platform.PaymentStatus
+import org.hibernate.annotations.OnDelete
+import org.hibernate.annotations.OnDeleteAction
 
 // ===================== ORDER GROUP =====================
 // Represents a single checkout action by the retailer (can contain orders from multiple wholesalers)
@@ -19,9 +21,6 @@ class OrderGroup(
     var id: String? = null,
 
     @Column(nullable = false)
-    var retailerId: String,
-
-    @Column(nullable = false)
     var groupTotal: BigDecimal,
 
     @Column(nullable = false, updatable = false)
@@ -31,15 +30,17 @@ class OrderGroup(
     @Column(nullable = false)
     var paymentStatus: PaymentStatus = PaymentStatus.PENDING,
 
-    @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
-    @JoinColumn(name = "order_group_id", nullable = false)
+    @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true, mappedBy = "orderGroup")
     var orders: MutableList<Order> = mutableListOf(),
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "retailerId", insertable = false, updatable = false)
+    @JoinColumn(name = "retailer_id", nullable = true)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     var retailer: User? = null
-)
+) {
+    val retailerId: String? get() = retailer?.id
+}
 
 
 // ===================== ORDER (PER WHOLESALER) =====================
@@ -50,15 +51,6 @@ class OrderGroup(
 class Order(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: String? = null,
-
-    @Column(name = "order_group_id", insertable = false, updatable = false)
-    var orderGroupId: String? = null,
-
-    @Column(nullable = false)
-    var retailerId: String,
-
-    @Column(nullable = false)
-    var wholesalerId: String,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -90,25 +82,31 @@ class Order(
     @Column(nullable = true)
     var deliveredAt: LocalDateTime? = null,
 
-    @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
-    @JoinColumn(name = "order_id", nullable = false)
+    @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true, mappedBy = "order")
     var orderItems: MutableList<OrderItem> = mutableListOf(),
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_group_id", insertable = false, updatable = false)
+    @JoinColumn(name = "order_group_id", nullable = true)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     var orderGroup: OrderGroup? = null,
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "retailerId", insertable = false, updatable = false)
+    @JoinColumn(name = "retailer_id", nullable = true)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     var retailer: User? = null,
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "wholesalerId", insertable = false, updatable = false)
+    @JoinColumn(name = "wholesaler_id", nullable = true)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     var wholesaler: User? = null
-)
+) {
+    val orderGroupId: String? get() = orderGroup?.id
+    val retailerId: String? get() = retailer?.id
+    val wholesalerId: String? get() = wholesaler?.id
+}
 
 
 // ===================== ORDER ITEM =====================
@@ -119,12 +117,6 @@ class OrderItem(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: String? = null,
 
-    @Column(name = "order_id", insertable = false, updatable = false, nullable = false)
-    var orderId: String? = null,
-
-    @Column(nullable = false)
-    var productId: String,
-
     @Column(nullable = false)
     var quantity: Int,
 
@@ -132,12 +124,17 @@ class OrderItem(
     var unitPrice: BigDecimal,
 
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", insertable = false, updatable = false)
-    var order: Order? = null,
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "order_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var order: Order,
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "productId", insertable = false, updatable = false)
+    @JoinColumn(name = "product_id", nullable = true)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     var product: Product? = null
-)
+) {
+    val orderId: String? get() = order.id
+    val productId: String? get() = product?.id
+}

@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Transactional
 import uqu.drawbridge.platform.model.ProductRating
 import uqu.drawbridge.platform.repository.ProductRatingRepository
 import uqu.drawbridge.platform.repository.ProductRepository
+import uqu.drawbridge.platform.repository.UserRepository
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDateTime
@@ -12,7 +13,8 @@ import java.time.LocalDateTime
 @Service
 class ProductRatingService(
     private val productRatingRepository: ProductRatingRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val userRepository: UserRepository
 ) {
 
     /**
@@ -24,7 +26,7 @@ class ProductRatingService(
     fun addOrUpdateRating(productId: String, userId: String, rating: Int, review: String? = null): ProductRating {
         require(rating in 1..5) { "Rating must be between 1 and 5" }
 
-        val existingRating = productRatingRepository.findByProductIdAndUserId(productId, userId)
+        val existingRating = productRatingRepository.findByProduct_IdAndUser_Id(productId, userId)
 
         val savedRating = if (existingRating != null) {
             existingRating.rating = rating
@@ -33,8 +35,8 @@ class ProductRatingService(
             productRatingRepository.save(existingRating)
         } else {
             val newRating = ProductRating(
-                productId = productId,
-                userId = userId,
+                product = productRepository.getReferenceById(productId),
+                user = userRepository.getReferenceById(userId),
                 rating = rating,
                 review = review
             )
@@ -51,21 +53,21 @@ class ProductRatingService(
      * Get all ratings for a product.
      */
     fun getRatingsByProductId(productId: String): List<ProductRating> {
-        return productRatingRepository.findByProductId(productId)
+        return productRatingRepository.findByProduct_Id(productId)
     }
 
     /**
      * Get all ratings by a user.
      */
     fun getRatingsByUserId(userId: String): List<ProductRating> {
-        return productRatingRepository.findByUserId(userId)
+        return productRatingRepository.findByUser_Id(userId)
     }
 
     /**
      * Get a specific rating by product and user.
      */
     fun getRating(productId: String, userId: String): ProductRating? {
-        return productRatingRepository.findByProductIdAndUserId(productId, userId)
+        return productRatingRepository.findByProduct_IdAndUser_Id(productId, userId)
     }
 
     /**
@@ -88,7 +90,7 @@ class ProductRatingService(
     private fun updateProductRatingSummary(productId: String) {
         val product = productRepository.findById(productId).orElse(null) ?: return
 
-        val count = productRatingRepository.countByProductId(productId)
+        val count = productRatingRepository.countByProduct_Id(productId)
         val average = productRatingRepository.getAverageRatingByProductId(productId)
             ?: BigDecimal.ZERO
 
