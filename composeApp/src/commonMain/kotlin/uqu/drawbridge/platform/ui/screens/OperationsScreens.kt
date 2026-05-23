@@ -1,72 +1,23 @@
 package uqu.drawbridge.platform.ui.screens
 
-import coil3.compose.AsyncImage
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -76,41 +27,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import uqu.drawbridge.platform.CategoryDTO
-import uqu.drawbridge.platform.InventoryAuditLogDTO
-import uqu.drawbridge.platform.InventoryItemDTO
-import uqu.drawbridge.platform.InventoryStatus
-import uqu.drawbridge.platform.MobileApiConfig
-import uqu.drawbridge.platform.ProductDTO
-import uqu.drawbridge.platform.ScheduleType
-import uqu.drawbridge.platform.ui.components.AppCard
-import uqu.drawbridge.platform.ui.components.AppPageHeader
-import uqu.drawbridge.platform.ui.components.AppTextField
-import uqu.drawbridge.platform.ui.components.BarcodeScannerView
-import uqu.drawbridge.platform.ui.components.EmptyStateCard
-import uqu.drawbridge.platform.ui.components.ErrorStateCard
-import uqu.drawbridge.platform.ui.components.LoadingStateCard
-import uqu.drawbridge.platform.ui.components.PrimaryButton
-import uqu.drawbridge.platform.ui.components.ScreenSection
-import uqu.drawbridge.platform.ui.components.SecondaryButton
-import uqu.drawbridge.platform.ui.components.ServerErrorCard
-import uqu.drawbridge.platform.ui.components.StatCard
-import uqu.drawbridge.platform.ui.components.StatusChip
-import uqu.drawbridge.platform.ui.components.StatusTone
+import uqu.drawbridge.platform.*
 import uqu.drawbridge.platform.ui.common.ServerNotFoundMessage
-import uqu.drawbridge.platform.ui.operations.AutoRestockUiState
-import uqu.drawbridge.platform.ui.operations.InventoryDetailUiState
-import uqu.drawbridge.platform.ui.operations.InventoryHistoryUiState
-import uqu.drawbridge.platform.ui.operations.InventoryMode
-import uqu.drawbridge.platform.ui.operations.InventoryStateHolder
-import uqu.drawbridge.platform.ui.operations.PosStateHolder
-import uqu.drawbridge.platform.ui.operations.ProductFormImage
-import uqu.drawbridge.platform.ui.operations.ProductManagementStateHolder
+import uqu.drawbridge.platform.ui.components.*
+import uqu.drawbridge.platform.ui.operations.*
 import uqu.drawbridge.platform.ui.platform.FilePhotoPicker
 import uqu.drawbridge.platform.ui.platform.NativeOptionPicker
-import org.jetbrains.skia.Image as SkiaImage
 
 private val InventoryText = Color(0xFFF8FAFC)
 private val InventoryMuted = Color(0xFFA8B7C7)
@@ -2473,14 +2398,9 @@ private fun ProductFormImagePreview(
     image: ProductFormImage,
     modifier: Modifier = Modifier,
 ) {
-    val localBitmap = remember(image.localId, image.bytes) {
-        image.bytes?.let { bytes ->
-            runCatching { SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
-        }
-    }
     when {
-        localBitmap != null -> Image(
-            bitmap = localBitmap,
+        image.bytes != null -> AsyncImage(
+            model = image.bytes,
             contentDescription = image.name,
             modifier = modifier,
             contentScale = ContentScale.Crop,
