@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom';
 import { useEffect, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useCart } from '../contexts/CartContext';
 import {
   ArrowUpDown,
   Copy,
@@ -51,6 +52,7 @@ export default function Orders(): JSX.Element {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [reorderingOrderId, setReorderingOrderId] = useState<string | null>(null);
+  const { addToCart } = useCart();
 
   useEffect(() => {
     const handleScroll = () => setOpenMenuId(null);
@@ -136,7 +138,7 @@ export default function Orders(): JSX.Element {
 
     setReorderingOrderId(order.id);
     try {
-      const { addedItems, failedItems, failedProductNames } = await reorderOrderToCart(user.id, order);
+      const { addedItems, failedItems, failedProductNames } = await reorderOrderToCart(addToCart, order);
 
       if (addedItems === 0 && failedItems === 0) {
         alert(t('orders.noItemsToReorder'));

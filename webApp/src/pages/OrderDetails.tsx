@@ -8,6 +8,7 @@ import { orderService } from '../services/orderService';
 import { reorderOrderToCart } from '../utils/reorderOrder';
 import { formatCurrency, formatDate, formatDateTime, orderStatusLabel, shippingMethodLabel } from '../i18n/display';
 import { UserRole, type Order, type OrderItem } from '../types';
+import { useCart } from '../contexts/CartContext';
 
 export default function OrderDetails(): JSX.Element {
   const { t } = useTranslation();
@@ -19,6 +20,7 @@ export default function OrderDetails(): JSX.Element {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isReordering, setIsReordering] = useState(false);
+  const { addToCart } = useCart();
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -63,7 +65,7 @@ export default function OrderDetails(): JSX.Element {
 
     setIsReordering(true);
     try {
-      const { addedItems, failedItems, failedProductNames } = await reorderOrderToCart(user.id, order);
+      const { addedItems, failedItems, failedProductNames } = await reorderOrderToCart(addToCart, order);
 
       if (addedItems === 0 && failedItems === 0) {
         alert(t('orders.noItemsToReorder'));
