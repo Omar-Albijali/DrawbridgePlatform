@@ -33,15 +33,21 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -59,6 +65,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -113,6 +120,9 @@ private val NotificationsBorder = Color.White.copy(alpha = 0.12f)
 private val SupportText = Color(0xFFF8FAFC)
 private val SupportPanel = AppNavySurfaceHigh.copy(alpha = 0.92f)
 private val SupportBorder = Color.White.copy(alpha = 0.12f)
+private val SettingsText = Color(0xFFF8FAFC)
+private val SettingsPanel = AppNavySurfaceHigh.copy(alpha = 0.92f)
+private val SettingsBorder = Color.White.copy(alpha = 0.12f)
 
 @Composable
 internal fun ReportsMainScreen(
@@ -1119,6 +1129,7 @@ private fun notificationIcon(type: NotificationType): ImageVector = when (type) 
 internal fun SettingsMainScreen(
     settingsStateHolder: SettingsStateHolder,
     onLogout: () -> Unit,
+    onBack: (() -> Unit)? = null,
 ) {
     val state = settingsStateHolder.state
     val scope = rememberCoroutineScope()
@@ -1135,7 +1146,15 @@ internal fun SettingsMainScreen(
     }
 
     LaunchedEffect(settingsStateHolder) {
-        settingsStateHolder.load()
+        settingsStateHolder.loadIfNeeded()
+    }
+
+    if (selectedSection == SettingsSection.Security) {
+        LoginSecuritySettingsScreen(
+            settingsStateHolder = settingsStateHolder,
+            onBack = onBack,
+        )
+        return
     }
 
     ScreenSection(
@@ -1188,6 +1207,30 @@ internal fun SettingsMainScreen(
 }
 
 @Composable
+private fun LoginSecuritySettingsScreen(
+    settingsStateHolder: SettingsStateHolder,
+    onBack: (() -> Unit)?,
+) {
+    val state = settingsStateHolder.state
+    val scope = rememberCoroutineScope()
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AppPageHeader(
+            title = "Login & Security",
+            subtitle = "Manage your password and account security",
+            leading = onBack?.let { { SupportBackSquare(onClick = it) } },
+        )
+        state.errorMessage?.let { ErrorCard(it) { scope.launch { settingsStateHolder.load() } } }
+        state.successMessage?.let { SuccessCard(it) }
+        if (state.isLoading) {
+            LoadingStateCard(title = "Loading security", message = "Fetching account security.")
+        } else {
+            SecuritySettingsSection(settingsStateHolder)
+        }
+    }
+}
+
+@Composable
 private fun ProfileSettingsSection(holder: SettingsStateHolder) {
     val state = holder.state
     val form = state.profileForm
@@ -1214,23 +1257,166 @@ private fun SecuritySettingsSection(holder: SettingsStateHolder) {
     val state = holder.state
     val form = state.passwordForm
     val scope = rememberCoroutineScope()
-    AppCard {
-        Text("Security", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        PasswordField("Current password", form.currentPassword) { holder.updatePassword(form.copy(currentPassword = it)) }
-        PasswordField("New password", form.newPassword) { holder.updatePassword(form.copy(newPassword = it)) }
-        PasswordField("Confirm new password", form.confirmPassword) { holder.updatePassword(form.copy(confirmPassword = it)) }
+    var twoFactorEnabled by remember { mutableStateOf(false) }
+
+    SettingsActionCard(
+        title = "Change Password",
+        icon = Icons.Default.Lock,
+        iconTint = WarningColor,
+    ) {
+        SettingsPasswordField(
+            label = "Current Password",
+            value = form.currentPassword,
+            placeholder = "Enter current password",
+            onChange = { holder.updatePassword(form.copy(currentPassword = it)) },
+        )
+        SettingsPasswordField(
+            label = "New Password",
+            value = form.newPassword,
+            placeholder = "Enter new password",
+            onChange = { holder.updatePassword(form.copy(newPassword = it)) },
+        )
+        SettingsPasswordField(
+            label = "Confirm New Password",
+            value = form.confirmPassword,
+            placeholder = "Confirm new password",
+            onChange = { holder.updatePassword(form.copy(confirmPassword = it)) },
+        )
         PrimaryButton(
-            text = if (state.isSaving) "Updating..." else "Update password",
+            text = if (state.isSaving) "Updating..." else "Update Password",
             enabled = !state.isSaving,
             onClick = { scope.launch { holder.changePassword() } },
         )
-        DeferredFeatureCard(
-            destination = uqu.drawbridge.platform.ui.model.AppDestination.Settings,
-            title = "Two-factor setup deferred",
-            message = "The web UI displays local 2FA controls, but there is no backend 2FA contract to enable here yet.",
+    }
+
+    SettingsActionCard(
+        title = "Two-Factor Authentication",
+        icon = Icons.Default.Security,
+        iconTint = Color(0xFF60A5FA),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Authenticator App",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = SettingsText,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    "Secure your account with an authenticator app",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppMutedText,
+                )
+            }
+            Switch(
+                checked = twoFactorEnabled,
+                onCheckedChange = { twoFactorEnabled = it },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = Primary500,
+                    uncheckedThumbColor = Color.White,
+                    uncheckedTrackColor = AppMutedText.copy(alpha = 0.35f),
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsActionCard(
+    title: String,
+    icon: ImageVector,
+    iconTint: Color,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = SettingsPanel,
+        border = BorderStroke(1.dp, SettingsBorder),
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.padding(18.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(iconTint.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
+                }
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = SettingsText,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(SettingsBorder))
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                content = content,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsPasswordField(
+    label: String,
+    value: String,
+    placeholder: String,
+    onChange: (String) -> Unit,
+) {
+    var visible by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = AppMutedText, fontWeight = FontWeight.Black)
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = { Text(placeholder, color = AppMutedText) },
+            visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            trailingIcon = {
+                IconButton(onClick = { visible = !visible }) {
+                    Icon(
+                        imageVector = if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = null,
+                        tint = AppMutedText,
+                    )
+                }
+            },
+            shape = RoundedCornerShape(8.dp),
+            colors = settingsTextFieldColors(),
         )
     }
 }
+
+@Composable
+private fun settingsTextFieldColors() = TextFieldDefaults.colors(
+    focusedContainerColor = Color.White.copy(alpha = 0.05f),
+    unfocusedContainerColor = Color.White.copy(alpha = 0.035f),
+    disabledContainerColor = Color.White.copy(alpha = 0.055f),
+    focusedIndicatorColor = Primary500,
+    unfocusedIndicatorColor = SettingsBorder,
+    disabledIndicatorColor = SettingsBorder,
+    cursorColor = Primary500,
+    focusedTextColor = SettingsText,
+    unfocusedTextColor = SettingsText,
+    disabledTextColor = AppMutedText,
+)
 
 @Composable
 private fun AddressesSettingsSection(holder: SettingsStateHolder) {

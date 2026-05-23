@@ -935,10 +935,7 @@ internal fun MoreDestinationScreen(
             notificationsContent()
         }
         AppDestination.Settings -> {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SecondaryButton(text = "Back to More", onClick = onBack)
-                settingsContent()
-            }
+            settingsContent()
         }
         else -> {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

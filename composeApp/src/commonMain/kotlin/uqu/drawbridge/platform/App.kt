@@ -566,6 +566,7 @@ private fun MainHost(
     val settingsStateHolder = remember(session.user.id) {
         SettingsStateHolder(sessionManager.api, session)
     }
+    var settingsBackDestination by remember(session.user.id) { mutableStateOf<AppDestination?>(null) }
     val productDetailStateHolder = remember(selectedProductId) {
         ProductDetailStateHolder(sessionManager.api)
     }
@@ -811,7 +812,10 @@ private fun MainHost(
                     if (selectedDestination == null) {
                         MoreMainScreen(
                             destinations = moreDestinationsFor(session.user.role),
-                            onOpenDestination = onActiveMoreDestinationChange,
+                            onOpenDestination = {
+                                settingsBackDestination = null
+                                onActiveMoreDestinationChange(it)
+                            },
                             onLogout = onLogout,
                         )
                     } else {
@@ -827,6 +831,7 @@ private fun MainHost(
                                     onLogout = onLogout,
                                     onOpenSettingsSection = { section ->
                                         settingsStateHolder.selectSection(section)
+                                        settingsBackDestination = AppDestination.Account
                                         onActiveMoreDestinationChange(AppDestination.Settings)
                                     },
                                 )
@@ -868,6 +873,11 @@ private fun MainHost(
                                 SettingsMainScreen(
                                     settingsStateHolder = settingsStateHolder,
                                     onLogout = onLogout,
+                                    onBack = {
+                                        val destination = settingsBackDestination
+                                        settingsBackDestination = null
+                                        onActiveMoreDestinationChange(destination)
+                                    },
                                 )
                             },
                             inventoryContent = {
