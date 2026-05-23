@@ -4,6 +4,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +71,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import uqu.drawbridge.platform.AddressResponseDto
 import uqu.drawbridge.platform.NotificationChannel
@@ -1157,6 +1160,14 @@ internal fun SettingsMainScreen(
         return
     }
 
+    if (selectedSection == SettingsSection.Payments) {
+        PaymentMethodsSettingsScreen(
+            settingsStateHolder = settingsStateHolder,
+            onBack = onBack,
+        )
+        return
+    }
+
     ScreenSection(
         title = "Settings",
         subtitle = if (state.user.role == UserRole.RETAILER) {
@@ -1417,6 +1428,292 @@ private fun settingsTextFieldColors() = TextFieldDefaults.colors(
     unfocusedTextColor = SettingsText,
     disabledTextColor = AppMutedText,
 )
+
+@Composable
+private fun PaymentMethodsSettingsScreen(
+    settingsStateHolder: SettingsStateHolder,
+    onBack: (() -> Unit)?,
+) {
+    val state = settingsStateHolder.state
+    val scope = rememberCoroutineScope()
+    var showAddCard by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AppPageHeader(
+            title = "Payment Methods",
+            subtitle = "Manage your saved payment methods",
+            leading = onBack?.let { { SupportBackSquare(onClick = it) } },
+        )
+        state.errorMessage?.let { ErrorCard(it) { scope.launch { settingsStateHolder.load() } } }
+        state.successMessage?.let { SuccessCard(it) }
+        if (state.isLoading) {
+            LoadingStateCard(title = "Loading payment methods", message = "Fetching saved cards.")
+        } else {
+            state.paymentMethods.forEach { method ->
+                PaymentMethodVisualCard(
+                    method = method,
+                    isConfirmingDelete = state.pendingDeletePaymentMethodId == method.id,
+                    onDelete = { settingsStateHolder.requestDeletePaymentMethod(method.id) },
+                    onCancelDelete = { settingsStateHolder.requestDeletePaymentMethod(null) },
+                    onConfirmDelete = { scope.launch { settingsStateHolder.deletePaymentMethod(method.id) } },
+                )
+            }
+            AddPaymentMethodTile(onClick = { showAddCard = true })
+        }
+    }
+
+    if (showAddCard) {
+        AddPaymentMethodDialog(
+            isSaving = state.isSaving,
+            onDismiss = { showAddCard = false },
+            onAdd = { cardNumber, expiry ->
+                val digits = cardNumber.filter(Char::isDigit)
+                val last4 = digits.takeLast(4).ifBlank { "0000" }
+                settingsStateHolder.updatePaymentForm(
+                    PaymentMethodFormState(
+                        type = PaymentMethodType.CREDIT_CARD,
+                        maskedDetails = "Visa •••• $last4${expiry.trim().takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()}",
+                        isDefault = state.paymentMethods.isEmpty(),
+                    ),
+                )
+                scope.launch {
+                    settingsStateHolder.addPaymentMethod()
+                    showAddCard = false
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun PaymentMethodVisualCard(
+    method: PaymentMethodDTO,
+    isConfirmingDelete: Boolean,
+    onDelete: () -> Unit,
+    onCancelDelete: () -> Unit,
+    onConfirmDelete: () -> Unit,
+) {
+    SettingsActionCard(
+        title = "",
+        icon = Icons.Default.CreditCard,
+        iconTint = Primary500,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(190.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF0B1328)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(132.dp)
+                    .clip(RoundedCornerShape(bottomStart = 80.dp))
+                    .background(Color.White.copy(alpha = 0.10f)),
+            )
+            Text(
+                paymentBrand(method),
+                modifier = Modifier.align(Alignment.TopStart).padding(22.dp),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White.copy(alpha = 0.72f),
+                fontWeight = FontWeight.Black,
+                letterSpacing = MaterialTheme.typography.labelLarge.letterSpacing,
+            )
+            if (method.isDefault) {
+                StatusChip(
+                    text = "Default",
+                    tone = StatusTone.Success,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(18.dp),
+                )
+            }
+            Text(
+                "••••  ••••  ••••  ${paymentLast4(method)}",
+                modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 22.dp),
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+            )
+            Column(
+                modifier = Modifier.align(Alignment.BottomStart).padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text("EXPIRES", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.45f), fontWeight = FontWeight.Black)
+                Text(paymentExpiry(method), style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Black)
+            }
+        }
+        if (isConfirmingDelete) {
+            Text("Remove this payment method?", color = ErrorColor, fontWeight = FontWeight.Black)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                SecondaryButton(text = "Cancel", modifier = Modifier.weight(1f), onClick = onCancelDelete)
+                SecondaryButton(text = "Remove", modifier = Modifier.weight(1f), onClick = onConfirmDelete)
+            }
+        } else {
+            Surface(
+                modifier = Modifier
+                    .height(48.dp)
+                    .width(150.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onDelete),
+                shape = RoundedCornerShape(8.dp),
+                color = ErrorColor.copy(alpha = 0.10f),
+                border = BorderStroke(1.dp, ErrorColor.copy(alpha = 0.35f)),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = ErrorColor, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Remove", color = ErrorColor, fontWeight = FontWeight.Black)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddPaymentMethodTile(onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val tileColor by animateColorAsState(
+        targetValue = if (pressed) Primary500.copy(alpha = 0.11f) else SettingsPanel,
+    )
+    val tileBorder by animateColorAsState(
+        targetValue = if (pressed) Primary500.copy(alpha = 0.46f) else SettingsBorder,
+    )
+    val iconBackground by animateColorAsState(
+        targetValue = if (pressed) Primary500.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (pressed) Primary500 else AppMutedText,
+    )
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(190.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        shape = RoundedCornerShape(8.dp),
+        color = tileColor,
+        border = BorderStroke(1.dp, tileBorder),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(58.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(iconBackground),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = iconTint, modifier = Modifier.size(28.dp))
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("Add Payment Method", style = MaterialTheme.typography.titleMedium, color = SettingsText, fontWeight = FontWeight.Black)
+            Text("Visa, Mastercard, Mada", style = MaterialTheme.typography.bodyMedium, color = AppMutedText, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun AddPaymentMethodDialog(
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onAdd: (String, String) -> Unit,
+) {
+    var cardholder by remember { mutableStateOf("") }
+    var cardNumber by remember { mutableStateOf("") }
+    var expiry by remember { mutableStateOf("") }
+    var cvv by remember { mutableStateOf("") }
+    val canAdd = cardholder.isNotBlank() && cardNumber.filter(Char::isDigit).length >= 4 && expiry.isNotBlank() && cvv.isNotBlank()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = SettingsPanel,
+            border = BorderStroke(1.dp, SettingsBorder),
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CreditCard, contentDescription = null, tint = Primary500, modifier = Modifier.size(22.dp))
+                        Text("Add New Card", style = MaterialTheme.typography.titleMedium, color = SettingsText, fontWeight = FontWeight.Black)
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.ExpandMore, contentDescription = "Close", tint = AppMutedText)
+                    }
+                }
+                PaymentInputField("Cardholder Name", cardholder, "Name on card") { cardholder = it }
+                PaymentInputField("Card Number", cardNumber, "1234 5678 9012 3456", KeyboardType.Number) { cardNumber = it }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    PaymentInputField("Expiry Date", expiry, "MM/YY", KeyboardType.Number, Modifier.weight(1f)) { expiry = it }
+                    PaymentInputField("CVV", cvv, "123", KeyboardType.Number, Modifier.weight(1f)) { cvv = it }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    SecondaryButton(text = "Cancel", modifier = Modifier.weight(1f), onClick = onDismiss)
+                    PrimaryButton(
+                        text = if (isSaving) "Adding..." else "Add Card",
+                        modifier = Modifier.weight(1f),
+                        enabled = canAdd && !isSaving,
+                        onClick = { onAdd(cardNumber, expiry) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaymentInputField(
+    label: String,
+    value: String,
+    placeholder: String,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    modifier: Modifier = Modifier,
+    onChange: (String) -> Unit,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = AppMutedText, fontWeight = FontWeight.Black)
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = { Text(placeholder, color = AppMutedText) },
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            shape = RoundedCornerShape(8.dp),
+            colors = settingsTextFieldColors(),
+        )
+    }
+}
+
+private fun paymentBrand(method: PaymentMethodDTO): String {
+    val firstWord = method.maskedDetails.trim().substringBefore(' ').takeIf { it.isNotBlank() }
+    return firstWord ?: method.type.name.replace('_', ' ')
+}
+
+private fun paymentLast4(method: PaymentMethodDTO): String =
+    Regex("\\d{4}(?!.*\\d)").find(method.maskedDetails)?.value ?: "4444"
+
+private fun paymentExpiry(method: PaymentMethodDTO): String =
+    Regex("\\d{2}/\\d{2}").find(method.maskedDetails)?.value ?: "12/28"
 
 @Composable
 private fun AddressesSettingsSection(holder: SettingsStateHolder) {
