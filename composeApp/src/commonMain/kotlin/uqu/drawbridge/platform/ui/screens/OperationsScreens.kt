@@ -2666,107 +2666,646 @@ private fun ProductInlineNotice(
 @Composable
 internal fun PosMainScreen(
     posStateHolder: PosStateHolder,
+    onBack: () -> Unit,
     onShowMessage: (String) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val state = posStateHolder.state
-    var showCameraScanner by remember { mutableStateOf(false) }
 
-    ScreenSection(
-        title = "POS Scanner",
-        subtitle = "Use manual GTIN entry or the platform scanner fallback to decrement retailer inventory.",
-    ) {
-        AnimatedVisibility(visible = showCameraScanner) {
-            BarcodeScannerView(
-                onBarcodeScanned = { scannedValue ->
-                    showCameraScanner = false
-                    posStateHolder.updateBarcodeInput(scannedValue)
-                    coroutineScope.launch {
-                        val result = posStateHolder.scan(scannedValue)
-                        result.message?.let(onShowMessage)
-                    }
-                },
-                onClose = { showCameraScanner = false },
+    LaunchedEffect(Unit) {
+        posStateHolder.loadInitial()
+    }
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        AppPageHeader(
+            title = "POS Integration",
+            subtitle = "Configure API auth, webhooks, and sync event logs",
+            leading = {
+                PosSquareButton(icon = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", onClick = onBack)
+            },
+            action = {
+                PosIntegrationTabs(
+                    selectedTab = state.selectedTab,
+                    failedCount = state.failedEvents,
+                    onSelect = posStateHolder::selectTab,
+                )
+            },
+        )
+
+        state.errorMessage?.let { message ->
+            InventoryStatePanel(
+                label = if (message == ServerNotFoundMessage) "Offline" else "Issue",
+                title = if (message == ServerNotFoundMessage) "Server not found" else "POS unavailable",
+                message = message,
+                actionText = "Try again",
+                onAction = { coroutineScope.launch { posStateHolder.refresh() } },
             )
         }
 
-        AppCard {
-            StatusChip(text = "Manual entry ready", tone = StatusTone.Success)
+        when {
+            state.isLoading -> InventoryStatePanel(
+                label = "Loading",
+                title = "Loading POS integration",
+                message = "Fetching API credentials and sync events.",
+            )
+            state.selectedTab == PosIntegrationTab.SyncLogs -> PosSyncLogsContent(
+                state = state,
+                onRefresh = { coroutineScope.launch { posStateHolder.refreshEvents() } },
+            )
+            else -> PosSetupContent(
+                state = state,
+                posStateHolder = posStateHolder,
+                onShowMessage = onShowMessage,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PosSetupContent(
+    state: PosUiState,
+    posStateHolder: PosStateHolder,
+    onShowMessage: (String) -> Unit,
+) {
+    val coroutineScope = rememberCoroutineScope()
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
+        PosContractCard(
+            expanded = state.contractExpanded,
+            onToggle = posStateHolder::toggleContractExpanded,
+        )
+        PosCredentialsCard(
+            state = state,
+            onActiveChange = posStateHolder::updateActive,
+            onRotate = {
+                coroutineScope.launch {
+                    val result = posStateHolder.rotateApiKey()
+                    result.message?.let(onShowMessage)
+                }
+            },
+        )
+        PosWebhookCard(
+            state = state,
+            onWebhookEnabledChange = posStateHolder::updateWebhookEnabled,
+            onWebhookUrlChange = posStateHolder::updateWebhookUrl,
+            onWebhookSecretChange = posStateHolder::updateWebhookSecret,
+        )
+        PosPrimaryButton(
+            text = if (state.isSaving) "Saving..." else "Save Changes",
+            icon = Icons.Default.Save,
+            enabled = !state.isSaving,
+            onClick = {
+                coroutineScope.launch {
+                    val result = posStateHolder.saveConfig()
+                    result.message?.let(onShowMessage)
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun PosSyncLogsContent(
+    state: PosUiState,
+    onRefresh: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            PosMetricCard(value = state.totalEvents.toString(), label = "Total Events", tint = InventoryText, modifier = Modifier.weight(1f))
+            PosMetricCard(value = state.storedEvents.toString(), label = "Stored", tint = InventorySuccess, modifier = Modifier.weight(1f))
+            PosMetricCard(value = state.failedEvents.toString(), label = "Failed", tint = InventoryDanger, modifier = Modifier.weight(1f))
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Native iOS camera scanning remains behind the build-safe fallback until AVFoundation is wired without risking Kotlin/Native compilation.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = "Last 7 inbound and outbound\nsync events",
+                style = MaterialTheme.typography.bodyLarge,
+                color = InventoryMuted,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier.weight(1f),
             )
-            SecondaryButton(
-                text = if (showCameraScanner) "Hide camera fallback" else "Open scanner fallback",
-                onClick = { showCameraScanner = !showCameraScanner },
-            )
-            AppTextField(
-                value = state.barcodeInput,
-                onValueChange = posStateHolder::updateBarcodeInput,
-                label = "Barcode / GTIN",
-                keyboardType = KeyboardType.Number,
-            )
-            PrimaryButton(
-                text = if (state.isScanning) "Scanning..." else "Lookup and decrement",
-                enabled = state.barcodeInput.isNotBlank() && !state.isScanning,
-                onClick = {
-                    coroutineScope.launch {
-                        val result = posStateHolder.scan()
-                        result.message?.let(onShowMessage)
-                    }
-                },
+            PosSmallButton(
+                text = if (state.isRefreshingEvents) "Refreshing" else "Refresh",
+                icon = Icons.Default.Refresh,
+                onClick = onRefresh,
             )
         }
-
-        if (state.errorMessage != null) {
-            ErrorStateCard(title = "POS lookup failed", message = state.errorMessage)
-        }
-
-        state.lastResult?.let { result ->
-            val success = result.message == "OK"
-            AppCard {
-                StatusChip(
-                    text = if (success) "Scan successful" else "Scan failed",
-                    tone = if (success) StatusTone.Success else StatusTone.Error,
-                )
-                Text(
-                    text = result.productName.ifBlank { "No matched product" },
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Black,
-                )
-                Text(
-                    text = if (success) "Remaining stock: ${result.newStock}" else result.message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (success) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-
-        if (state.history.isEmpty()) {
-            EmptyStateCard(
-                title = "No scans yet",
-                message = "Successful and failed manual barcode lookups will appear here during this session.",
+        if (state.events.isEmpty()) {
+            InventoryStatePanel(
+                title = "No sync events",
+                message = "POS inventory events will appear here after the integration starts syncing.",
             )
         } else {
-            Text("Scan history", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            state.history.forEach { entry ->
-                AppCard {
-                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(entry.productName.ifBlank { entry.gtin }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text(
-                                if (entry.success) "Stock after scan: ${entry.newStock}" else entry.message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        StatusChip(text = if (entry.success) "OK" else "Failed", tone = if (entry.success) StatusTone.Success else StatusTone.Error)
-                    }
+            state.events.forEach { event ->
+                PosEventCard(event)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PosIntegrationTabs(
+    selectedTab: PosIntegrationTab,
+    failedCount: Int,
+    onSelect: (PosIntegrationTab) -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.06f),
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Row(
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PosTabButton(
+                label = "Setup",
+                icon = Icons.Default.Key,
+                selected = selectedTab == PosIntegrationTab.Setup,
+                modifier = Modifier.weight(1f),
+                onClick = { onSelect(PosIntegrationTab.Setup) },
+            )
+            PosTabButton(
+                label = "Sync Logs",
+                icon = Icons.Default.Sync,
+                badge = failedCount.takeIf { it > 0 },
+                selected = selectedTab == PosIntegrationTab.SyncLogs,
+                modifier = Modifier.weight(1f),
+                onClick = { onSelect(PosIntegrationTab.SyncLogs) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PosTabButton(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    badge: Int? = null,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = if (selected) Color.White.copy(alpha = 0.10f) else Color.Transparent,
+        border = if (selected) BorderStroke(1.dp, InventoryBorder) else null,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = if (selected) InventoryText else InventoryMuted, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(label, style = MaterialTheme.typography.titleSmall, color = if (selected) InventoryText else InventoryMuted, fontWeight = FontWeight.Black)
+            badge?.let {
+                Spacer(modifier = Modifier.width(8.dp))
+                Surface(shape = RoundedCornerShape(999.dp), color = InventoryDanger) {
+                    Text(
+                        text = it.toString(),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun PosContractCard(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    PosSectionCard(
+        title = "Integration Contract",
+        icon = Icons.Default.Code,
+        trailing = {
+            Icon(
+                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = InventoryMuted,
+            )
+        },
+        onClickHeader = onToggle,
+    ) {
+        AnimatedVisibility(visible = expanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Use X-API-Key auth. Inbound payload retailerId must match this page retailer scope.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InventoryMuted,
+                )
+                PosContractBlock(
+                    title = "Inbound (POS -> Platform)",
+                    tint = Color(0xFF60A5FA),
+                    lines = listOf(
+                        "Endpoint" to "POST /api/pos/webhooks/inventory.changed",
+                        "Required header" to "X-API-Key: pos_live_...",
+                        "Required fields" to "eventId, retailerId, gtin, changeType, quantityDelta or quantityAfter",
+                    ),
+                )
+                PosContractBlock(
+                    title = "Outbound (Platform -> POS)",
+                    tint = InventorySuccess,
+                    lines = listOf(
+                        "Webhook event" to "inventory.changed",
+                        "Webhook channel" to "GET /api/pos/inventory/events",
+                        "Change message" to "Manual + order-complete inventory changes",
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PosCredentialsCard(
+    state: PosUiState,
+    onActiveChange: (Boolean) -> Unit,
+    onRotate: () -> Unit,
+) {
+    val config = state.config
+    PosSectionCard(
+        title = "API Credentials",
+        icon = Icons.Default.Key,
+        iconTint = InventoryWarning,
+        trailing = {
+            PosSmallButton(
+                text = if (state.isRotating) "Rotating" else if (config?.integrationExists == true) "Rotate Key" else "Generate Key",
+                icon = Icons.Default.Refresh,
+                onClick = onRotate,
+            )
+        },
+    ) {
+        PosToggleRow(
+            title = "Active",
+            subtitle = if (state.isActive) "POS requests are accepted" else "POS requests are paused",
+            checked = state.isActive,
+            onCheckedChange = onActiveChange,
+        )
+        PosReadOnlyField(
+            label = "API Key",
+            value = posApiKeyPreview(config, state.generatedKey),
+            trailingIcon = Icons.Default.Visibility,
+        )
+        PosReadOnlyField(
+            label = "Router ID",
+            value = config?.retailerId?.ifBlank { "-" } ?: "-",
+            trailingIcon = Icons.Default.ContentCopy,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+            PosInfoPair("Created", formatAuditDateTime(config?.createdAt.orEmpty()), Modifier.weight(1f))
+            PosInfoPair("Last Rotated", formatAuditDateTime(config?.rotatedAt.orEmpty()), Modifier.weight(1f))
+        }
+        state.generatedKey?.let { generated ->
+            PosGeneratedKeyNotice(apiKey = generated.apiKey)
+        }
+    }
+}
+
+@Composable
+private fun PosWebhookCard(
+    state: PosUiState,
+    onWebhookEnabledChange: (Boolean) -> Unit,
+    onWebhookUrlChange: (String) -> Unit,
+    onWebhookSecretChange: (String) -> Unit,
+) {
+    PosSectionCard(title = "Outbound Webhook", icon = Icons.Default.Sync, iconTint = Color(0xFF60A5FA)) {
+        PosToggleRow(
+            title = "Enable webhooks",
+            subtitle = "POST events to your endpoint",
+            checked = state.webhookEnabledDraft,
+            onCheckedChange = onWebhookEnabledChange,
+        )
+        if (state.webhookEnabledDraft) {
+            ProductFormInput(
+                label = "Webhook URL",
+                value = state.webhookUrlDraft,
+                onValueChange = onWebhookUrlChange,
+                placeholder = "https://pos.example.com/webhooks/inventory",
+                keyboardType = KeyboardType.Uri,
+            )
+            ProductFormInput(
+                label = "Webhook Secret",
+                value = state.webhookSecretDraft,
+                onValueChange = onWebhookSecretChange,
+                placeholder = if (state.config?.webhookSecretConfigured == true) "Keep current secret" else "Set signing secret",
+            )
+        } else {
+            PosReadOnlyField(
+                label = "Pull endpoint",
+                value = "GET /api/pos/inventory/events",
+                trailingIcon = Icons.Default.ContentCopy,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PosEventCard(event: PosIntegrationEventLogDTO) {
+    val delta = event.changeAmount ?: event.quantityAfter?.let { after ->
+        event.quantityBefore?.let { before -> after - before }
+    }
+    val deltaTint = when {
+        (delta ?: 0) < 0 -> InventoryDanger
+        (delta ?: 0) > 0 -> InventorySuccess
+        else -> InventoryMuted
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    PosMiniChip(text = event.direction.lowercase().replaceFirstChar { it.uppercase() }, tint = Color(0xFF60A5FA), icon = Icons.Default.Send)
+                    PosMiniChip(text = event.status, tint = if (event.status.equals("FAILED", true)) InventoryDanger else InventorySuccess, icon = Icons.Default.CheckCircle)
+                }
+                Text(
+                    text = delta?.let(::formatSignedAmount).orEmpty(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = deltaTint,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+            Text(event.eventType, style = MaterialTheme.typography.titleSmall, color = InventoryText, fontWeight = FontWeight.Black)
+            Text(event.eventId, style = MaterialTheme.typography.bodySmall, color = HistorySoftText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(formatAuditDateTime(event.eventTime), style = MaterialTheme.typography.bodySmall, color = InventoryMuted, fontWeight = FontWeight.SemiBold)
+                Text("•", color = HistorySoftText)
+                Text("GTIN: ${event.gtin ?: "-"}", style = MaterialTheme.typography.bodySmall, color = InventoryMuted, fontWeight = FontWeight.SemiBold)
+            }
+            event.lastError?.takeIf { it.isNotBlank() }?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = InventoryDanger, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PosSectionCard(
+    title: String,
+    icon: ImageVector,
+    iconTint: Color = InventoryMuted,
+    trailing: (@Composable () -> Unit)? = null,
+    onClickHeader: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (onClickHeader != null) Modifier.clickable(onClick = onClickHeader) else Modifier)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Surface(shape = RoundedCornerShape(8.dp), color = iconTint.copy(alpha = 0.14f)) {
+                        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.padding(11.dp).size(22.dp))
+                    }
+                    Text(title, style = MaterialTheme.typography.titleMedium, color = InventoryText, fontWeight = FontWeight.Black)
+                }
+                trailing?.invoke()
+            }
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(InventorySoftLine))
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = content)
+        }
+    }
+}
+
+@Composable
+private fun PosContractBlock(
+    title: String,
+    tint: Color,
+    lines: List<Pair<String, String>>,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.035f),
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = InventoryText, fontWeight = FontWeight.Black)
+            lines.forEach { (label, value) ->
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = InventoryMuted, fontWeight = FontWeight.Black)
+                    Text(value, style = MaterialTheme.typography.bodyMedium, color = InventoryText, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PosToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = HistoryPanel,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Row(modifier = Modifier.padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = InventoryText, fontWeight = FontWeight.Black)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = InventoryMuted)
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = InventorySuccess,
+                    uncheckedThumbColor = Color.White,
+                    uncheckedTrackColor = Color(0xFF64748B),
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PosReadOnlyField(
+    label: String,
+    value: String,
+    trailingIcon: ImageVector,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = InventoryMuted, fontWeight = FontWeight.Black)
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            color = Color.White.copy(alpha = 0.045f),
+            border = BorderStroke(1.dp, InventoryBorder),
+        ) {
+            Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(value, style = MaterialTheme.typography.bodyMedium, color = InventoryText, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Icon(trailingIcon, contentDescription = null, tint = InventoryMuted, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PosInfoPair(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = InventoryMuted, fontWeight = FontWeight.Black)
+        Text(value.ifBlank { "Never" }, style = MaterialTheme.typography.bodyMedium, color = InventoryText, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun PosGeneratedKeyNotice(apiKey: String) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = InventoryWarning.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, InventoryWarning.copy(alpha = 0.28f)),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Shown once. Save this key now.", style = MaterialTheme.typography.labelLarge, color = InventoryWarning, fontWeight = FontWeight.Black)
+            Text(apiKey, style = MaterialTheme.typography.bodySmall, color = InventoryText, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun PosMetricCard(value: String, label: String, tint: Color, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.height(88.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = InventoryCardBg,
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text(value, style = MaterialTheme.typography.titleLarge, color = tint, fontWeight = FontWeight.Black)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = InventoryMuted, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+private fun PosMiniChip(
+    text: String,
+    tint: Color,
+    icon: ImageVector? = null,
+) {
+    Surface(shape = RoundedCornerShape(8.dp), color = tint.copy(alpha = 0.12f), border = BorderStroke(1.dp, tint.copy(alpha = 0.34f))) {
+        Row(modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+            icon?.let { Icon(it, contentDescription = null, tint = tint, modifier = Modifier.size(14.dp)) }
+            Text(text, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+private fun PosSmallButton(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.045f),
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = InventoryMuted, modifier = Modifier.size(17.dp))
+            Text(text, style = MaterialTheme.typography.labelLarge, color = InventoryText, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+private fun PosPrimaryButton(
+    text: String,
+    icon: ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = if (enabled) InventorySuccess else InventorySuccess.copy(alpha = 0.45f),
+    ) {
+        Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(text, style = MaterialTheme.typography.titleMedium, color = Color.White, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+private fun PosSquareButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .size(58.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.045f),
+        border = BorderStroke(1.dp, InventoryBorder),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = contentDescription, tint = InventoryText, modifier = Modifier.size(25.dp))
+        }
+    }
+}
+
+@Composable
+private fun PosStatusPill(active: Boolean) {
+    val tint = if (active) InventorySuccess else InventoryMuted
+    Surface(shape = RoundedCornerShape(999.dp), color = tint.copy(alpha = 0.12f), border = BorderStroke(1.dp, tint.copy(alpha = 0.34f))) {
+        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(7.dp).background(tint, RoundedCornerShape(999.dp)))
+            Text(if (active) "Active" else "Disabled", style = MaterialTheme.typography.labelLarge, color = tint, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+private fun posApiKeyPreview(
+    config: PosIntegrationConfigDTO?,
+    generatedKey: PosIntegrationApiKeyRotateResponse?,
+): String {
+    generatedKey?.apiKey?.let { return it }
+    val prefix = config?.apiKeyPrefix?.takeIf { it.isNotBlank() } ?: return "Not generated"
+    return "pos_live_$prefix••••••••••"
 }
 
 @Composable

@@ -167,6 +167,51 @@ class MobileAuthApi(
         )
     }
 
+    suspend fun fetchPosIntegrationConfig(): PosIntegrationConfigDTO {
+        val response = authorizedGet("/retailer/pos-integration")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(PosIntegrationConfigDTO.serializer(), body)
+    }
+
+    suspend fun updatePosIntegrationConfig(
+        request: PosIntegrationConfigUpdateRequest,
+    ): PosIntegrationConfigDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/retailer/pos-integration")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(PosIntegrationConfigDTO.serializer(), body)
+    }
+
+    suspend fun rotatePosIntegrationApiKey(): PosIntegrationApiKeyRotateResponse {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/retailer/pos-integration/api-key/rotate")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(PosIntegrationApiKeyRotateResponse.serializer(), body)
+    }
+
+    suspend fun fetchPosIntegrationEventLogs(limit: Int = 100): List<PosIntegrationEventLogDTO> {
+        val token = requireBearerToken()
+        val response = client.get(buildUrl("/retailer/pos-integration/events")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("limit", limit.coerceIn(1, 100))
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
     suspend fun fetchInventoryByRetailer(retailerId: String): List<InventoryItemDTO> {
         val response = authorizedGet("/inventory/retailer/$retailerId")
         val body = response.bodyAsText()

@@ -11,7 +11,10 @@ import uqu.drawbridge.platform.InventoryItemDTO
 import uqu.drawbridge.platform.InventoryStatus
 import uqu.drawbridge.platform.MarketplaceProductQuery
 import uqu.drawbridge.platform.MobileAuthApi
-import uqu.drawbridge.platform.PosScanResponse
+import uqu.drawbridge.platform.PosIntegrationApiKeyRotateResponse
+import uqu.drawbridge.platform.PosIntegrationConfigDTO
+import uqu.drawbridge.platform.PosIntegrationConfigUpdateRequest
+import uqu.drawbridge.platform.PosIntegrationEventLogDTO
 import uqu.drawbridge.platform.ProductDTO
 import uqu.drawbridge.platform.ProductImageResponse
 import uqu.drawbridge.platform.ScheduleType
@@ -1036,21 +1039,40 @@ internal class ProductManagementStateHolder(
     }
 }
 
-internal data class PosScanHistoryEntry(
-    val gtin: String,
-    val productName: String,
-    val newStock: Int,
-    val success: Boolean,
-    val message: String,
-)
+internal enum class PosIntegrationTab {
+    Setup,
+    SyncLogs,
+}
 
 internal data class PosUiState(
-    val barcodeInput: String = "",
-    val lastResult: PosScanResponse? = null,
-    val history: List<PosScanHistoryEntry> = emptyList(),
-    val isScanning: Boolean = false,
+    val hasLoaded: Boolean = false,
+    val isLoading: Boolean = false,
+    val isSaving: Boolean = false,
+    val isRotating: Boolean = false,
+    val isRefreshingEvents: Boolean = false,
+    val selectedTab: PosIntegrationTab = PosIntegrationTab.Setup,
+    val contractExpanded: Boolean = false,
+    val config: PosIntegrationConfigDTO? = null,
+    val events: List<PosIntegrationEventLogDTO> = emptyList(),
+    val statusDraft: String = "DISABLED",
+    val webhookEnabledDraft: Boolean = false,
+    val webhookUrlDraft: String = "",
+    val webhookSecretDraft: String = "",
+    val generatedKey: PosIntegrationApiKeyRotateResponse? = null,
     val errorMessage: String? = null,
-)
+) {
+    val isActive: Boolean
+        get() = statusDraft == "ACTIVE"
+
+    val totalEvents: Int
+        get() = events.size
+
+    val storedEvents: Int
+        get() = events.count { it.status.equals("STORED", ignoreCase = true) || it.status.equals("DELIVERED", ignoreCase = true) }
+
+    val failedEvents: Int
+        get() = events.count { it.status.equals("FAILED", ignoreCase = true) || it.lastError != null }
+}
 
 internal class PosStateHolder(
     private val api: MobileAuthApi,
@@ -1061,47 +1083,170 @@ internal class PosStateHolder(
 
     val isEnabled: Boolean = session.user.role == UserRole.RETAILER
 
-    fun updateBarcodeInput(value: String) {
-        state = state.copy(barcodeInput = value.filter { it.isDigit() })
+    suspend fun loadInitial() {
+        if (state.hasLoaded || state.isLoading) return
+        refresh()
     }
 
-    suspend fun scan(gtin: String = state.barcodeInput): AuthActionResult {
-        val normalized = gtin.trim()
+    suspend fun refresh() {
         if (!isEnabled) {
-            return AuthActionResult(success = false, message = "POS scanning is available for retailer accounts.")
+            state = state.copy(
+                hasLoaded = true,
+                isLoading = false,
+                errorMessage = "POS integration is available for retailer accounts.",
+            )
+            return
         }
-        if (normalized.isBlank()) {
-            return AuthActionResult(success = false, message = "Enter a barcode or GTIN.")
-        }
-
-        state = state.copy(isScanning = true, errorMessage = null, lastResult = null)
-        return runCatching {
-            api.scanBarcode(retailerId = session.user.id, gtin = normalized)
+        state = state.copy(
+            isLoading = !state.hasLoaded,
+            errorMessage = null,
+        )
+        runCatching {
+            val config = api.fetchPosIntegrationConfig()
+            val events = api.fetchPosIntegrationEventLogs(limit = 7)
+            config to events
         }.fold(
-            onSuccess = { response ->
-                val success = response.message == "OK"
+            onSuccess = { (config, events) ->
                 state = state.copy(
-                    barcodeInput = if (success) "" else state.barcodeInput,
-                    lastResult = response,
-                    isScanning = false,
-                    history = listOf(
-                        PosScanHistoryEntry(
-                            gtin = normalized,
-                            productName = response.productName,
-                            newStock = response.newStock,
-                            success = success,
-                            message = response.message,
-                        ),
-                    ) + state.history,
-                )
-                AuthActionResult(
-                    success = success,
-                    message = if (success) "Inventory updated from barcode scan." else response.message,
+                    hasLoaded = true,
+                    isLoading = false,
+                    config = config,
+                    events = events,
+                    statusDraft = config.status.ifBlank { "DISABLED" },
+                    webhookEnabledDraft = config.webhookEnabled,
+                    webhookUrlDraft = config.webhookUrl.orEmpty(),
+                    webhookSecretDraft = "",
+                    errorMessage = null,
                 )
             },
             onFailure = { error ->
-                val message = userReadableMessage(error, "Barcode lookup failed.")
-                state = state.copy(isScanning = false, errorMessage = message)
+                state = state.copy(
+                    hasLoaded = true,
+                    isLoading = false,
+                    errorMessage = userReadableMessage(error, "Unable to load POS integration."),
+                )
+            },
+        )
+    }
+
+    suspend fun refreshEvents() {
+        if (!isEnabled || state.isRefreshingEvents) return
+        state = state.copy(isRefreshingEvents = true, errorMessage = null)
+        runCatching { api.fetchPosIntegrationEventLogs(limit = 7) }.fold(
+            onSuccess = { events ->
+                state = state.copy(isRefreshingEvents = false, events = events)
+            },
+            onFailure = { error ->
+                state = state.copy(
+                    isRefreshingEvents = false,
+                    errorMessage = userReadableMessage(error, "Unable to refresh POS events."),
+                )
+            },
+        )
+    }
+
+    fun selectTab(tab: PosIntegrationTab) {
+        state = state.copy(selectedTab = tab)
+    }
+
+    fun toggleContractExpanded() {
+        state = state.copy(contractExpanded = !state.contractExpanded)
+    }
+
+    fun updateActive(enabled: Boolean) {
+        state = state.copy(statusDraft = if (enabled) "ACTIVE" else "DISABLED")
+    }
+
+    fun updateWebhookEnabled(enabled: Boolean) {
+        state = state.copy(webhookEnabledDraft = enabled)
+    }
+
+    fun updateWebhookUrl(value: String) {
+        state = state.copy(webhookUrlDraft = value)
+    }
+
+    fun updateWebhookSecret(value: String) {
+        state = state.copy(webhookSecretDraft = value)
+    }
+
+    suspend fun rotateApiKey(): AuthActionResult {
+        if (!isEnabled) {
+            return AuthActionResult(success = false, message = "POS integration is available for retailer accounts.")
+        }
+        if (state.isRotating) {
+            return AuthActionResult(success = false, message = null)
+        }
+        state = state.copy(isRotating = true, errorMessage = null, generatedKey = null)
+        return runCatching {
+            api.rotatePosIntegrationApiKey()
+        }.fold(
+            onSuccess = { rotated ->
+                val config = state.config?.copy(
+                    integrationExists = true,
+                    status = state.statusDraft,
+                    apiKeyPrefix = rotated.apiKeyPrefix,
+                    rotatedAt = rotated.rotatedAt,
+                ) ?: PosIntegrationConfigDTO(
+                    retailerId = rotated.retailerId,
+                    integrationExists = true,
+                    status = state.statusDraft,
+                    apiKeyPrefix = rotated.apiKeyPrefix,
+                    webhookEnabled = state.webhookEnabledDraft,
+                    webhookUrl = state.webhookUrlDraft.takeIf { it.isNotBlank() },
+                    webhookSecretConfigured = false,
+                    createdAt = null,
+                    rotatedAt = rotated.rotatedAt,
+                )
+                state = state.copy(
+                    isRotating = false,
+                    config = config,
+                    generatedKey = rotated,
+                    statusDraft = config.status.ifBlank { "ACTIVE" },
+                    errorMessage = null,
+                )
+                AuthActionResult(success = true, message = "API key generated. Save it now; it will only be shown once.")
+            },
+            onFailure = { error ->
+                val message = userReadableMessage(error, "Unable to rotate POS API key.")
+                state = state.copy(isRotating = false, errorMessage = message)
+                AuthActionResult(success = false, message = message)
+            },
+        )
+    }
+
+    suspend fun saveConfig(): AuthActionResult {
+        if (!isEnabled) {
+            return AuthActionResult(success = false, message = "POS integration is available for retailer accounts.")
+        }
+        if (state.config?.integrationExists != true) {
+            return AuthActionResult(success = false, message = "Generate an API key before saving POS settings.")
+        }
+        state = state.copy(isSaving = true, errorMessage = null)
+        return runCatching {
+            api.updatePosIntegrationConfig(
+                PosIntegrationConfigUpdateRequest(
+                    status = state.statusDraft,
+                    webhookEnabled = state.webhookEnabledDraft,
+                    webhookUrl = state.webhookUrlDraft.trim().takeIf { it.isNotBlank() },
+                    webhookSecret = state.webhookSecretDraft.trim().takeIf { it.isNotBlank() },
+                ),
+            )
+        }.fold(
+            onSuccess = { config ->
+                state = state.copy(
+                    isSaving = false,
+                    config = config,
+                    statusDraft = config.status.ifBlank { "DISABLED" },
+                    webhookEnabledDraft = config.webhookEnabled,
+                    webhookUrlDraft = config.webhookUrl.orEmpty(),
+                    webhookSecretDraft = "",
+                    errorMessage = null,
+                )
+                AuthActionResult(success = true, message = "POS settings saved.")
+            },
+            onFailure = { error ->
+                val message = userReadableMessage(error, "Unable to save POS settings.")
+                state = state.copy(isSaving = false, errorMessage = message)
                 AuthActionResult(success = false, message = message)
             },
         )

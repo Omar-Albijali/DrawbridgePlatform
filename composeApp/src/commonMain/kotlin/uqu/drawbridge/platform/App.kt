@@ -852,6 +852,7 @@ private fun MainHost(
                             posContent = {
                                 PosMainScreen(
                                     posStateHolder = posStateHolder,
+                                    onBack = { onActiveMoreDestinationChange(null) },
                                     onShowMessage = showMessage,
                                 )
                             },
