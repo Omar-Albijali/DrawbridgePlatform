@@ -28,12 +28,12 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
     iosArm64()
     iosSimulatorArm64()
-    
+
     jvm()
-    
+
     js {
         outputModuleName = "shared"
         browser()
@@ -43,7 +43,7 @@ kotlin {
             target = "es2015"
         }
     }
-    
+
     sourceSets {
         commonMain.dependencies {
             implementation(libs.ktor.client.core)

@@ -1,5 +1,5 @@
 import type { Order, OrderItem } from '../types';
-import { cartService } from '../services/cartService';
+import type { Product } from '../types';
 
 export interface ReorderToCartResult {
   addedItems: number;
@@ -7,19 +7,20 @@ export interface ReorderToCartResult {
   failedProductNames: string[];
 }
 
-export async function reorderOrderToCart(retailerId: string, order: Order): Promise<ReorderToCartResult> {
+export async function reorderOrderToCart(
+    addToCart: (product: Product, quantity?: number) => Promise<void>,
+    order: Order,
+): Promise<ReorderToCartResult> {
   const orderItems = (order.items ?? []).filter((item: OrderItem) => item.quantity > 0);
 
   if (orderItems.length === 0) {
-    return {
-      addedItems: 0,
-      failedItems: 0,
-      failedProductNames: [],
-    };
+    return { addedItems: 0, failedItems: 0, failedProductNames: [] };
   }
 
   const results = await Promise.allSettled(
-    orderItems.map((item: OrderItem) => cartService.addItem(retailerId, item.productId, item.quantity)),
+      orderItems.map((item: OrderItem) =>
+          addToCart({ id: item.productId, name: item.productName } as Product, item.quantity),
+      ),
   );
 
   const failedProductNames: string[] = [];
@@ -30,7 +31,6 @@ export async function reorderOrderToCart(retailerId: string, order: Order): Prom
       addedItems += 1;
       return;
     }
-
     failedProductNames.push(orderItems[index].productName);
   });
 

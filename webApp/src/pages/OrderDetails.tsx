@@ -1,26 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, CheckCircle2, Copy, Download, MapPin, Package, Truck } from 'lucide-react';
+import { ArrowLeft, Calendar, Copy, Download, MapPin, Package, Truck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { orderService } from '../services/orderService';
 import { reorderOrderToCart } from '../utils/reorderOrder';
-import { enumToken, formatCurrency, formatDate, formatDateTime, orderStatusLabel, shippingMethodLabel } from '../i18n/display';
+import { formatCurrency, formatDate, formatDateTime, orderStatusLabel, shippingMethodLabel } from '../i18n/display';
 import { UserRole, type Order, type OrderItem } from '../types';
+import { useCart } from '../contexts/CartContext';
 
 export default function OrderDetails(): JSX.Element {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const roleName = enumToken(user?.role);
-  const isRetailer = roleName === UserRole.RETAILER.name;
+  const isWholesaler = user?.role === UserRole.WHOLESALER;
 
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isReordering, setIsReordering] = useState(false);
-  const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
+  const { addToCart } = useCart();
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -59,13 +59,13 @@ export default function OrderDetails(): JSX.Element {
   }
 
   const handleReorder = async (): Promise<void> => {
-    if (!user?.id || !isRetailer || isReordering) {
+    if (!user?.id || isWholesaler || isReordering) {
       return;
     }
 
     setIsReordering(true);
     try {
-      const { addedItems, failedItems, failedProductNames } = await reorderOrderToCart(user.id, order);
+      const { addedItems, failedItems, failedProductNames } = await reorderOrderToCart(addToCart, order);
 
       if (addedItems === 0 && failedItems === 0) {
         alert(t('orders.noItemsToReorder'));
@@ -95,30 +95,6 @@ export default function OrderDetails(): JSX.Element {
     }
   };
 
-  const handleConfirmDelivery = async (): Promise<void> => {
-    if (!order || !isRetailer || isConfirmingDelivery) {
-      return;
-    }
-
-    if (!window.confirm(t('orders.confirmDeliveryPrompt'))) {
-      return;
-    }
-
-    setIsConfirmingDelivery(true);
-    try {
-      const updatedOrder = await orderService.confirmDelivery(order.id);
-      setOrder(updatedOrder);
-      alert(t('orders.deliveryConfirmed'));
-    } catch (error) {
-      console.error('Failed to confirm delivery', error);
-      alert(t('orders.confirmDeliveryFailed'));
-    } finally {
-      setIsConfirmingDelivery(false);
-    }
-  };
-
-  const canConfirmDelivery = isRetailer && enumToken(order.status) === 'SHIPPED';
-
   return (
     <PageShell
       title={t('orders.detail.title', { id: order.id })}
@@ -134,9 +110,9 @@ export default function OrderDetails(): JSX.Element {
           </button>
           <button
             onClick={() => void handleReorder()}
-            disabled={!isRetailer || isReordering}
+            disabled={isWholesaler || isReordering}
             className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
-              !isRetailer || isReordering
+              isWholesaler || isReordering
                 ? 'border-gray-100 text-gray-400 cursor-not-allowed'
                 : 'border-gray-200 text-navy-600 hover:bg-gray-50'
             }`}
@@ -144,16 +120,6 @@ export default function OrderDetails(): JSX.Element {
             <Copy className="w-4 h-4" />
             {isReordering ? t('orders.reordering') : t('orders.reorder')}
           </button>
-          {canConfirmDelivery && (
-            <button
-              onClick={() => void handleConfirmDelivery()}
-              disabled={isConfirmingDelivery}
-              className="flex items-center gap-2 px-4 py-2 border border-green-200 rounded-lg text-green-700 hover:bg-green-50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              {isConfirmingDelivery ? t('orders.confirmingDelivery') : t('orders.confirmDelivery')}
-            </button>
-          )}
           <button
   onClick={() => {
     const printWindow = window.open('', '_blank');
