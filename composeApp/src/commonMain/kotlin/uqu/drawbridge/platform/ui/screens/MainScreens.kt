@@ -221,10 +221,6 @@ internal fun AccountMainScreen(
                 onValueChange = { settingsStateHolder.updateProfile(form.copy(commercialRegister = it)) },
             )
         }
-        AccountManagementCard(
-            isRetailer = isRetailer,
-            onOpenSettingsSection = onOpenSettingsSection,
-        )
         AccountSignOutButton(onLogout = onLogout)
         Text(
             "Drawbridge Platform · v1.0.0",
@@ -560,7 +556,7 @@ private fun AccountTextField(
 }
 
 @Composable
-private fun AccountManagementCard(
+internal fun AccountManagementCard(
     isRetailer: Boolean,
     onOpenSettingsSection: (SettingsSection) -> Unit,
 ) {

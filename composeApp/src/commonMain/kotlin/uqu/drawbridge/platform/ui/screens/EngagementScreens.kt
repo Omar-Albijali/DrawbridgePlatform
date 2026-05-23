@@ -30,11 +30,14 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Schedule
@@ -76,6 +79,7 @@ import kotlinx.coroutines.launch
 import uqu.drawbridge.platform.AddressResponseDto
 import uqu.drawbridge.platform.NotificationChannel
 import uqu.drawbridge.platform.NotificationDTO
+import uqu.drawbridge.platform.NotificationPreferenceDTO
 import uqu.drawbridge.platform.NotificationPreferenceKey
 import uqu.drawbridge.platform.NotificationType
 import uqu.drawbridge.platform.OrderStatus
@@ -1135,11 +1139,19 @@ internal fun SettingsMainScreen(
     onBack: (() -> Unit)? = null,
 ) {
     val state = settingsStateHolder.state
-    val scope = rememberCoroutineScope()
     val availableSections = remember(state.user.role) {
-        SettingsSection.entries.filter { section ->
-            state.user.role == UserRole.RETAILER ||
-                section !in listOf(SettingsSection.Addresses, SettingsSection.Payments)
+        if (state.user.role == UserRole.RETAILER) {
+            listOf(
+                SettingsSection.Security,
+                SettingsSection.Payments,
+                SettingsSection.Addresses,
+                SettingsSection.Notifications,
+            )
+        } else {
+            listOf(
+                SettingsSection.Security,
+                SettingsSection.Notifications,
+            )
         }
     }
     val selectedSection = if (state.selectedSection in availableSections) {
@@ -1155,7 +1167,15 @@ internal fun SettingsMainScreen(
     if (selectedSection == SettingsSection.Security) {
         LoginSecuritySettingsScreen(
             settingsStateHolder = settingsStateHolder,
-            onBack = onBack,
+            onBack = { settingsStateHolder.selectSection(SettingsSection.Profile) },
+        )
+        return
+    }
+
+    if (selectedSection == SettingsSection.Addresses) {
+        AddressManagementSettingsScreen(
+            settingsStateHolder = settingsStateHolder,
+            onBack = { settingsStateHolder.selectSection(SettingsSection.Profile) },
         )
         return
     }
@@ -1163,57 +1183,29 @@ internal fun SettingsMainScreen(
     if (selectedSection == SettingsSection.Payments) {
         PaymentMethodsSettingsScreen(
             settingsStateHolder = settingsStateHolder,
-            onBack = onBack,
+            onBack = { settingsStateHolder.selectSection(SettingsSection.Profile) },
         )
         return
     }
 
-    ScreenSection(
-        title = "Settings",
-        subtitle = if (state.user.role == UserRole.RETAILER) {
-            "Manage profile, security, addresses, payments, and preferences."
-        } else {
-            "Manage profile, security, and notification preferences."
-        },
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            availableSections.chunked(2).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    row.forEach { section ->
-                        FilterChip(
-                            modifier = Modifier.weight(1f),
-                            selected = selectedSection == section,
-                            onClick = { settingsStateHolder.selectSection(section) },
-                            label = { Text(section.name) },
-                        )
-                    }
-                    if (row.size == 1) {
-                        Column(modifier = Modifier.weight(1f)) {}
-                    }
-                }
-            }
-        }
-        state.errorMessage?.let { ErrorCard(it) { scope.launch { settingsStateHolder.load() } } }
-        state.successMessage?.let { SuccessCard(it) }
-        if (state.isLoading) {
-            LoadingStateCard(title = "Loading settings", message = "Fetching account details.")
-            return@ScreenSection
-        }
-        if (state.errorMessage != null && state.profileForm == ProfileFormState()) {
-            SecondaryButton(text = "Retry settings", onClick = { scope.launch { settingsStateHolder.load() } })
-            return@ScreenSection
-        }
-        when (selectedSection) {
-            SettingsSection.Profile -> ProfileSettingsSection(settingsStateHolder)
-            SettingsSection.Security -> SecuritySettingsSection(settingsStateHolder)
-            SettingsSection.Addresses -> AddressesSettingsSection(settingsStateHolder)
-            SettingsSection.Payments -> PaymentsSettingsSection(settingsStateHolder)
-            SettingsSection.Notifications -> NotificationPreferencesSection(settingsStateHolder)
-        }
-        AppCard {
-            Text("Session", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            SecondaryButton(text = "Sign out", onClick = onLogout)
-        }
+    if (selectedSection == SettingsSection.Notifications) {
+        NotificationPreferencesSettingsScreen(
+            settingsStateHolder = settingsStateHolder,
+            onBack = { settingsStateHolder.selectSection(SettingsSection.Profile) },
+        )
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AppPageHeader(
+            title = "Settings",
+            subtitle = "App configuration",
+            leading = onBack?.let { { SupportBackSquare(onClick = it) } },
+        )
+        AccountManagementCard(
+            isRetailer = state.user.role == UserRole.RETAILER,
+            onOpenSettingsSection = settingsStateHolder::selectSection,
+        )
     }
 }
 
@@ -1428,6 +1420,578 @@ private fun settingsTextFieldColors() = TextFieldDefaults.colors(
     unfocusedTextColor = SettingsText,
     disabledTextColor = AppMutedText,
 )
+
+@Composable
+private fun AddressManagementSettingsScreen(
+    settingsStateHolder: SettingsStateHolder,
+    onBack: (() -> Unit)?,
+) {
+    val state = settingsStateHolder.state
+    val scope = rememberCoroutineScope()
+    var showAddressForm by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AppPageHeader(
+            title = "Address Management",
+            subtitle = "Manage your shipping and billing addresses",
+            leading = onBack?.let { { SupportBackSquare(onClick = it) } },
+            trailing = {
+                SettingsHeaderActionButton(
+                    text = "Add",
+                    icon = Icons.Default.Add,
+                    onClick = {
+                        settingsStateHolder.startAddAddress()
+                        showAddressForm = true
+                    },
+                )
+            },
+        )
+        state.errorMessage?.let { ErrorCard(it) { scope.launch { settingsStateHolder.load() } } }
+        state.successMessage?.let { SuccessCard(it) }
+        if (state.isLoading) {
+            LoadingStateCard(title = "Loading addresses", message = "Fetching saved addresses.")
+        } else if (state.addresses.isEmpty()) {
+            EmptyStateCard(title = "No addresses", message = "Add a delivery address to use during checkout.")
+        } else {
+            state.addresses.forEachIndexed { index, address ->
+                AddressManagementCard(
+                    address = address,
+                    isDefault = index == 0,
+                    isConfirmingDelete = state.pendingDeleteAddressId == address.id,
+                    onEdit = {
+                        settingsStateHolder.startEditAddress(address)
+                        showAddressForm = true
+                    },
+                    onDelete = { settingsStateHolder.requestDeleteAddress(address.id) },
+                    onCancelDelete = { settingsStateHolder.requestDeleteAddress(null) },
+                    onConfirmDelete = { scope.launch { settingsStateHolder.deleteAddress(address.id) } },
+                )
+            }
+        }
+    }
+
+    if (showAddressForm) {
+        AddressFormDialog(
+            title = if (state.editingAddressId == null) "Add Address" else "Edit Address",
+            form = state.addressForm,
+            isSaving = state.isSaving,
+            onChange = settingsStateHolder::updateAddressForm,
+            onDismiss = {
+                settingsStateHolder.startAddAddress()
+                showAddressForm = false
+            },
+            onSave = {
+                scope.launch {
+                    settingsStateHolder.saveAddress()
+                    if (settingsStateHolder.state.errorMessage == null) {
+                        showAddressForm = false
+                    }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SettingsHeaderActionButton(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val color by animateColorAsState(if (pressed) Primary500.copy(alpha = 0.82f) else Primary500)
+
+    Surface(
+        modifier = Modifier
+            .height(52.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        shape = RoundedCornerShape(10.dp),
+        color = color,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+            Text(text, style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+private fun AddressManagementCard(
+    address: AddressResponseDto,
+    isDefault: Boolean,
+    isConfirmingDelete: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onCancelDelete: () -> Unit,
+    onConfirmDelete: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = SettingsPanel,
+        border = BorderStroke(1.dp, SettingsBorder),
+    ) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.08f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = AppMutedText, modifier = Modifier.size(24.dp))
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            address.street,
+                            modifier = Modifier.weight(1f, fill = false),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = SettingsText,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (isDefault) {
+                            StatusChip(text = "Default", tone = StatusTone.Success)
+                        }
+                    }
+                    Text("${address.city}, ${address.state} ${address.zipCode}", style = MaterialTheme.typography.bodyMedium, color = AppMutedText)
+                    Text(address.country, style = MaterialTheme.typography.bodyMedium, color = AppMutedText)
+                }
+            }
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(SettingsBorder))
+            if (isConfirmingDelete) {
+                Text("Remove this address?", color = ErrorColor, fontWeight = FontWeight.Black)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    SettingsSmallActionButton(text = "Cancel", modifier = Modifier.weight(1f), tint = AppMutedText, onClick = onCancelDelete)
+                    SettingsSmallActionButton(text = "Remove", modifier = Modifier.weight(1f), tint = ErrorColor, onClick = onConfirmDelete)
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    SettingsSmallActionButton(text = "Edit", modifier = Modifier.weight(1f), tint = AppMutedText, onClick = onEdit)
+                    SettingsSmallActionButton(text = "Remove", modifier = Modifier.weight(1f), tint = ErrorColor, onClick = onDelete)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsSmallActionButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    tint: Color,
+    icon: ImageVector? = null,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val background by animateColorAsState(if (pressed) tint.copy(alpha = 0.18f) else tint.copy(alpha = 0.08f))
+
+    Surface(
+        modifier = modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        shape = RoundedCornerShape(8.dp),
+        color = background,
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.28f)),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 10.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(7.dp))
+            }
+            Text(text, style = MaterialTheme.typography.labelLarge, color = if (tint == AppMutedText) SettingsText else tint, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+@Composable
+private fun AddressFormDialog(
+    title: String,
+    form: AddressFormState,
+    isSaving: Boolean,
+    onChange: (AddressFormState) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = SettingsPanel,
+            border = BorderStroke(1.dp, SettingsBorder),
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.LocationOn, contentDescription = null, tint = Primary500, modifier = Modifier.size(22.dp))
+                        Text(title, style = MaterialTheme.typography.titleMedium, color = SettingsText, fontWeight = FontWeight.Black)
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = AppMutedText)
+                    }
+                }
+                PaymentInputField("Street", form.street, "Street address") { onChange(form.copy(street = it)) }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    PaymentInputField("City", form.city, "City", modifier = Modifier.weight(1f)) { onChange(form.copy(city = it)) }
+                    PaymentInputField("State", form.state, "State", modifier = Modifier.weight(1f)) { onChange(form.copy(state = it)) }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    PaymentInputField("Zip Code", form.zipCode, "11564", modifier = Modifier.weight(1f)) { onChange(form.copy(zipCode = it)) }
+                    PaymentInputField("Country", form.country, "Saudi Arabia", modifier = Modifier.weight(1f)) { onChange(form.copy(country = it)) }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    SecondaryButton(text = "Cancel", modifier = Modifier.weight(1f), onClick = onDismiss)
+                    PrimaryButton(
+                        text = if (isSaving) "Saving..." else "Save",
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSaving,
+                        onClick = onSave,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationPreferencesSettingsScreen(
+    settingsStateHolder: SettingsStateHolder,
+    onBack: (() -> Unit)?,
+) {
+    val state = settingsStateHolder.state
+    val scope = rememberCoroutineScope()
+    val groups = remember(state.user.role) { notificationPreferenceGroups(state.user.role) }
+    val pushEnabled = state.pushSubscriptions.isNotEmpty()
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AppPageHeader(
+            title = "Notification Preferences",
+            subtitle = "Control notification channels for each event",
+            leading = onBack?.let { { SupportBackSquare(onClick = it) } },
+        )
+        state.errorMessage?.let { ErrorCard(it) { scope.launch { settingsStateHolder.load() } } }
+        state.successMessage?.let { SuccessCard(it) }
+        if (state.isLoading) {
+            LoadingStateCard(title = "Loading preferences", message = "Fetching notification settings.")
+        } else {
+            NotificationChannelsSummaryCard()
+            PushSubscriptionCard(
+                pushEnabled = pushEnabled,
+                isSaving = state.isSaving,
+                onClick = {
+                    if (pushEnabled) {
+                        scope.launch { settingsStateHolder.disablePushSubscriptions() }
+                    } else {
+                        settingsStateHolder.requestPushSubscriptionSetup()
+                    }
+                },
+            )
+            groups.forEach { group ->
+                NotificationPreferenceGroupCard(
+                    group = group,
+                    preferences = state.preferences,
+                    enabled = !state.isSaving,
+                    onToggle = { key, channel -> scope.launch { settingsStateHolder.togglePreference(key, channel) } },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationChannelsSummaryCard() {
+    SettingsActionCard(
+        title = "Notification Channels",
+        icon = Icons.Default.Notifications,
+        iconTint = Color(0xFF60A5FA),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            NotificationChannelLabel("Email", Icons.Default.Email, Modifier.weight(1f))
+            NotificationChannelLabel("SMS", Icons.AutoMirrored.Filled.List, Modifier.weight(1f))
+            NotificationChannelLabel("Push", Icons.Default.Notifications, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun NotificationChannelLabel(
+    label: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = AppMutedText, modifier = Modifier.size(17.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, color = AppMutedText, fontWeight = FontWeight.Black, maxLines = 1)
+    }
+}
+
+@Composable
+private fun PushSubscriptionCard(
+    pushEnabled: Boolean,
+    isSaving: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = SettingsPanel,
+        border = BorderStroke(1.dp, SettingsBorder),
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Push Subscription",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = SettingsText,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    "Enable this device for real-time push notifications",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppMutedText,
+                )
+            }
+            SettingsSmallActionButton(
+                text = when {
+                    isSaving -> "Saving"
+                    pushEnabled -> "Disable Push"
+                    else -> "Enable Push"
+                },
+                modifier = Modifier.width(138.dp),
+                tint = if (pushEnabled) AppMutedText else Primary500,
+                onClick = onClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotificationPreferenceGroupCard(
+    group: NotificationPreferenceGroup,
+    preferences: List<NotificationPreferenceDTO>,
+    enabled: Boolean,
+    onToggle: (NotificationPreferenceKey, NotificationChannel) -> Unit,
+) {
+    SettingsActionCard(
+        title = group.title,
+        icon = group.icon,
+        iconTint = group.tint,
+    ) {
+        group.items.forEachIndexed { index, item ->
+            if (index > 0) {
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(SettingsBorder))
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        item.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = SettingsText,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Text(
+                        item.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AppMutedText,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    preferenceChannels.forEach { channel ->
+                        NotificationPreferenceChip(
+                            label = notificationChannelLabel(channel),
+                            icon = notificationChannelIcon(channel),
+                            selected = notificationPreferenceEnabled(preferences, item.key, channel),
+                            enabled = enabled,
+                            modifier = Modifier.weight(1f),
+                            onClick = { onToggle(item.key, channel) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationPreferenceChip(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val baseTint = if (selected) Primary500 else AppMutedText
+    val background by animateColorAsState(
+        when {
+            pressed -> baseTint.copy(alpha = 0.20f)
+            selected -> Primary500.copy(alpha = 0.14f)
+            else -> Color.White.copy(alpha = 0.035f)
+        },
+    )
+    val border by animateColorAsState(if (selected) Primary500.copy(alpha = 0.42f) else SettingsBorder)
+
+    Surface(
+        modifier = modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        shape = RoundedCornerShape(8.dp),
+        color = background,
+        border = BorderStroke(1.dp, border),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = baseTint, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, color = if (selected) SettingsText else AppMutedText, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+private val preferenceChannels = listOf(
+    NotificationChannel.EMAIL,
+    NotificationChannel.SMS,
+    NotificationChannel.PUSH,
+)
+
+private data class NotificationPreferenceGroup(
+    val title: String,
+    val icon: ImageVector,
+    val tint: Color,
+    val items: List<NotificationPreferenceItem>,
+)
+
+private data class NotificationPreferenceItem(
+    val title: String,
+    val description: String,
+    val key: NotificationPreferenceKey,
+)
+
+private fun notificationPreferenceGroups(role: UserRole): List<NotificationPreferenceGroup> {
+    val groups = mutableListOf(
+        NotificationPreferenceGroup(
+            title = "Order Updates",
+            icon = Icons.Default.ShoppingCart,
+            tint = Color(0xFF60A5FA),
+            items = listOf(
+                NotificationPreferenceItem(
+                    title = "Order Confirmation",
+                    description = "Receive confirmation when your order is placed",
+                    key = NotificationPreferenceKey.ORDER_CONFIRMATION,
+                ),
+                NotificationPreferenceItem(
+                    title = "Shipping Status Changes",
+                    description = "Get updates when your order ships or is delivered",
+                    key = NotificationPreferenceKey.SHIPPING_STATUS,
+                ),
+            ),
+        ),
+    )
+    if (role == UserRole.RETAILER) {
+        groups += NotificationPreferenceGroup(
+            title = "Inventory Alerts",
+            icon = Icons.Default.Inventory2,
+            tint = WarningColor,
+            items = listOf(
+                NotificationPreferenceItem(
+                    title = "Low Stock Warning",
+                    description = "Alert when inventory falls below threshold",
+                    key = NotificationPreferenceKey.LOW_STOCK_WARNING,
+                ),
+                NotificationPreferenceItem(
+                    title = "Auto-Restock Confirmation",
+                    description = "Confirmation when auto-restock orders are placed",
+                    key = NotificationPreferenceKey.AUTO_RESTOCK_CONFIRMATION,
+                ),
+            ),
+        )
+    }
+    groups += NotificationPreferenceGroup(
+        title = "Payment Updates",
+        icon = Icons.Default.CreditCard,
+        tint = Primary500,
+        items = listOf(
+            NotificationPreferenceItem(
+                title = "Payment Status Updates",
+                description = "Get updates when payments are processed, completed, or refunded",
+                key = NotificationPreferenceKey.PAYMENT_STATUS,
+            ),
+        ),
+    )
+    return groups
+}
+
+private fun notificationPreferenceEnabled(
+    preferences: List<NotificationPreferenceDTO>,
+    key: NotificationPreferenceKey,
+    channel: NotificationChannel,
+): Boolean = preferences.firstOrNull { it.preferenceKey == key && it.channel == channel }?.enabled
+    ?: (channel != NotificationChannel.SMS)
+
+private fun notificationChannelLabel(channel: NotificationChannel): String = when (channel) {
+    NotificationChannel.EMAIL -> "Email"
+    NotificationChannel.SMS -> "SMS"
+    NotificationChannel.PUSH -> "Push"
+    NotificationChannel.SYSTEM -> "System"
+}
+
+private fun notificationChannelIcon(channel: NotificationChannel): ImageVector = when (channel) {
+    NotificationChannel.EMAIL -> Icons.Default.Email
+    NotificationChannel.SMS -> Icons.AutoMirrored.Filled.List
+    NotificationChannel.PUSH -> Icons.Default.Notifications
+    NotificationChannel.SYSTEM -> Icons.Default.CheckCircle
+}
 
 @Composable
 private fun PaymentMethodsSettingsScreen(

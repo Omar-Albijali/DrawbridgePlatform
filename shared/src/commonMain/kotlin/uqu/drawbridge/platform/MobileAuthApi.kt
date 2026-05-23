@@ -854,6 +854,13 @@ class MobileAuthApi(
         return json.decodeFromString(body)
     }
 
+    suspend fun fetchPushSubscriptions(userId: String): List<WebPushSubscriptionDTO> {
+        val response = authorizedGet("/notifications/push-subscriptions/$userId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
     suspend fun upsertNotificationPreference(
         userId: String,
         request: UpsertNotificationPreferenceRequest,
@@ -868,6 +875,16 @@ class MobileAuthApi(
         val body = response.bodyAsText()
         ensureSuccess(response.status, body)
         return json.decodeFromString(NotificationPreferenceDTO.serializer(), body)
+    }
+
+    suspend fun unregisterPushSubscription(endpoint: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/notifications/push-subscriptions")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("endpoint", endpoint)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
     }
 
     private fun buildUrl(path: String): String = "${MobileApiConfig.baseUrl}${path}"

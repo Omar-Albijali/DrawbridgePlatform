@@ -29,6 +29,7 @@ import uqu.drawbridge.platform.UpsertNotificationPreferenceRequest
 import uqu.drawbridge.platform.ui.common.userReadableMessage
 import uqu.drawbridge.platform.ui.model.SessionState
 import uqu.drawbridge.platform.ui.platform.PickedFile
+import uqu.drawbridge.platform.WebPushSubscriptionDTO
 
 internal data class ReportsUiState(
     val isLoading: Boolean = true,
@@ -379,6 +380,7 @@ internal data class SettingsUiState(
     val paymentMethods: List<PaymentMethodDTO> = emptyList(),
     val paymentForm: PaymentMethodFormState = PaymentMethodFormState(),
     val preferences: List<NotificationPreferenceDTO> = emptyList(),
+    val pushSubscriptions: List<WebPushSubscriptionDTO> = emptyList(),
     val pendingDeleteAddressId: String? = null,
     val pendingDeletePaymentMethodId: String? = null,
     val errorMessage: String? = null,
@@ -411,6 +413,7 @@ internal class SettingsStateHolder(
                 addresses = if (user.role == UserRole.RETAILER) api.fetchAddresses() else emptyList(),
                 payments = if (user.role == UserRole.RETAILER) api.fetchPaymentMethods(session.user.id) else emptyList(),
                 preferences = api.fetchNotificationPreferences(session.user.id),
+                pushSubscriptions = api.fetchPushSubscriptions(session.user.id),
             )
         }.fold(
             onSuccess = { result ->
@@ -422,6 +425,7 @@ internal class SettingsStateHolder(
                     addresses = result.addresses,
                     paymentMethods = result.payments,
                     preferences = result.preferences,
+                    pushSubscriptions = result.pushSubscriptions,
                 )
             },
             onFailure = { error ->
@@ -671,6 +675,25 @@ internal class SettingsStateHolder(
         }
     }
 
+    suspend fun disablePushSubscriptions() {
+        val subscriptions = state.pushSubscriptions
+        if (subscriptions.isEmpty()) {
+            state = state.copy(errorMessage = "Push notifications are not enabled on this device.")
+            return
+        }
+        save("Push notifications disabled.") {
+            subscriptions.forEach { api.unregisterPushSubscription(it.endpoint) }
+            state = state.copy(pushSubscriptions = emptyList())
+        }
+    }
+
+    fun requestPushSubscriptionSetup() {
+        state = state.copy(
+            errorMessage = "Push notifications are not available on this device yet.",
+            successMessage = null,
+        )
+    }
+
     private suspend fun save(successMessage: String, block: suspend () -> Unit) {
         state = state.copy(isSaving = true, errorMessage = null, successMessage = null)
         runCatching { block() }.fold(
@@ -689,6 +712,7 @@ internal class SettingsStateHolder(
         val addresses: List<AddressResponseDto>,
         val payments: List<PaymentMethodDTO>,
         val preferences: List<NotificationPreferenceDTO>,
+        val pushSubscriptions: List<WebPushSubscriptionDTO>,
     )
 }
 
