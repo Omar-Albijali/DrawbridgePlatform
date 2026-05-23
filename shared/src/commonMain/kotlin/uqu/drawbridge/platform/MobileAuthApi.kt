@@ -733,8 +733,15 @@ class MobileAuthApi(
         return json.decodeFromString(SupportTicketDTO.serializer(), body)
     }
 
-    suspend fun createSupportTicket(request: CreateTicketRequest): SupportTicketDTO {
+    suspend fun createSupportTicket(
+        request: CreateTicketRequest,
+        attachmentFileName: String? = null,
+        attachmentMimeType: String? = null,
+        attachmentBytes: ByteArray? = null,
+    ): SupportTicketDTO {
         val token = requireBearerToken()
+        val safeAttachmentName = attachmentFileName?.ifBlank { "support-attachment" }?.replace("\"", "")
+        val safeAttachmentType = attachmentMimeType?.takeIf { it.isNotBlank() } ?: ContentType.Application.OctetStream.toString()
         val response = client.post(buildUrl("/support")) {
             accept(ContentType.Application.Json)
             bearerAuth(token)
@@ -744,6 +751,16 @@ class MobileAuthApi(
                         append("subject", request.subject.trim())
                         append("category", request.category.name)
                         append("description", request.description.trim())
+                        if (attachmentBytes != null && attachmentBytes.isNotEmpty() && safeAttachmentName != null) {
+                            append(
+                                key = "attachment",
+                                value = attachmentBytes,
+                                headers = Headers.build {
+                                    append(HttpHeaders.ContentDisposition, "filename=\"$safeAttachmentName\"")
+                                    append(HttpHeaders.ContentType, safeAttachmentType)
+                                },
+                            )
+                        }
                     },
                 ),
             )

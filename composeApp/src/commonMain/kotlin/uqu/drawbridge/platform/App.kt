@@ -838,7 +838,12 @@ private fun MainHost(
                                 )
                             },
                             supportContent = {
-                                SupportMainScreen(supportStateHolder = supportStateHolder)
+                                SupportMainScreen(
+                                    supportStateHolder = supportStateHolder,
+                                    filePhotoPicker = filePhotoPicker,
+                                    optionPicker = optionPicker,
+                                    onBack = { onActiveMoreDestinationChange(null) },
+                                )
                             },
                             notificationsContent = {
                                 NotificationsMainScreen(

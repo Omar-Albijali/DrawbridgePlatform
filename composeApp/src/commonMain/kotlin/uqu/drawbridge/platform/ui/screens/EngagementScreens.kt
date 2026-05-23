@@ -8,11 +8,13 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,11 +23,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -34,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -66,6 +76,7 @@ import uqu.drawbridge.platform.SupportTicketDTO
 import uqu.drawbridge.platform.SupportTicketStatus
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.ui.components.AppCard
+import uqu.drawbridge.platform.ui.components.AppPageHeader
 import uqu.drawbridge.platform.ui.components.AppTextField
 import uqu.drawbridge.platform.ui.components.DeferredFeatureCard
 import uqu.drawbridge.platform.ui.components.EmptyStateCard
@@ -87,6 +98,9 @@ import uqu.drawbridge.platform.ui.engagement.ReportsStateHolder
 import uqu.drawbridge.platform.ui.engagement.SettingsSection
 import uqu.drawbridge.platform.ui.engagement.SettingsStateHolder
 import uqu.drawbridge.platform.ui.engagement.SupportStateHolder
+import uqu.drawbridge.platform.ui.platform.FilePhotoPicker
+import uqu.drawbridge.platform.ui.platform.NativeOptionPicker
+import uqu.drawbridge.platform.ui.platform.PickedFile
 import uqu.drawbridge.platform.ui.theme.AppMutedText
 import uqu.drawbridge.platform.ui.theme.AppNavySurfaceHigh
 import uqu.drawbridge.platform.ui.theme.ErrorColor
@@ -96,6 +110,9 @@ import uqu.drawbridge.platform.ui.theme.WarningColor
 private val NotificationsText = Color(0xFFF8FAFC)
 private val NotificationsPanel = AppNavySurfaceHigh.copy(alpha = 0.92f)
 private val NotificationsBorder = Color.White.copy(alpha = 0.12f)
+private val SupportText = Color(0xFFF8FAFC)
+private val SupportPanel = AppNavySurfaceHigh.copy(alpha = 0.92f)
+private val SupportBorder = Color.White.copy(alpha = 0.12f)
 
 @Composable
 internal fun ReportsMainScreen(
@@ -149,77 +166,614 @@ internal fun ReportsMainScreen(
 @Composable
 internal fun SupportMainScreen(
     supportStateHolder: SupportStateHolder,
+    filePhotoPicker: FilePhotoPicker,
+    optionPicker: NativeOptionPicker,
+    onBack: (() -> Unit)? = null,
 ) {
     val state = supportStateHolder.state
     val scope = rememberCoroutineScope()
+    var selectedTab by remember { mutableStateOf(SupportTab.Create) }
 
     LaunchedEffect(supportStateHolder) {
-        supportStateHolder.load()
+        supportStateHolder.loadIfNeeded()
     }
 
-    ScreenSection(title = "Support", subtitle = "Create tickets and track your existing requests.") {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SupportHeader(
+            selectedTab = selectedTab,
+            ticketCount = state.tickets.size,
+            onBack = onBack,
+            onTabSelected = { selectedTab = it },
+        )
         state.errorMessage?.let { ErrorCard(it) { scope.launch { supportStateHolder.load() } } }
         state.successMessage?.let { SuccessCard(it) }
-        AppCard {
-            Text("Create ticket", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            AppTextField(value = state.subject, onValueChange = supportStateHolder::updateSubject, label = "Subject")
-            Text("Category", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SupportTicketCategory.entries.chunked(2).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        row.forEach { category ->
-                            FilterChip(
-                                modifier = Modifier.weight(1f),
-                                selected = state.category == category,
-                                onClick = { supportStateHolder.updateCategory(category) },
-                                label = { Text(category.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                            )
+
+        if (selectedTab == SupportTab.Create) {
+            SupportCreateTicketContent(
+                state = state,
+                onSubjectChange = supportStateHolder::updateSubject,
+                onDescriptionChange = supportStateHolder::updateDescription,
+                onPickCategory = {
+                    scope.launch {
+                        val categories = SupportTicketCategory.entries
+                        val selectedIndex = categories.indexOf(state.category)
+                        val pickedIndex = optionPicker.pickOption(
+                            title = "Support category",
+                            options = categories.map { it.supportLabel() },
+                            selectedIndex = selectedIndex,
+                        )
+                        if (pickedIndex != null && pickedIndex in categories.indices) {
+                            supportStateHolder.updateCategory(categories[pickedIndex])
                         }
                     }
-                }
-            }
-            OutlinedTextField(
-                value = state.description,
-                onValueChange = supportStateHolder::updateDescription,
-                label = { Text("Description") },
-                minLines = 4,
-                modifier = Modifier.fillMaxWidth(),
+                },
+                onPickAttachment = {
+                    scope.launch {
+                        filePhotoPicker.pickFile()?.let(supportStateHolder::updateAttachment)
+                    }
+                },
+                onClearAttachment = supportStateHolder::clearAttachment,
+                onSubmit = {
+                    scope.launch {
+                        if (supportStateHolder.submit()) {
+                            selectedTab = SupportTab.Tickets
+                        }
+                    }
+                },
             )
-            Text("Attachments are deferred until the native picker/upload flow is ready.", style = MaterialTheme.typography.bodySmall)
-            PrimaryButton(
-                text = if (state.isSubmitting) "Submitting..." else "Submit ticket",
-                enabled = !state.isSubmitting,
-                onClick = { scope.launch { supportStateHolder.submit() } },
+        } else {
+            SupportTicketsContent(
+                state = state,
             )
         }
-        AppCard {
-            Text("My tickets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard(modifier = Modifier.weight(1f), value = "${state.tickets.size}", label = "Tickets")
-                StatCard(modifier = Modifier.weight(1f), value = "${state.openCount}", label = "Open")
+    }
+}
+
+private enum class SupportTab {
+    Create,
+    Tickets
+}
+
+@Composable
+private fun SupportHeader(
+    selectedTab: SupportTab,
+    ticketCount: Int,
+    onBack: (() -> Unit)?,
+    onTabSelected: (SupportTab) -> Unit,
+) {
+    AppPageHeader(
+        title = "Support",
+        subtitle = "Create tickets and track your requests",
+        leading = onBack?.let { { SupportBackSquare(onClick = it) } },
+        action = {
+            SupportTabSwitch(
+                selectedTab = selectedTab,
+                ticketCount = ticketCount,
+                onTabSelected = onTabSelected,
+            )
+        },
+    )
+}
+
+@Composable
+private fun SupportTabSwitch(
+    selectedTab: SupportTab,
+    ticketCount: Int,
+    onTabSelected: (SupportTab) -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.06f),
+        border = BorderStroke(1.dp, SupportBorder),
+    ) {
+        Row(
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SupportTabButton(
+                modifier = Modifier.weight(1f),
+                selected = selectedTab == SupportTab.Create,
+                icon = Icons.Default.Add,
+                label = "Create Ticket",
+                badge = null,
+                onClick = { onTabSelected(SupportTab.Create) },
+            )
+            SupportTabButton(
+                modifier = Modifier.weight(1f),
+                selected = selectedTab == SupportTab.Tickets,
+                icon = Icons.AutoMirrored.Filled.List,
+                label = "My Tickets",
+                badge = ticketCount.takeIf { it > 0 }?.toString(),
+                onClick = { onTabSelected(SupportTab.Tickets) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SupportTabButton(
+    modifier: Modifier,
+    selected: Boolean,
+    icon: ImageVector,
+    label: String,
+    badge: String?,
+    onClick: () -> Unit,
+) {
+    val contentColor by animateColorAsState(if (selected) SupportText else AppMutedText)
+    Surface(
+        modifier = modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = if (selected) SupportPanel else Color.Transparent,
+        border = if (selected) BorderStroke(1.dp, SupportBorder) else null,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                color = contentColor,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            badge?.let {
+                Spacer(Modifier.width(8.dp))
+                Surface(shape = RoundedCornerShape(999.dp), color = Primary500) {
+                    Text(
+                        it,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                    )
+                }
             }
-            when {
-                state.isLoading -> LoadingStateCard(title = "Loading tickets", message = "Fetching your support history.")
-                state.errorMessage != null -> Text("Resolve the error above, then retry.")
-                state.tickets.isEmpty() -> Text("No support tickets yet.")
-                else -> state.tickets.forEach { ticket ->
-                    TicketCard(ticket = ticket, selected = state.selectedTicket?.id == ticket.id) {
-                        scope.launch { supportStateHolder.selectTicket(ticket.id) }
+        }
+    }
+}
+
+@Composable
+private fun SupportCreateTicketContent(
+    state: uqu.drawbridge.platform.ui.engagement.SupportUiState,
+    onSubjectChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onPickCategory: () -> Unit,
+    onPickAttachment: () -> Unit,
+    onClearAttachment: () -> Unit,
+    onSubmit: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SupportNoticeCard()
+        SupportSectionCard {
+            SupportFieldLabel("Subject *")
+            SupportTextInput(
+                value = state.subject,
+                onValueChange = onSubjectChange,
+                placeholder = "Short summary of the issue",
+                singleLine = true,
+            )
+        }
+        SupportSectionCard {
+            SupportFieldLabel("Category *")
+            SupportCategorySelector(category = state.category, onClick = onPickCategory)
+            Text(
+                state.category.supportHint(),
+                style = MaterialTheme.typography.bodySmall,
+                color = AppMutedText,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        SupportSectionCard {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                SupportFieldLabel("Description *")
+                Text(
+                    "${state.description.length} / 500",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = AppMutedText,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            SupportTextInput(
+                value = state.description,
+                onValueChange = onDescriptionChange,
+                placeholder = "Describe the issue in detail...",
+                singleLine = false,
+                minLines = 6,
+                modifier = Modifier.heightIn(min = 150.dp),
+            )
+        }
+        SupportAttachmentCard(
+            attachment = state.attachment,
+            onPickAttachment = onPickAttachment,
+            onClearAttachment = onClearAttachment,
+        )
+        SupportSubmitButton(
+            text = if (state.isSubmitting) "Submitting..." else "Submit Ticket",
+            enabled = !state.isSubmitting,
+            onClick = onSubmit,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Schedule, contentDescription = null, tint = AppMutedText, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "We aim to respond within 24-48 business hours",
+                style = MaterialTheme.typography.bodySmall,
+                color = AppMutedText,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SupportTicketsContent(
+    state: uqu.drawbridge.platform.ui.engagement.SupportUiState,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            "${state.tickets.size} total tickets",
+            style = MaterialTheme.typography.titleSmall,
+            color = AppMutedText,
+            fontWeight = FontWeight.Black,
+        )
+        when {
+            state.isLoading -> LoadingStateCard(title = "Loading tickets", message = "Fetching your support history.")
+            state.errorMessage != null -> Unit
+            state.tickets.isEmpty() -> SupportEmptyTickets()
+            else -> state.tickets.forEach { ticket ->
+                SupportTicketRow(
+                    ticket = ticket,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupportNoticeCard() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = Primary500.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, Primary500.copy(alpha = 0.35f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(Icons.Default.Info, contentDescription = null, tint = Primary500, modifier = Modifier.size(22.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(
+                    "Share enough detail for a faster resolution",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = SupportText,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    "Include what happened, when it happened, and any order or payment context you already have.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppMutedText,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupportSectionCard(
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = SupportPanel,
+        border = BorderStroke(1.dp, SupportBorder),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun SupportFieldLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = AppMutedText,
+        fontWeight = FontWeight.Black,
+    )
+}
+
+@Composable
+private fun SupportTextInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    singleLine: Boolean,
+    modifier: Modifier = Modifier,
+    minLines: Int = 1,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.fillMaxWidth(),
+        placeholder = {
+            Text(placeholder, color = AppMutedText, fontWeight = FontWeight.SemiBold)
+        },
+        minLines = minLines,
+        singleLine = singleLine,
+        shape = RoundedCornerShape(8.dp),
+        colors = supportTextFieldColors(),
+    )
+}
+
+@Composable
+private fun SupportCategorySelector(
+    category: SupportTicketCategory,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(58.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.04f),
+        border = BorderStroke(1.dp, SupportBorder),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                category.supportLabel(),
+                style = MaterialTheme.typography.titleSmall,
+                color = SupportText,
+                fontWeight = FontWeight.Black,
+            )
+            Icon(Icons.Default.ExpandMore, contentDescription = null, tint = AppMutedText, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+@Composable
+private fun SupportAttachmentCard(
+    attachment: PickedFile?,
+    onPickAttachment: () -> Unit,
+    onClearAttachment: () -> Unit,
+) {
+    SupportSectionCard {
+        SupportFieldLabel("Attachment (optional)")
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 118.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onPickAttachment),
+            shape = RoundedCornerShape(8.dp),
+            color = Color.White.copy(alpha = 0.035f),
+            border = BorderStroke(1.dp, SupportBorder),
+        ) {
+            Row(
+                modifier = Modifier.padding(18.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Primary500.copy(alpha = 0.13f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.AttachFile, contentDescription = null, tint = Primary500, modifier = Modifier.size(24.dp))
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Text(
+                        attachment?.name ?: "Add a screenshot, invoice, or related file",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = SupportText,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        attachment?.let { "${formatAttachmentSize(it.bytes.size)} attached" }
+                            ?: "Max upload size follows the platform upload settings",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppMutedText,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                if (attachment != null) {
+                    IconButton(onClick = onClearAttachment) {
+                        Icon(Icons.Default.Delete, contentDescription = "Remove attachment", tint = ErrorColor)
                     }
                 }
             }
         }
-        state.selectedTicket?.let { ticket ->
-            AppCard {
-                Text("Ticket ${ticket.ticketNumber}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                StatusChip(text = ticket.status.name.replace('_', ' '), tone = supportTone(ticket.status))
-                Text(ticket.subject, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(ticket.description, style = MaterialTheme.typography.bodyMedium)
-                Text("Updated ${ticket.updatedAt}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                ticket.attachmentUrl?.takeIf { it.isNotBlank() }?.let {
-                    Text("Attachment: $it", style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun SupportSubmitButton(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = if (enabled) Primary500 else Color.White.copy(alpha = 0.08f),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SupportTicketRow(
+    ticket: SupportTicketDTO,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = SupportPanel,
+        border = BorderStroke(1.dp, SupportBorder),
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    ticket.subject,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = SupportText,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    ticket.ticketNumber,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = AppMutedText,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    ticket.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppMutedText,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    StatusChip(text = ticket.status.supportLabel(), tone = supportTone(ticket.status))
+                    SupportMiniChip(ticket.category.supportLabel())
+                    Text(
+                        supportDate(ticket.updatedAt),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = AppMutedText,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SupportMiniChip(text: String) {
+    Surface(shape = RoundedCornerShape(6.dp), color = Color.White.copy(alpha = 0.08f)) {
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = AppMutedText,
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun SupportEmptyTickets() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp, horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(86.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color.White.copy(alpha = 0.06f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = AppMutedText, modifier = Modifier.size(38.dp))
+        }
+        Text("No tickets yet", style = MaterialTheme.typography.titleLarge, color = SupportText, fontWeight = FontWeight.Black)
+        Text(
+            "Create your first support request and it will appear here.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = AppMutedText,
+            textAlign = TextAlign.Center,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun SupportBackSquare(onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.size(50.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = SupportPanel,
+        border = BorderStroke(1.dp, SupportBorder),
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = SupportText, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -975,8 +1529,50 @@ private fun SuccessCard(message: String) {
     }
 }
 
+@Composable
+private fun supportTextFieldColors() = TextFieldDefaults.colors(
+    focusedContainerColor = Color.White.copy(alpha = 0.05f),
+    unfocusedContainerColor = Color.White.copy(alpha = 0.035f),
+    disabledContainerColor = Color.White.copy(alpha = 0.03f),
+    focusedIndicatorColor = Primary500,
+    unfocusedIndicatorColor = SupportBorder,
+    focusedLabelColor = Primary500,
+    unfocusedLabelColor = AppMutedText,
+    cursorColor = Primary500,
+    focusedTextColor = SupportText,
+    unfocusedTextColor = SupportText,
+)
+
+private fun SupportTicketCategory.supportLabel(): String = when (this) {
+    SupportTicketCategory.ORDER -> "Order"
+    SupportTicketCategory.POS -> "POS"
+    SupportTicketCategory.PAYMENT -> "Payment"
+    SupportTicketCategory.OTHER -> "Other"
+}
+
+private fun SupportTicketCategory.supportHint(): String = when (this) {
+    SupportTicketCategory.ORDER -> "Questions about order status, delivery, or order issues."
+    SupportTicketCategory.POS -> "Issues related to POS flows, terminals, or store checkout."
+    SupportTicketCategory.PAYMENT -> "Payment failures, settlement issues, or payment methods."
+    SupportTicketCategory.OTHER -> "Anything else that needs the support team."
+}
+
+private fun SupportTicketStatus.supportLabel(): String = when (this) {
+    SupportTicketStatus.OPEN -> "Delivered"
+    SupportTicketStatus.IN_PROGRESS -> "In Progress"
+    SupportTicketStatus.CLOSED -> "Resolved"
+}
+
+private fun supportDate(value: String): String = value.take(10).ifBlank { "Date unavailable" }
+
+private fun formatAttachmentSize(bytes: Int): String = when {
+    bytes >= 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
+    bytes >= 1024 -> "${bytes / 1024} KB"
+    else -> "$bytes B"
+}
+
 private fun supportTone(status: SupportTicketStatus): StatusTone = when (status) {
-    SupportTicketStatus.OPEN -> StatusTone.Warning
+    SupportTicketStatus.OPEN -> StatusTone.Success
     SupportTicketStatus.IN_PROGRESS -> StatusTone.Warning
     SupportTicketStatus.CLOSED -> StatusTone.Neutral
 }

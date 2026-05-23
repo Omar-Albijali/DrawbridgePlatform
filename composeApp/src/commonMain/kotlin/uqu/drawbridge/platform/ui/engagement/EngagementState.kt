@@ -28,6 +28,7 @@ import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.UpsertNotificationPreferenceRequest
 import uqu.drawbridge.platform.ui.common.userReadableMessage
 import uqu.drawbridge.platform.ui.model.SessionState
+import uqu.drawbridge.platform.ui.platform.PickedFile
 
 internal data class ReportsUiState(
     val isLoading: Boolean = true,
@@ -83,13 +84,15 @@ internal class ReportsStateHolder(
 }
 
 internal data class SupportUiState(
-    val isLoading: Boolean = true,
+    val isLoading: Boolean = false,
+    val hasLoaded: Boolean = false,
     val isSubmitting: Boolean = false,
     val tickets: List<SupportTicketDTO> = emptyList(),
     val selectedTicket: SupportTicketDTO? = null,
     val subject: String = "",
     val category: SupportTicketCategory = SupportTicketCategory.ORDER,
     val description: String = "",
+    val attachment: PickedFile? = null,
     val errorMessage: String? = null,
     val successMessage: String? = null,
 ) {
@@ -102,12 +105,20 @@ internal class SupportStateHolder(
     var state: SupportUiState by mutableStateOf(SupportUiState())
         private set
 
+    suspend fun loadIfNeeded() {
+        if (!state.hasLoaded) {
+            load()
+        }
+    }
+
     suspend fun load() {
+        if (state.isLoading) return
         state = state.copy(isLoading = true, errorMessage = null)
         runCatching { api.fetchSupportTickets() }.fold(
             onSuccess = { tickets ->
                 state = state.copy(
                     isLoading = false,
+                    hasLoaded = true,
                     tickets = tickets,
                     selectedTicket = tickets.firstOrNull(),
                 )
@@ -115,6 +126,7 @@ internal class SupportStateHolder(
             onFailure = { error ->
                 state = state.copy(
                     isLoading = false,
+                    hasLoaded = true,
                     tickets = emptyList(),
                     selectedTicket = null,
                     errorMessage = userReadableMessage(error, "Unable to load support tickets."),
@@ -140,7 +152,25 @@ internal class SupportStateHolder(
     }
 
     fun updateDescription(value: String) {
-        state = state.copy(description = value, errorMessage = null, successMessage = null)
+        state = state.copy(description = value.take(500), errorMessage = null, successMessage = null)
+    }
+
+    fun updateAttachment(value: PickedFile?) {
+        val validationMessage = when {
+            value == null -> null
+            value.bytes.isEmpty() -> "Selected attachment is empty."
+            value.bytes.size > MaxSupportAttachmentBytes -> "Attachment must be 10MB or smaller."
+            else -> null
+        }
+        state = if (validationMessage != null) {
+            state.copy(errorMessage = validationMessage, successMessage = null)
+        } else {
+            state.copy(attachment = value, errorMessage = null, successMessage = null)
+        }
+    }
+
+    fun clearAttachment() {
+        state = state.copy(attachment = null, errorMessage = null, successMessage = null)
     }
 
     suspend fun submit(): Boolean {
@@ -159,6 +189,9 @@ internal class SupportStateHolder(
                     category = state.category,
                     description = description,
                 ),
+                attachmentFileName = state.attachment?.name,
+                attachmentMimeType = state.attachment?.mimeType,
+                attachmentBytes = state.attachment?.bytes,
             )
         }.fold(
             onSuccess = { created ->
@@ -170,6 +203,7 @@ internal class SupportStateHolder(
                     subject = "",
                     description = "",
                     category = SupportTicketCategory.ORDER,
+                    attachment = null,
                     successMessage = "Support ticket ${created.ticketNumber} was created.",
                 )
                 true
@@ -182,6 +216,10 @@ internal class SupportStateHolder(
                 false
             },
         )
+    }
+
+    private companion object {
+        const val MaxSupportAttachmentBytes: Int = 10 * 1024 * 1024
     }
 }
 
