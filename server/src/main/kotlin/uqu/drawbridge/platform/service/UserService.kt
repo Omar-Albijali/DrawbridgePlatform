@@ -73,7 +73,8 @@ class UserService(
                     city = addrDto.city,
                     state = addrDto.state,
                     zipCode = addrDto.zipCode,
-                    country = addrDto.country
+                    country = addrDto.country,
+                    user = this
                 )
             }.toMutableList()
         }

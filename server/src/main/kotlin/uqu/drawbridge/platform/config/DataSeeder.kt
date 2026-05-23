@@ -75,17 +75,16 @@ class DataSeeder(
                 phoneNumber = "0501111111",
                 email = "rep@wholesaler.com"
             )
-
-            wholesaler.addresses.add(
-                Address(
-                    street = "Jeddah Industrial City",
-                    city = "Jeddah",
-                    state = "Makkah",
-                    zipCode = "21411",
-                    country = "Saudi Arabia"
-                )
-            )
-
+            
+            wholesaler.addresses.add(Address(
+                street = "Jeddah Industrial City",
+                city = "Jeddah",
+                state = "Makkah",
+                zipCode = "21411",
+                country = "Saudi Arabia",
+                user = wholesaler
+            ))
+            
             userRepository.save(wholesaler)
 
             val retailer = User(
@@ -104,16 +103,15 @@ class DataSeeder(
                 phoneNumber = "0502222222",
                 email = "owner@coffeehouse.com"
             )
-
-            retailer.addresses.add(
-                Address(
-                    street = "King Fahd Road, Al Olaya",
-                    city = "Riyadh",
-                    state = "Riyadh",
-                    zipCode = "11564",
-                    country = "Saudi Arabia"
-                )
-            )
+            
+            retailer.addresses.add(Address(
+                street = "Riyadh Blvd",
+                city = "Riyadh",
+                state = "Riyadh",
+                zipCode = "11564",
+                country = "Saudi Arabia",
+                user = retailer
+            ))
 
             val savedRetailer = userRepository.save(retailer)
 

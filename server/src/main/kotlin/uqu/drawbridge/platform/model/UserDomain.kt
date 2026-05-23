@@ -4,6 +4,8 @@ import jakarta.persistence.*
 import uqu.drawbridge.platform.UserRole
 import java.time.LocalDateTime
 import com.fasterxml.jackson.annotation.JsonIgnore
+import org.hibernate.annotations.OnDelete
+import org.hibernate.annotations.OnDeleteAction
 
 
 @Entity
@@ -32,8 +34,7 @@ class User(
     @Embedded
     var representative: Representative = Representative(),
 
-    @OneToMany(cascade = [CascadeType.ALL], orphanRemoval = true)
-    @JoinColumn(name = "user_id", nullable = false)
+    @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true)
     var addresses: MutableList<Address> = mutableListOf(),
 
     // Business info
@@ -97,14 +98,15 @@ class Address(
     @Column(nullable = false)
     var country: String,
 
-    @Column(name = "user_id", insertable = false, updatable = false, nullable = false)
-    var userId: String? = null,
-
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", insertable = false, updatable = false)
-    var user: User? = null
-)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var user: User
+) {
+    val userId: String
+        get() = user.id ?: ""
+}
 
 @Embeddable
 class Representative(

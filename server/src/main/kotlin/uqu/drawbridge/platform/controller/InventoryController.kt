@@ -264,7 +264,7 @@ class InventoryController(
     }
 
     private fun requireInventoryOwner(authentication: Authentication, item: InventoryItem) {
-        requireRetailerOwner(authentication, item.retailerId)
+        requireRetailerOwner(authentication, item.retailerId ?: "")
     }
 
     private fun requireProductOwner(authentication: Authentication, product: uqu.drawbridge.platform.model.Product) {
