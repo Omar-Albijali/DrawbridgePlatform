@@ -21,6 +21,8 @@ logback = "1.5.24"
 material3 = "1.10.0-alpha05"
 camerax = "1.4.2"
 mlkit-barcode = "17.3.0"
+kscan = "0.8.1"
+multiplatformSettings = "1.1.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -60,7 +62,10 @@ camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "ca
 camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 mlkit-barcode = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkit-barcode" }
-
+kscan = { module = "io.github.ismai117:KScan", version.ref = "kscan" }
+multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatformSettings" }
+multiplatform-settings-no-arg = { module = "com.russhwolf:multiplatform-settings-no-arg", version.ref = "multiplatformSettings" }
+jnativehook = { module = "com.github.kwhat:jnativehook", version = "2.2.2" }
 [plugins]
 buildConfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
 androidApplication = { id = "com.android.application", version.ref = "agp" }

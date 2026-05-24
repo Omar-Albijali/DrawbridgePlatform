@@ -13,7 +13,7 @@ import uqu.drawbridge.platform.dto.InventoryAuditLogDTO
 import uqu.drawbridge.platform.dto.InventoryAuditLogPageResponse
 import uqu.drawbridge.platform.model.InventoryAuditChangeType
 import uqu.drawbridge.platform.model.InventoryAuditLog
-import uqu.drawbridge.platform.model.InventoryAuditSourceType
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.model.InventoryStockTargetType
 import uqu.drawbridge.platform.repository.InventoryAuditLogRepository
 import uqu.drawbridge.platform.repository.InventoryItemRepository

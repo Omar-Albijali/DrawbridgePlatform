@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*
 import uqu.drawbridge.platform.*
 import uqu.drawbridge.platform.model.InventoryItem
 import uqu.drawbridge.platform.dto.InventoryAuditLogPageResponse
-import uqu.drawbridge.platform.model.InventoryAuditSourceType
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.model.InventoryStockTargetType
 import uqu.drawbridge.platform.service.InventoryAuditService
 import uqu.drawbridge.platform.service.InventoryService
@@ -249,21 +249,6 @@ class InventoryController(
         return runCatching { LocalDateTime.parse(normalized) }
             .recoverCatching { OffsetDateTime.parse(normalized).toLocalDateTime() }
             .getOrElse { throw IllegalArgumentException("Invalid date filter: $normalized") }
-    }
-    // ==================== POS SCAN ====================
-
-    @PostMapping("/scan")
-    fun scanBarcode(
-        authentication: Authentication,
-        @RequestBody request: PosScanRequest
-    ): ResponseEntity<PosScanResponse> {
-        requireRetailerOwner(authentication, request.retailerId)
-        val result = inventoryService.scanByGtin(request.retailerId, request.gtin)
-        return if (result.message == "OK") {
-            ResponseEntity.ok(result)
-        } else {
-            ResponseEntity.status(HttpStatus.NOT_FOUND).body(result)
-        }
     }
 
     private fun currentUser(authentication: Authentication): uqu.drawbridge.platform.model.User {

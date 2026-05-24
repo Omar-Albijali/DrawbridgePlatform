@@ -18,8 +18,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uqu.drawbridge.platform.dto.PosOutboundInventoryEventDTO
 import uqu.drawbridge.platform.model.InventoryAuditLog
-import uqu.drawbridge.platform.model.InventoryAuditSourceType
-import uqu.drawbridge.platform.model.PosOutboundEventStatus
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
+import uqu.drawbridge.platform.dto.PosOutboundEventStatus
 import uqu.drawbridge.platform.model.PosOutboundInventoryEvent
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.PosIntegrationRepository

@@ -13,7 +13,7 @@ import uqu.drawbridge.platform.PosIntegrationEventLogDTO
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.model.PosIntegration
 import uqu.drawbridge.platform.model.PosIntegrationStatus
-import uqu.drawbridge.platform.model.InventoryAuditSourceType
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.repository.InventoryAuditLogRepository
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.PosEventReceiptRepository

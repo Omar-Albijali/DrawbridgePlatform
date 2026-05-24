@@ -11,6 +11,8 @@ import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import java.time.LocalDateTime
+import uqu.drawbridge.platform.dto.PosOutboundEventStatus
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 
 enum class PosIntegrationStatus {
     ACTIVE,
@@ -22,12 +24,6 @@ enum class PosEventReceiptStatus {
     PROCESSED
 }
 
-enum class PosOutboundEventStatus {
-    STORED,
-    PENDING,
-    SENT,
-    DEAD_LETTER
-}
 
 @Entity
 @Table(
