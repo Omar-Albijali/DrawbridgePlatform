@@ -1,4 +1,4 @@
-package uqu.drawbridge.platform.ui.components
+package uqu.drawbridge.posdemo.ui.components
 
 import android.Manifest
 import android.content.pm.PackageManager

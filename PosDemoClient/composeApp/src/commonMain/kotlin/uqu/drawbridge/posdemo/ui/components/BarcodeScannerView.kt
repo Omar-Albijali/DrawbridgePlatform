@@ -1,4 +1,4 @@
-package uqu.drawbridge.platform.ui.components
+package uqu.drawbridge.posdemo.ui.components
 
 import androidx.compose.runtime.Composable
 
