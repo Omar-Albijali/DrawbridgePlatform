@@ -3,9 +3,12 @@ package uqu.drawbridge.platform
 import uqu.drawbridge.platform.shared.BuildConfig
 
 object MobileApiConfig {
-    var baseUrl: String = BuildConfig.API_BASE_URL.ifBlank { platformDefaultApiBaseUrl() }
+    var baseUrl: String = normalizeBaseUrl(
+        platformConfiguredApiBaseUrl()
+            ?: BuildConfig.API_BASE_URL.ifBlank { platformDefaultApiBaseUrl() }
+    )
         set(value) {
-            field = value.trim().trimEnd('/')
+            field = normalizeBaseUrl(value)
         }
 
     fun resolveResourceUrl(resourceUrl: String): String {
@@ -23,5 +26,9 @@ object MobileApiConfig {
         return origin + path
     }
 }
+
+private fun normalizeBaseUrl(value: String): String = value.trim().trimEnd('/')
+
+internal expect fun platformConfiguredApiBaseUrl(): String?
 
 internal expect fun platformDefaultApiBaseUrl(): String

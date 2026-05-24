@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		124AAF3080B22B789B7DB6CA /* DrawbridgePlatform.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DrawbridgePlatform.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		124AAF3080B22B789B7DB6CA /* Drawbridge POS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Drawbridge POS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -59,7 +59,7 @@
 		C1E5343FB679751B64D939CA /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				124AAF3080B22B789B7DB6CA /* DrawbridgePlatform.app */,
+				124AAF3080B22B789B7DB6CA /* Drawbridge POS.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -87,7 +87,7 @@
 			packageProductDependencies = (
 			);
 			productName = iosApp;
-			productReference = 124AAF3080B22B789B7DB6CA /* DrawbridgePlatform.app */;
+			productReference = 124AAF3080B22B789B7DB6CA /* Drawbridge POS.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -245,6 +245,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Drawbridge POS";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Select product images to publish in your marketplace listings.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -254,6 +256,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				PRODUCT_BUNDLE_IDENTIFIER = uqu.drawbridge.pos;
+				PRODUCT_NAME = "Drawbridge POS";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -331,6 +335,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Drawbridge POS";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Select product images to publish in your marketplace listings.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -340,6 +346,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				PRODUCT_BUNDLE_IDENTIFIER = uqu.drawbridge.pos;
+				PRODUCT_NAME = "Drawbridge POS";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

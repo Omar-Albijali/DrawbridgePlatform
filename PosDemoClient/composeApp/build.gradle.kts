@@ -19,8 +19,9 @@ kotlin {
         iosSimulatorArm64()
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
-            baseName = "PosDemoClient"
+            baseName = "PosComposeApp"
             isStatic = true
+            binaryOption("bundleId", "uqu.drawbridge.pos.PosComposeApp")
         }
     }
 
