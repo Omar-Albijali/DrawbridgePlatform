@@ -146,6 +146,9 @@ jobs:
   ios-simulator:
     name: iOS simulator builds
     runs-on: macos-latest
+    env:
+      IOS_SIMULATOR_ARCH: arm64
+      IOS_SIMULATOR_DESTINATION: generic/platform=iOS Simulator
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -159,9 +162,12 @@ jobs:
             -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -configuration Debug \
-            -sdk iphonesimulator \
+            -destination "$IOS_SIMULATOR_DESTINATION" \
             -derivedDataPath "$RUNNER_TEMP/ios-main" \
             CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            ARCHS="$IOS_SIMULATOR_ARCH" \
             build
 
       - name: Build POS iOS app for simulator
@@ -170,7 +176,10 @@ jobs:
             -project PosDemoClient/iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -configuration Debug \
-            -sdk iphonesimulator \
+            -destination "$IOS_SIMULATOR_DESTINATION" \
             -derivedDataPath "$RUNNER_TEMP/ios-pos" \
             CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            ARCHS="$IOS_SIMULATOR_ARCH" \
             build
