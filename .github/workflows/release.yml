@@ -143,22 +143,22 @@ jobs:
             os: ubuntu-latest
             tasks: :desktopApp:packageReleaseDeb :PosDemoClient:desktopApp:packageReleaseDeb
             patterns: |
-              desktopApp/build/compose/binaries/main/deb/*.deb
-              PosDemoClient/desktopApp/build/compose/binaries/main/deb/*.deb
+              desktopApp/build/compose/binaries/main-release/deb/*.deb
+              PosDemoClient/desktopApp/build/compose/binaries/main-release/deb/*.deb
           - label: windows
             os: windows-latest
             tasks: :desktopApp:packageReleaseExe :desktopApp:packageReleaseMsi :PosDemoClient:desktopApp:packageReleaseExe :PosDemoClient:desktopApp:packageReleaseMsi
             patterns: |
-              desktopApp/build/compose/binaries/main/exe/*.exe
-              desktopApp/build/compose/binaries/main/msi/*.msi
-              PosDemoClient/desktopApp/build/compose/binaries/main/exe/*.exe
-              PosDemoClient/desktopApp/build/compose/binaries/main/msi/*.msi
+              desktopApp/build/compose/binaries/main-release/exe/*.exe
+              desktopApp/build/compose/binaries/main-release/msi/*.msi
+              PosDemoClient/desktopApp/build/compose/binaries/main-release/exe/*.exe
+              PosDemoClient/desktopApp/build/compose/binaries/main-release/msi/*.msi
           - label: macos
             os: macos-latest
             tasks: :desktopApp:packageReleaseDmg :PosDemoClient:desktopApp:packageReleaseDmg
             patterns: |
-              desktopApp/build/compose/binaries/main/dmg/*.dmg
-              PosDemoClient/desktopApp/build/compose/binaries/main/dmg/*.dmg
+              desktopApp/build/compose/binaries/main-release/dmg/*.dmg
+              PosDemoClient/desktopApp/build/compose/binaries/main-release/dmg/*.dmg
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
