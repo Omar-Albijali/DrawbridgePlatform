@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "uqu.drawbridge.platform"
-version = "1.0.0"
+version = rootProject.extra["releaseVersion"] as String
 
 java {
     toolchain {

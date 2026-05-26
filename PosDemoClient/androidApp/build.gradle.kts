@@ -5,6 +5,9 @@ plugins {
     alias(libs.plugins.androidApplication)
 }
 
+val androidVersionName = rootProject.extra["androidVersionName"] as String
+val androidVersionCode = rootProject.extra["androidVersionCode"] as Int
+
 kotlin {
     androidTarget()
 
@@ -27,8 +30,8 @@ android {
         applicationId = "uqu.drawbridge.posdemo.android"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = androidVersionCode
+        versionName = androidVersionName
     }
     packaging {
         resources {

@@ -11,3 +11,9 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform) apply false
     alias(libs.plugins.ktor) apply false
 }
+
+val releaseVersion = providers.gradleProperty("releaseVersion").orElse("1.0.0")
+
+extra["releaseVersion"] = releaseVersion.get()
+extra["androidVersionName"] = releaseVersion.get()
+extra["androidVersionCode"] = providers.gradleProperty("androidVersionCode").orElse("1").get().toInt()
