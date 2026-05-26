@@ -1,0 +1,277 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Prepare release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      android_version_code: ${{ steps.meta.outputs.android_version_code }}
+      release_name: ${{ steps.meta.outputs.release_name }}
+    steps:
+      - name: Derive release metadata
+        id: meta
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          IFS='.' read -r major minor patch <<<"$version"
+          android_version_code=$((major * 10000 + minor * 100 + patch))
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "android_version_code=$android_version_code" >> "$GITHUB_OUTPUT"
+          echo "release_name=Drawbridge Platform $tag" >> "$GITHUB_OUTPUT"
+
+  web-release:
+    name: Web release artifact
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up toolchain
+        uses: ./.github/actions/setup-build
+
+      - name: Build shared JS package
+        run: ./gradlew --no-daemon :shared:jsBrowserDevelopmentLibraryDistribution
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Archive web app
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          cd webApp/dist
+          zip -r "../../release-assets/drawbridge-web-v${{ needs.prepare.outputs.version }}.zip" .
+
+      - name: Upload web release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-web
+          path: release-assets/*
+          if-no-files-found: error
+
+  server-release:
+    name: Server release artifact
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up toolchain
+        uses: ./.github/actions/setup-build
+
+      - name: Build server boot jar
+        run: ./gradlew --no-daemon -PreleaseVersion=${{ needs.prepare.outputs.version }} :server:bootJar
+
+      - name: Stage server jar
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          cp "server/build/libs/server-${{ needs.prepare.outputs.version }}.jar" \
+            "release-assets/drawbridge-server-v${{ needs.prepare.outputs.version }}.jar"
+
+      - name: Upload server release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-server
+          path: release-assets/*
+          if-no-files-found: error
+
+  android-release:
+    name: Android release artifacts
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up toolchain
+        uses: ./.github/actions/setup-build
+
+      - name: Build Android debug APKs
+        run: |
+          ./gradlew --no-daemon \
+            -PreleaseVersion=${{ needs.prepare.outputs.version }} \
+            -PandroidVersionCode=${{ needs.prepare.outputs.android_version_code }} \
+            :androidApp:assembleDebug \
+            :PosDemoClient:androidApp:assembleDebug
+
+      - name: Stage Android APKs
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          cp androidApp/build/outputs/apk/debug/androidApp-debug.apk \
+            "release-assets/DrawbridgePlatform-android-debug-v${{ needs.prepare.outputs.version }}.apk"
+          cp PosDemoClient/androidApp/build/outputs/apk/debug/androidApp-debug.apk \
+            "release-assets/PosDemoClient-android-debug-v${{ needs.prepare.outputs.version }}.apk"
+
+      - name: Upload Android release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-android
+          path: release-assets/*
+          if-no-files-found: error
+
+  desktop-release:
+    name: Desktop release ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: linux
+            os: ubuntu-latest
+            tasks: :desktopApp:packageReleaseDeb :PosDemoClient:desktopApp:packageReleaseDeb
+            patterns: |
+              desktopApp/build/compose/binaries/main-release/deb/*.deb
+              PosDemoClient/desktopApp/build/compose/binaries/main-release/deb/*.deb
+          - label: windows
+            os: windows-latest
+            tasks: :desktopApp:packageReleaseMsi :PosDemoClient:desktopApp:packageReleaseMsi
+            patterns: |
+              desktopApp/build/compose/binaries/main-release/msi/*.msi
+              PosDemoClient/desktopApp/build/compose/binaries/main-release/msi/*.msi
+          - label: macos
+            os: macos-latest
+            tasks: :desktopApp:packageReleaseDmg :PosDemoClient:desktopApp:packageReleaseDmg
+            patterns: |
+              desktopApp/build/compose/binaries/main-release/dmg/*.dmg
+              PosDemoClient/desktopApp/build/compose/binaries/main-release/dmg/*.dmg
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up toolchain
+        uses: ./.github/actions/setup-build
+
+      - name: Build desktop packages
+        shell: bash
+        run: |
+          ./gradlew --no-daemon \
+            -PreleaseVersion=${{ needs.prepare.outputs.version }} \
+            ${{ matrix.tasks }}
+
+      - name: Stage desktop artifacts
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          while IFS= read -r pattern; do
+            [ -z "$pattern" ] && continue
+            for file in $pattern; do
+              [ -e "$file" ] || continue
+              cp "$file" release-assets/
+            done
+          done <<'EOF'
+          ${{ matrix.patterns }}
+          EOF
+
+      - name: Upload desktop release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-desktop-${{ matrix.label }}
+          path: release-assets/*
+          if-no-files-found: error
+
+  ios-simulator-release:
+    name: iOS simulator artifacts
+    runs-on: macos-latest
+    needs: prepare
+    env:
+      IOS_SIMULATOR_ARCH: arm64
+      IOS_SIMULATOR_DESTINATION: generic/platform=iOS Simulator
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up toolchain
+        uses: ./.github/actions/setup-build
+
+      - name: Build main iOS app for simulator
+        run: |
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Debug \
+            -destination "$IOS_SIMULATOR_DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/ios-main" \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            ARCHS="$IOS_SIMULATOR_ARCH" \
+            build
+
+      - name: Build POS iOS app for simulator
+        run: |
+          xcodebuild \
+            -project PosDemoClient/iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Debug \
+            -destination "$IOS_SIMULATOR_DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/ios-pos" \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            ARCHS="$IOS_SIMULATOR_ARCH" \
+            build
+
+      - name: Archive iOS simulator apps
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          main_app="$(find "$RUNNER_TEMP/ios-main/Build/Products" -name '*.app' -print -quit)"
+          pos_app="$(find "$RUNNER_TEMP/ios-pos/Build/Products" -name '*.app' -print -quit)"
+          ditto -c -k --sequesterRsrc --keepParent "$main_app" \
+            "release-assets/DrawbridgePlatform-ios-simulator-v${{ needs.prepare.outputs.version }}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$pos_app" \
+            "release-assets/PosDemoClient-ios-simulator-v${{ needs.prepare.outputs.version }}.zip"
+
+      - name: Upload iOS simulator artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-ios-simulator
+          path: release-assets/*
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub release
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - web-release
+      - server-release
+      - android-release
+      - desktop-release
+      - ios-simulator-release
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ needs.prepare.outputs.release_name }}
+          generate_release_notes: true
+          files: release-artifacts/*

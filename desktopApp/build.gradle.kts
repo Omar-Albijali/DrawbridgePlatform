@@ -6,6 +6,8 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
+val releaseVersion = rootProject.extra["releaseVersion"] as String
+
 dependencies {
     implementation(projects.composeApp)
 //    implementation(projects.shared)
@@ -20,10 +22,14 @@ compose.desktop {
     application {
         mainClass = "uqu.drawbridge.platform.MainKt"
 
+        buildTypes.release.proguard {
+            isEnabled = false
+        }
+
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb)
             packageName = "uqu.drawbridge.platform"
-            packageVersion = "1.0.0"
+            packageVersion = releaseVersion
         }
     }
 }

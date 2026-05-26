@@ -7,6 +7,8 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
+val releaseVersion = rootProject.extra["releaseVersion"] as String
+
 kotlin {
     jvm()
 
@@ -25,10 +27,14 @@ compose.desktop {
     application {
         mainClass = "uqu.drawbridge.posdemo.MainKt"
 
+        buildTypes.release.proguard {
+            isEnabled = false
+        }
+
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb)
             packageName = "uqu.drawbridge.posdemo.desktop"
-            packageVersion = "1.0.0"
+            packageVersion = releaseVersion
         }
     }
 }
