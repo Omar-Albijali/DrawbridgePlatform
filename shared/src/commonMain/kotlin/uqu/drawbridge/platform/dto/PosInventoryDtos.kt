@@ -65,3 +65,19 @@ data class PosOutboundInventoryEventDTO(
     val changeAmount: Int,
     val reason: String?
 )
+
+@Serializable
+data class PosInventoryWebhookPayload(
+    val eventId: String,
+    val eventTime: String,
+    val retailerId: String,
+    val sourceType: String,
+    val sourceId: String?,
+    val gtin: String,
+    val productId: String,
+    val inventoryItemId: String,
+    val quantityBefore: Int,
+    val quantityAfter: Int,
+    val changeAmount: Int,
+    val reason: String?
+)

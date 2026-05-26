@@ -61,7 +61,7 @@ class PosInventorySyncServiceTest {
             inventoryService.adjustQuantity(
                 "inv-1",
                 -3,
-                uqu.drawbridge.platform.model.InventoryAuditSourceType.POS,
+                uqu.drawbridge.platform.dto.InventoryAuditSourceType.POS,
                 "evt-1",
                 "POS sale"
             )

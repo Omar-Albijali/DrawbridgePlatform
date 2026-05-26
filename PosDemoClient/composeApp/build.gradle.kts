@@ -42,6 +42,10 @@ kotlin {
             implementation(libs.kscan)
             implementation(libs.multiplatform.settings)
             implementation(libs.multiplatform.settings.no.arg)
+            implementation(libs.ktor.server.core.mpp)
+            implementation(libs.ktor.server.cio.mpp)
+            implementation(libs.ktor.server.content.negotiation.mpp)
+            implementation(libs.ktor.serialization.kotlinx.json)
         }
         val iosArm64Main by getting
         val iosSimulatorArm64Main by getting
