@@ -6,9 +6,9 @@ import uqu.drawbridge.platform.ScheduleType
 import java.time.LocalDateTime
 
 interface InventoryItemRepository : JpaRepository<InventoryItem, String> {
-    fun findByRetailerId(retailerId: String): List<InventoryItem>
-    fun findByProductId(productId: String): List<InventoryItem>
-    fun findByRetailerIdAndProductId(retailerId: String, productId: String): InventoryItem?
+    fun findByRetailer_Id(retailerId: String): List<InventoryItem>
+    fun findByProduct_Id(productId: String): List<InventoryItem>
+    fun findByRetailer_IdAndProduct_Id(retailerId: String, productId: String): InventoryItem?
     fun findByCurrentQuantityLessThanEqual(quantity: Int): List<InventoryItem>
     
     fun findByAutoOrderConfigEnabledTrue(): List<InventoryItem>

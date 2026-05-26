@@ -5,6 +5,6 @@ import uqu.drawbridge.platform.model.ShoppingCart
 import java.util.Optional
 
 interface ShoppingCartRepository : JpaRepository<ShoppingCart, String> {
-    fun findByRetailerId(retailerId: String): Optional<ShoppingCart>
-    fun existsByRetailerId(retailerId: String): Boolean
+    fun findByRetailer_Id(retailerId: String): Optional<ShoppingCart>
+    fun existsByRetailer_Id(retailerId: String): Boolean
 }

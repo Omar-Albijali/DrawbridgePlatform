@@ -47,11 +47,11 @@ class NotificationService(
     }
 
     fun getNotificationsByRecipient(recipientId: String): List<Notification> {
-        return notificationRepository.findByRecipientIdOrderByCreatedAtDesc(recipientId)
+        return notificationRepository.findByRecipient_IdOrderByCreatedAtDesc(recipientId)
     }
 
     fun getUnreadCount(recipientId: String): Long {
-        return notificationRepository.countByRecipientIdAndReadFalse(recipientId)
+        return notificationRepository.countByRecipient_IdAndReadFalse(recipientId)
     }
 
     fun getNotificationsByChannel(channel: NotificationChannel): List<Notification> {
@@ -74,8 +74,9 @@ class NotificationService(
         message: String,
         deepLink: String
     ): Notification {
+        val recipientRef = userRepository.getReferenceById(recipientId)
         val inApp = notificationRepository.save(Notification(
-            recipientId = recipientId,
+            recipient = recipientRef,
             type = type,
             eventKey = eventKey,
             entityType = entityType,
@@ -117,7 +118,7 @@ class NotificationService(
             }
 
             if (isChannelEnabled(recipientId, preferenceKey, NotificationChannel.PUSH)) {
-                val subscriptions = webPushSubscriptionRepository.findByUserId(recipientId)
+                val subscriptions = webPushSubscriptionRepository.findByUser_Id(recipientId)
                 subscriptions.forEach { subscription ->
                     val sent = webPushService.send(subscription, title, message, inApp.id, deepLink)
                     if (!sent) {
@@ -142,7 +143,7 @@ class NotificationService(
 
     @Transactional
     fun markAllNotificationsRead(recipientId: String): Int {
-        val unread = notificationRepository.findByRecipientIdAndReadFalseOrderByCreatedAtDesc(recipientId)
+        val unread = notificationRepository.findByRecipient_IdAndReadFalseOrderByCreatedAtDesc(recipientId)
         unread.forEach { it.read = true }
         notificationRepository.saveAll(unread)
         return unread.size
@@ -160,18 +161,18 @@ class NotificationService(
 
     @Transactional
     fun deleteAllNotificationsForRecipient(recipientId: String): Int {
-        val notifications = notificationRepository.findByRecipientId(recipientId)
+        val notifications = notificationRepository.findByRecipient_Id(recipientId)
         notificationRepository.deleteAll(notifications)
         return notifications.size
     }
 
     fun getPreferences(userId: String): List<NotificationPreference> {
-        return notificationPreferenceRepository.findByUserId(userId)
+        return notificationPreferenceRepository.findByUser_Id(userId)
     }
 
     @Transactional
     fun upsertPreference(userId: String, request: UpsertNotificationPreferenceRequest): NotificationPreference {
-        val existing = notificationPreferenceRepository.findByUserIdAndPreferenceKeyAndChannel(
+        val existing = notificationPreferenceRepository.findByUser_IdAndPreferenceKeyAndChannel(
             userId = userId,
             preferenceKey = request.preferenceKey,
             channel = request.channel
@@ -183,7 +184,7 @@ class NotificationService(
             existing
         } else {
             NotificationPreference(
-                userId = userId,
+                user = userRepository.getReferenceById(userId),
                 preferenceKey = request.preferenceKey,
                 channel = request.channel,
                 enabled = request.enabled,
@@ -198,14 +199,14 @@ class NotificationService(
     fun registerPushSubscription(request: RegisterWebPushSubscriptionRequest): WebPushSubscription {
         val existing = webPushSubscriptionRepository.findByEndpoint(request.endpoint)
         val subscription = if (existing != null) {
-            existing.userId = request.userId
+            existing.user = userRepository.getReferenceById(request.userId)
             existing.p256dh = request.p256dh
             existing.auth = request.auth
             existing.userAgent = request.userAgent
             existing
         } else {
             WebPushSubscription(
-                userId = request.userId,
+                user = userRepository.getReferenceById(request.userId),
                 endpoint = request.endpoint,
                 p256dh = request.p256dh,
                 auth = request.auth,
@@ -224,7 +225,7 @@ class NotificationService(
     }
 
     fun getPushSubscriptions(userId: String): List<WebPushSubscription> {
-        return webPushSubscriptionRepository.findByUserId(userId)
+        return webPushSubscriptionRepository.findByUser_Id(userId)
     }
 
     fun getPushSubscriptionByEndpoint(endpoint: String): WebPushSubscription? {
@@ -291,7 +292,7 @@ class NotificationService(
         preferenceKey: NotificationPreferenceKey,
         channel: NotificationChannel
     ): Boolean {
-        val preference = notificationPreferenceRepository.findByUserIdAndPreferenceKeyAndChannel(
+        val preference = notificationPreferenceRepository.findByUser_IdAndPreferenceKeyAndChannel(
             userId = userId,
             preferenceKey = preferenceKey,
             channel = channel

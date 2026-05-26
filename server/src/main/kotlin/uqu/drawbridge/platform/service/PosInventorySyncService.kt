@@ -14,6 +14,7 @@ import uqu.drawbridge.platform.model.PosEventReceiptStatus
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.PosEventReceiptRepository
 import uqu.drawbridge.platform.repository.ProductRepository
+import uqu.drawbridge.platform.repository.UserRepository
 import uqu.drawbridge.platform.validation.RequestValidation
 
 @Service
@@ -21,7 +22,8 @@ class PosInventorySyncService(
     private val productRepository: ProductRepository,
     private val inventoryItemRepository: InventoryItemRepository,
     private val posEventReceiptRepository: PosEventReceiptRepository,
-    private val inventoryService: InventoryService
+    private val inventoryService: InventoryService,
+    private val userRepository: UserRepository
 ) {
     private val logger = LoggerFactory.getLogger(PosInventorySyncService::class.java)
 
@@ -46,7 +48,7 @@ class PosInventorySyncService(
         try {
             val product = productRepository.findByGtin(gtin)
                 ?: throw NoSuchElementException("No product found for GTIN: $gtin")
-            val inventoryItem = inventoryItemRepository.findByRetailerIdAndProductId(retailerId, product.id.orEmpty())
+            val inventoryItem = inventoryItemRepository.findByRetailer_IdAndProduct_Id(retailerId, product.id.orEmpty())
                 ?: throw NoSuchElementException("No inventory entry found for retailer and GTIN")
             val inventoryItemId = inventoryItem.id ?: throw IllegalStateException("Inventory item has no id")
 
@@ -102,13 +104,13 @@ class PosInventorySyncService(
     }
 
     private fun tryStartReceipt(retailerId: String, eventId: String, eventType: String): PosEventReceipt? {
-        if (posEventReceiptRepository.existsByRetailerIdAndEventIdAndEventType(retailerId, eventId, eventType)) {
+        if (posEventReceiptRepository.existsByRetailer_IdAndEventIdAndEventType(retailerId, eventId, eventType)) {
             return null
         }
         return try {
             posEventReceiptRepository.saveAndFlush(
                 PosEventReceipt(
-                    retailerId = retailerId,
+                    retailer = userRepository.getReferenceById(retailerId),
                     eventId = eventId,
                     eventType = eventType,
                     status = PosEventReceiptStatus.PROCESSING,

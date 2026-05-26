@@ -1,7 +1,10 @@
 package uqu.drawbridge.platform.model
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 
 import jakarta.persistence.*
+import org.hibernate.annotations.OnDelete
+import org.hibernate.annotations.OnDeleteAction
 
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -15,15 +18,6 @@ class Payment(
     var id: String? = null,
 
     @Column(nullable = false)
-    var orderId: String,
-
-    @Column(nullable = false)
-    var ownerId: String,
-
-    @Column(nullable = false)
-    var paymentMethodId: String,
-
-    @Column(nullable = false)
     var amount: BigDecimal,
 
     @Column(nullable = false)
@@ -34,17 +28,39 @@ class Payment(
     var transactionRef: String,
 
     @Column(nullable = false)
-    var completedAt: LocalDateTime
-)
+    var completedAt: LocalDateTime,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "order_id", nullable = false)
+    var order: Order,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "owner_id", nullable = false)
+    var owner: User,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_method_id", nullable = true)
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    var paymentMethod: PaymentMethod? = null
+) {
+    val orderId: String
+        get() = order.id ?: ""
+
+    val ownerId: String
+        get() = owner.id ?: ""
+
+    val paymentMethodId: String?
+        get() = paymentMethod?.id
+}
 
 @Entity
 @Table(name = "invoices")
 class Invoice(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: String? = null,
-
-    @Column(nullable = false)
-    var orderId: String,
 
     @Column(nullable = false, unique = true)
     var invoiceNumber: String,
@@ -59,17 +75,22 @@ class Invoice(
     var totalAmount: BigDecimal,
 
     @Column(nullable = false)
-    var currency: String
-)
+    var currency: String,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "order_id", nullable = false)
+    var order: Order
+) {
+    val orderId: String
+        get() = order.id ?: ""
+}
 
 @Entity
 @Table(name = "payment_methods")
 class PaymentMethod(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: String? = null,
-
-    @Column(nullable = false)
-    var ownerId: String,
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
@@ -79,5 +100,14 @@ class PaymentMethod(
     var maskedDetails: String,
 
     @Column(nullable = false)
-    var isDefault: Boolean = false
-)
+    var isDefault: Boolean = false,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "owner_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var owner: User
+) {
+    val ownerId: String
+        get() = owner.id ?: ""
+}

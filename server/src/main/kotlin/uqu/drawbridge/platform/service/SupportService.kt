@@ -51,7 +51,7 @@ class SupportService(
 
         val ticket = SupportTicket(
             ticketNumber = generateTicketNumber(),
-            userId = requireNotNull(user.id) { "User ID is required" },
+            user = user,
             subject = normalizedSubject,
             category = category,
             description = normalizedDescription,
@@ -97,12 +97,12 @@ class SupportService(
 
     @Transactional(readOnly = true)
     fun getMyTickets(userId: String): List<SupportTicketDTO> {
-        return supportTicketRepository.findAllByUserIdOrderByUpdatedAtDesc(userId).map { it.toDTO() }
+        return supportTicketRepository.findAllByUser_IdOrderByUpdatedAtDesc(userId).map { it.toDTO() }
     }
 
     @Transactional(readOnly = true)
     fun getTicketById(id: Long, userId: String): SupportTicketDTO {
-        val ticket = supportTicketRepository.findByIdAndUserId(id, userId)
+        val ticket = supportTicketRepository.findByIdAndUser_Id(id, userId)
             ?: throw NoSuchElementException("Support ticket not found")
         return ticket.toDTO()
     }

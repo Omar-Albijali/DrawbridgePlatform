@@ -33,6 +33,7 @@ class ProductServiceTest {
     @Test
     fun `product creation with MOQ succeeds`() {
         `when`(userRepository.findById("wh-1")).thenReturn(Optional.of(wholesalerUser()))
+        `when`(categoryRepository.getReferenceById("cat-1")).thenReturn(Category(id = "cat-1", name = "Drinks"))
         `when`(categoryRepository.findById("cat-1")).thenReturn(Optional.of(Category(id = "cat-1", name = "Drinks")))
         `when`(productRepository.save(any(Product::class.java))).thenAnswer { invocation ->
             (invocation.arguments[0] as Product).apply { id = "prod-1" }

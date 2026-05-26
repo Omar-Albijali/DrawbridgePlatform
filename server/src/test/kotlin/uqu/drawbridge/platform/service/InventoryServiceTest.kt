@@ -15,6 +15,8 @@ import org.mockito.Mockito.verify
 import uqu.drawbridge.platform.ScheduleType
 import uqu.drawbridge.platform.UpdateAutoOrderConfigRequest
 import uqu.drawbridge.platform.UserRole
+import uqu.drawbridge.platform.OrderStatus
+import uqu.drawbridge.platform.model.Order
 import uqu.drawbridge.platform.model.AutoOrderConfig
 import uqu.drawbridge.platform.model.InventoryItem
 import uqu.drawbridge.platform.model.Product
@@ -22,6 +24,7 @@ import uqu.drawbridge.platform.model.Representative
 import uqu.drawbridge.platform.model.User
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.ProductRepository
+import uqu.drawbridge.platform.repository.UserRepository
 import java.math.BigDecimal
 import java.time.DayOfWeek
 import java.time.LocalDateTime
@@ -34,13 +37,15 @@ class InventoryServiceTest {
     private val orderService = mock(OrderService::class.java)
     private val notificationService = mock(NotificationService::class.java)
     private val inventoryAuditService = mock(InventoryAuditService::class.java)
+    private val userRepository = mock(UserRepository::class.java)
 
     private val service = InventoryService(
         inventoryItemRepository = inventoryItemRepository,
         productRepository = productRepository,
         orderService = orderService,
         notificationService = notificationService,
-        inventoryAuditService = inventoryAuditService
+        inventoryAuditService = inventoryAuditService,
+        userRepository = userRepository
     )
 
     @Test
@@ -194,11 +199,12 @@ class InventoryServiceTest {
                 unitPrice = BigDecimal("20.00")
             )
         ).thenReturn(
-            uqu.drawbridge.platform.model.Order(
+            Order(
                 id = "ord-1",
-                retailerId = "retailer-1",
-                wholesalerId = "wh-1",
-                subtotal = BigDecimal("140.00")
+                retailer = User(id = "retailer-1", email = "", passwordHash = "", role = UserRole.RETAILER, phoneNumber = "", businessName = "", verificationStatus = true, commercialRegistrationNumber = ""),
+                wholesaler = wholesalerUser(),
+                subtotal = BigDecimal("140.00"),
+                status = OrderStatus.PENDING
             )
         )
 
@@ -218,8 +224,8 @@ class InventoryServiceTest {
     private fun inventoryWithConfig(id: String, scheduleType: ScheduleType): InventoryItem {
         return InventoryItem(
             id = id,
-            retailerId = "retailer-1",
-            productId = "prod-1",
+            retailer = User(id = "retailer-1", email = "", passwordHash = "", role = uqu.drawbridge.platform.UserRole.RETAILER, phoneNumber = "", businessName = "", verificationStatus = true, commercialRegistrationNumber = ""),
+            product = product(),
             currentQuantity = 25,
             lastUpdated = LocalDateTime.now(),
             autoOrderConfig = AutoOrderConfig(
@@ -234,7 +240,7 @@ class InventoryServiceTest {
     private fun stubInventoryFindAndSave(item: InventoryItem) {
         `when`(inventoryItemRepository.findById(item.id!!)).thenReturn(Optional.of(item))
         `when`(inventoryItemRepository.save(any(InventoryItem::class.java))).thenAnswer { it.arguments[0] as InventoryItem }
-        `when`(productRepository.findById(item.productId)).thenReturn(Optional.of(product()))
+        `when`(productRepository.findById(item.productId ?: "")).thenReturn(Optional.of(item.product ?: product()))
     }
 
     private fun product(minimumOrderQuantity: Int = 1, stockQuantity: Int = 100): Product {
@@ -243,7 +249,7 @@ class InventoryServiceTest {
             wholesaler = wholesalerUser(),
             name = "Beans",
             description = "Desc",
-            categoryId = "cat-1",
+            category = uqu.drawbridge.platform.model.Category(id = "cat-1", name = "category"),
             price = BigDecimal("20.00"),
             stockQuantity = stockQuantity,
             minimumOrderQuantity = minimumOrderQuantity,

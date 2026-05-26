@@ -6,6 +6,7 @@ import uqu.drawbridge.platform.model.*
 import uqu.drawbridge.platform.repository.CartItemRepository
 import uqu.drawbridge.platform.repository.ProductRepository
 import uqu.drawbridge.platform.repository.ShoppingCartRepository
+import uqu.drawbridge.platform.repository.UserRepository
 import uqu.drawbridge.platform.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -15,17 +16,18 @@ class CartService(
     private val shoppingCartRepository: ShoppingCartRepository,
     private val cartItemRepository: CartItemRepository,
     private val productRepository: ProductRepository,
-    private val orderService: OrderService
+    private val orderService: OrderService,
+    private val userRepository: UserRepository
 ) {
 
     // ==================== CART OPERATIONS ====================
 
     fun getOrCreateCart(retailerId: String): ShoppingCart {
-        return shoppingCartRepository.findByRetailerId(retailerId)
+        return shoppingCartRepository.findByRetailer_Id(retailerId)
             .orElseGet {
                 shoppingCartRepository.save(
                     ShoppingCart(
-                        retailerId = retailerId,
+                        retailer = userRepository.getReferenceById(retailerId),
                         updatedAt = LocalDateTime.now()
                     )
                 )
@@ -33,17 +35,17 @@ class CartService(
     }
 
     fun getCartByRetailerId(retailerId: String): ShoppingCart? {
-        return shoppingCartRepository.findByRetailerId(retailerId).orElse(null)
+        return shoppingCartRepository.findByRetailer_Id(retailerId).orElse(null)
     }
 
     fun getCartItems(retailerId: String): List<CartItem> {
         val cart = getCartByRetailerId(retailerId) ?: return emptyList()
-        return cartItemRepository.findByCartId(cart.id!!)
+        return cartItemRepository.findByCart_Id(cart.id!!)
     }
 
     fun getCartItemsGroupedByWholesaler(retailerId: String): Map<String, List<CartItem>> {
         val cart = getCartByRetailerId(retailerId) ?: return emptyMap()
-        val items = cartItemRepository.findByCartId(cart.id!!)
+        val items = cartItemRepository.findByCart_Id(cart.id!!)
         return items.groupBy { it.wholesalerId }
     }
 
@@ -55,7 +57,7 @@ class CartService(
         val cart = getOrCreateCart(retailerId)
         
         // Check if item already exists in cart
-        val existingItem = cartItemRepository.findByCartIdAndProductId(cart.id!!, productId)
+        val existingItem = cartItemRepository.findByCart_IdAndProduct_Id(cart.id!!, productId)
         val finalQuantity = (existingItem?.quantity ?: 0) + quantity
         validateCartQuantity(product, finalQuantity)
         
@@ -68,8 +70,9 @@ class CartService(
         } else {
             // Add new item
             val cartItem = CartItem(
-                productId = productId,
-                wholesalerId = product.wholesaler.id!!,
+                product = productRepository.getReferenceById(productId),
+                wholesaler = product.wholesaler,
+                cart = cart,
                 quantity = quantity,
                 addedAt = LocalDateTime.now()
             )
@@ -86,7 +89,7 @@ class CartService(
     @Transactional
     fun updateCartItemQuantity(retailerId: String, productId: String, quantity: Int): CartItem? {
         val cart = getCartByRetailerId(retailerId) ?: return null
-        val item = cartItemRepository.findByCartIdAndProductId(cart.id!!, productId) ?: return null
+        val item = cartItemRepository.findByCart_IdAndProduct_Id(cart.id!!, productId) ?: return null
         
         if (quantity <= 0) {
             removeFromCart(retailerId, productId)
@@ -128,12 +131,12 @@ class CartService(
 
     fun getCartItemCount(retailerId: String): Int {
         val cart = getCartByRetailerId(retailerId) ?: return 0
-        return cartItemRepository.findByCartId(cart.id!!).sumOf { it.quantity }
+        return cartItemRepository.findByCart_Id(cart.id!!).sumOf { it.quantity }
     }
 
     fun getCartTotal(retailerId: String): BigDecimal {
         val cart = getCartByRetailerId(retailerId) ?: return BigDecimal.ZERO
-        val items = cartItemRepository.findByCartId(cart.id!!)
+        val items = cartItemRepository.findByCart_Id(cart.id!!)
         
         return items.fold(BigDecimal.ZERO) { total, item ->
             val product = productRepository.findById(item.productId).orElse(null)
@@ -154,7 +157,7 @@ class CartService(
     @Transactional
     fun checkout(retailerId: String): OrderGroup? {
         val cart = getCartByRetailerId(retailerId) ?: return null
-        val items = cartItemRepository.findByCartId(cart.id!!)
+        val items = cartItemRepository.findByCart_Id(cart.id!!)
         
         if (items.isEmpty()) return null
 
@@ -169,7 +172,7 @@ class CartService(
         // Create OrderGroup
         val orderGroup = orderService.createOrderGroup(
             OrderGroup(
-                retailerId = retailerId,
+                retailer = userRepository.getReferenceById(retailerId),
                 groupTotal = BigDecimal.ZERO, // Will be updated
                 paymentStatus = PaymentStatus.PENDING
             )
@@ -180,6 +183,15 @@ class CartService(
             // Calculate subtotal for this wholesaler's order
             var subtotal = BigDecimal.ZERO
             
+            // Create the order
+            val order = Order(
+                retailer = userRepository.getReferenceById(retailerId),
+                wholesaler = userRepository.getReferenceById(wholesalerId),
+                subtotal = BigDecimal.ZERO, // will set below
+                status = OrderStatus.PENDING,
+                orderGroup = orderGroup
+            )
+            
             val orderItems = wholesalerItems.mapNotNull { cartItem ->
                 val product = productRepository.findById(cartItem.productId).orElse(null)
                 if (product != null) {
@@ -187,22 +199,16 @@ class CartService(
                     subtotal += itemTotal
                     
                     OrderItem(
-                        productId = cartItem.productId,
+                        product = product,
                         quantity = cartItem.quantity,
-                        unitPrice = product.price
+                        unitPrice = product.price,
+                        order = order
                     )
                 } else null
             }
             
+            order.subtotal = subtotal
             groupTotal += subtotal
-            
-            // Create the order with items
-            val order = Order(
-                retailerId = retailerId,
-                wholesalerId = wholesalerId,
-                subtotal = subtotal,
-                status = OrderStatus.PENDING
-            )
             
             orderService.createOrderWithItems(order, orderItems)
             orderGroup.orders.add(order)
@@ -230,7 +236,7 @@ class CartService(
 
     fun ShoppingCart.toDTO() = ShoppingCartDTO(
         id = this.id ?: "",
-        retailerId = this.retailerId,
+        retailerId = this.retailerId ?: "",
         updatedAt = this.updatedAt.toString(),
         items = this.items.map { it.toDTO() }.toTypedArray()
     )

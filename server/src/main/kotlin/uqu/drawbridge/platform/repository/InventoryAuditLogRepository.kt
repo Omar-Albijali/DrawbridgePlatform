@@ -8,8 +8,8 @@ import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.model.InventoryAuditLog
 
 interface InventoryAuditLogRepository : JpaRepository<InventoryAuditLog, String>, JpaSpecificationExecutor<InventoryAuditLog> {
-    fun findByProductIdOrderByCreatedAtDesc(productId: String, pageable: Pageable): Page<InventoryAuditLog>
-    fun findByInventoryItemIdOrderByCreatedAtDesc(inventoryItemId: String, pageable: Pageable): Page<InventoryAuditLog>
+    fun findByProduct_IdOrderByCreatedAtDesc(productId: String, pageable: Pageable): Page<InventoryAuditLog>
+    fun findByInventoryItem_IdOrderByCreatedAtDesc(inventoryItemId: String, pageable: Pageable): Page<InventoryAuditLog>
     fun findFirstBySourceTypeAndSourceIdOrderByCreatedAtDesc(
         sourceType: InventoryAuditSourceType,
         sourceId: String

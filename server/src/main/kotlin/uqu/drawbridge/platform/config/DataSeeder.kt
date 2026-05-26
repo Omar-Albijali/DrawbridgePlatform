@@ -52,7 +52,7 @@ class DataSeeder(
                 }
             }
 
-            ensureDemoRetailerCheckoutData()
+
 
             if (userRepository.count() > 0) return@CommandLineRunner
 
@@ -81,7 +81,8 @@ class DataSeeder(
                 city = "Jeddah",
                 state = "Makkah",
                 zipCode = "21411",
-                country = "Saudi Arabia"
+                country = "Saudi Arabia",
+                user = wholesaler
             ))
             
             userRepository.save(wholesaler)
@@ -104,29 +105,34 @@ class DataSeeder(
             )
             
             retailer.addresses.add(Address(
-                street = "King Fahd Road, Al Olaya",
+                street = "Riyadh Blvd",
                 city = "Riyadh",
                 state = "Riyadh",
                 zipCode = "11564",
-                country = "Saudi Arabia"
+                country = "Saudi Arabia",
+                user = retailer
             ))
 
             val savedRetailer = userRepository.save(retailer)
 
             // Seed Payment Methods
-            paymentMethodRepository.save(PaymentMethod(
-                ownerId = savedRetailer.id!!,
-                type = PaymentMethodType.CREDIT_CARD,
-                maskedDetails = "Visa **** 4444 (Exp: 12/28)",
-                isDefault = true
-            ))
+            paymentMethodRepository.save(
+                PaymentMethod(
+                    owner = savedRetailer,
+                    type = PaymentMethodType.CREDIT_CARD,
+                    maskedDetails = "Visa **** 4444 (Exp: 12/28)",
+                    isDefault = true
+                )
+            )
 
 
             // 2. Categories
             val categoriesByName = categoryRepository.findAll().associateBy { it.name }
-            val catFood = categoriesByName["Food & Beverages"] ?: categoryRepository.save(Category(name = "Food & Beverages"))
+            val catFood =
+                categoriesByName["Food & Beverages"] ?: categoryRepository.save(Category(name = "Food & Beverages"))
             val catSupplies = categoriesByName["Supplies"] ?: categoryRepository.save(Category(name = "Supplies"))
-            val catElectronics = categoriesByName["Electronics"] ?: categoryRepository.save(Category(name = "Electronics"))
+            val catElectronics =
+                categoriesByName["Electronics"] ?: categoryRepository.save(Category(name = "Electronics"))
 
             // 3. Products
             val p1 = Product(
@@ -136,13 +142,25 @@ class DataSeeder(
                 stockQuantity = 150,
                 gtin = "628100001",
                 wholesaler = wholesaler,
-                categoryId = catFood.id!!,
+                category = catFood,
                 published = true,
                 averageRating = BigDecimal("4.8"),
                 ratingCount = 124
             )
-            p1.images.add(ProductImage(url = "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=800&q=80", altText = "Premium Coffee Beans"))
-            p1.images.add(ProductImage(url = "https://images.unsplash.com/photo-1580915411954-282cb1b0d780?w=800&q=80", altText = "Coffee roasting process"))
+            p1.images.add(
+                ProductImage(
+                    url = "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=800&q=80",
+                    altText = "Premium Coffee Beans",
+                    product = p1
+                )
+            )
+            p1.images.add(
+                ProductImage(
+                    url = "https://images.unsplash.com/photo-1580915411954-282cb1b0d780?w=800&q=80",
+                    altText = "Coffee roasting process",
+                    product = p1
+                )
+            )
             val savedP1 = productRepository.save(p1)
 
             val p2 = Product(
@@ -152,12 +170,18 @@ class DataSeeder(
                 stockQuantity = 80,
                 gtin = "628100002",
                 wholesaler = wholesaler,
-                categoryId = catFood.id!!,
+                category = catFood,
                 published = true,
                 averageRating = BigDecimal("4.6"),
                 ratingCount = 56
             )
-            p2.images.add(ProductImage(url = "https://images.unsplash.com/photo-1511537190424-bbbab87ac5eb?w=800&q=80", altText = "Colombian Single Origin Beans"))
+            p2.images.add(
+                ProductImage(
+                    url = "https://images.unsplash.com/photo-1511537190424-bbbab87ac5eb?w=800&q=80",
+                    altText = "Colombian Single Origin Beans",
+                    product = p2
+                )
+            )
             val savedP2 = productRepository.save(p2)
 
             val p3 = Product(
@@ -167,112 +191,99 @@ class DataSeeder(
                 stockQuantity = 50,
                 gtin = "628100003",
                 wholesaler = wholesaler,
-                categoryId = catFood.id!!,
+                category = catFood,
                 published = true,
                 averageRating = BigDecimal("4.9"),
                 ratingCount = 89
             )
-            p3.images.add(ProductImage(url = "https://images.unsplash.com/photo-1552611052-33e04de081de?w=800&q=80", altText = "Espresso Roast Bulk Bag"))
+            p3.images.add(
+                ProductImage(
+                    url = "https://images.unsplash.com/photo-1552611052-33e04de081de?w=800&q=80",
+                    altText = "Espresso Roast Bulk Bag",
+                    product = p3
+                )
+            )
             val savedP3 = productRepository.save(p3)
 
             // Seed some ratings
-            productRatingRepository.save(ProductRating(
-                productId = savedP1.id!!,
-                userId = savedRetailer.id!!,
-                rating = 5,
-                review = "Excellent coffee beans! My customers love it."
-            ))
+            productRatingRepository.save(
+                ProductRating(
+                    product = savedP1,
+                    user = savedRetailer,
+                    rating = 5,
+                    review = "Excellent coffee beans! My customers love it."
+                )
+            )
 
-            productRatingRepository.save(ProductRating(
-                productId = savedP2.id!!,
-                userId = savedRetailer.id!!,
-                rating = 4,
-                review = "Great quality, but the packaging could be better."
-            ))
+            productRatingRepository.save(
+                ProductRating(
+                    product = savedP2,
+                    user = savedRetailer,
+                    rating = 4,
+                    review = "Great quality, but the packaging could be better."
+                )
+            )
 
             // 4. Inventory (for Retailer)
-            inventoryItemRepository.save(InventoryItem(
-                productId = savedP1.id!!,
-                retailerId = savedRetailer.id!!,
-                currentQuantity = 5,
-                lastUpdated = LocalDateTime.now(),
-                autoOrderConfig = AutoOrderConfig(
-                    enabled = true,
-                    minThreshold = 10,
-                    reorderQuantity = 20
-            )))
-
-            inventoryItemRepository.save(InventoryItem(
-                productId = savedP2.id!!,
-                retailerId = savedRetailer.id!!,
-                currentQuantity = 8,
-                lastUpdated = LocalDateTime.now(),
-                autoOrderConfig = AutoOrderConfig(
-                    enabled = true,
-                    minThreshold = 5,
-                    reorderQuantity = 10
+            inventoryItemRepository.save(
+                InventoryItem(
+                    product = savedP1,
+                    retailer = savedRetailer,
+                    currentQuantity = 5,
+                    lastUpdated = LocalDateTime.now(),
+                    autoOrderConfig = AutoOrderConfig(
+                        enabled = true,
+                        minThreshold = 10,
+                        reorderQuantity = 20
+                    )
                 )
-            ))
+            )
+
+            inventoryItemRepository.save(
+                InventoryItem(
+                    product = savedP2,
+                    retailer = savedRetailer,
+                    currentQuantity = 8,
+                    lastUpdated = LocalDateTime.now(),
+                    autoOrderConfig = AutoOrderConfig(
+                        enabled = true,
+                        minThreshold = 5,
+                        reorderQuantity = 10
+                    )
+                )
+            )
 
             // 5. Orders
-            val orderGroup = orderGroupRepository.save(OrderGroup(
-                retailerId = savedRetailer.id!!,
-                groupTotal = BigDecimal("456.78"),
-                paymentStatus = PaymentStatus.COMPLETED
-            ))
+            val orderGroup = orderGroupRepository.save(
+                OrderGroup(
+                    retailer = savedRetailer,
+                    groupTotal = BigDecimal("456.78"),
+                    paymentStatus = PaymentStatus.COMPLETED
+                )
+            )
 
             val order = Order(
-                retailerId = savedRetailer.id!!,
-                wholesalerId = wholesaler.id!!,
+                retailer = savedRetailer,
+                wholesaler = wholesaler,
                 status = OrderStatus.DELIVERED,
-                subtotal = BigDecimal("456.78")
+                subtotal = BigDecimal("456.78"),
+                orderGroup = orderGroup
             )
-            
+
             // Link order items
             val orderItem = OrderItem(
-                productId = savedP1.id!!,
+                product = savedP1,
                 quantity = 5,
-                unitPrice = savedP1.price
+                unitPrice = savedP1.price,
+                order = order
             )
-            
+
             order.orderItems.add(orderItem)
             orderGroup.orders.add(order)
-            
+
             orderGroupRepository.save(orderGroup)
 
             println("DATA SEEDING COMPLETED.")
-        }
-    }
-
-    private fun ensureDemoRetailerCheckoutData() {
-        val retailer = userRepository.findByEmail("retailer@test.com") ?: return
-        val retailerId = retailer.id ?: return
-
-        if (addressRepository.findByUserId(retailerId).isEmpty()) {
-            retailer.addresses.add(
-                Address(
-                    street = "King Fahd Road, Al Olaya",
-                    city = "Riyadh",
-                    state = "Riyadh",
-                    zipCode = "11564",
-                    country = "Saudi Arabia"
-                )
-            )
-            userRepository.save(retailer)
-        }
-
-        val hasCard =
-            paymentMethodRepository.findByOwnerIdAndType(retailerId, PaymentMethodType.CREDIT_CARD).isNotEmpty() ||
-                paymentMethodRepository.findByOwnerIdAndType(retailerId, PaymentMethodType.DEBIT_CARD).isNotEmpty()
-        if (!hasCard) {
-            paymentMethodRepository.save(
-                PaymentMethod(
-                    ownerId = retailerId,
-                    type = PaymentMethodType.CREDIT_CARD,
-                    maskedDetails = "Visa **** 4444 (Exp: 12/28)",
-                    isDefault = true
-                )
-            )
         }
     }
 }

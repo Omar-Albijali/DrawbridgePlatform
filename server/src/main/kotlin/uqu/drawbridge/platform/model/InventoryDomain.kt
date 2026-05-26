@@ -1,7 +1,9 @@
 package uqu.drawbridge.platform.model
 
-
+import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.persistence.*
+import org.hibernate.annotations.OnDelete
+import org.hibernate.annotations.OnDeleteAction
 import java.time.LocalDateTime
 import uqu.drawbridge.platform.ScheduleType
 
@@ -12,20 +14,29 @@ class InventoryItem(
     var id: String? = null,
 
     @Column(nullable = false)
-    var retailerId: String,
-    
-    @Column(nullable = false)
-    var productId: String,
-
-    @Column(nullable = false)
     var currentQuantity: Int,
 
     @Column(nullable = false)
     var lastUpdated: LocalDateTime = LocalDateTime.now(),
 
     @Embedded
-    var autoOrderConfig: AutoOrderConfig
-)
+    var autoOrderConfig: AutoOrderConfig,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "retailer_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var retailer: User,
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "product_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var product: Product
+) {
+    val retailerId: String? get() = retailer.id
+    val productId: String? get() = product.id
+}
 
 
 

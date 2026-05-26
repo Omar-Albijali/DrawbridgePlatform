@@ -31,10 +31,10 @@ class ProductService(
     fun getProductById(id: String): Product? = productRepository.findById(id).orElse(null)
 
     fun getProductsByWholesaler(wholesalerId: String): List<Product> = 
-        productRepository.findByWholesalerId(wholesalerId)
+        productRepository.findByWholesaler_Id(wholesalerId)
 
     fun getProductsByCategory(categoryId: String): List<Product> = 
-        productRepository.findByCategoryId(categoryId)
+        productRepository.findByCategory_Id(categoryId)
 
     fun searchProducts(query: String): List<Product> = 
         productRepository.findByNameContainingIgnoreCase(query)
@@ -46,7 +46,7 @@ class ProductService(
         productRepository.findByNameContainingIgnoreCase(query).filter { it.published }
 
     fun getPublishedProductsByCategory(categoryId: String): List<Product> =
-        productRepository.findByCategoryId(categoryId).filter { it.published }
+        productRepository.findByCategory_Id(categoryId).filter { it.published }
 
     fun getPublishedBrands(): List<String> =
         productRepository.findDistinctPublishedBrands()
@@ -329,7 +329,7 @@ class ProductService(
             wholesaler = wholesaler,
             name = request.name,
             description = request.description,
-            categoryId = request.categoryId,
+            category = categoryRepository.getReferenceById(request.categoryId),
             price = parsedPrice,
             stockQuantity = request.stock,
             minimumOrderQuantity = request.minimumOrderQuantity,
@@ -355,7 +355,7 @@ class ProductService(
         val previousStockQuantity = existing.stockQuantity
         existing.name = request.name
         existing.description = request.description
-        existing.categoryId = request.categoryId
+        existing.category = categoryRepository.getReferenceById(request.categoryId)
         existing.price = parsedPrice
         existing.stockQuantity = request.stock
         existing.minimumOrderQuantity = request.minimumOrderQuantity

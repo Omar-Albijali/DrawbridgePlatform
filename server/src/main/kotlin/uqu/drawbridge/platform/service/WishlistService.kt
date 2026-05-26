@@ -6,15 +6,17 @@ import uqu.drawbridge.platform.WishlistDTO
 import uqu.drawbridge.platform.model.Wishlist
 import uqu.drawbridge.platform.repository.WishlistRepository
 import uqu.drawbridge.platform.repository.ProductRepository
+import uqu.drawbridge.platform.repository.UserRepository
 
 @Service
 class WishlistService(
     private val wishlistRepository: WishlistRepository,
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val userRepository: UserRepository
 ) {
 
     fun getWishlist(userId: String): List<WishlistDTO> {
-        return wishlistRepository.findAllByUserId(userId).mapNotNull { wishlistItem ->
+        return wishlistRepository.findAllByUser_Id(userId).mapNotNull { wishlistItem ->
             val product = productRepository.findById(wishlistItem.productId).orElse(null) ?: return@mapNotNull null
             WishlistDTO(
                 id = wishlistItem.id ?: "",
@@ -29,17 +31,18 @@ class WishlistService(
     }
 
     fun isInWishlist(userId: String, productId: String): Boolean {
-        return wishlistRepository.existsByUserIdAndProductId(userId, productId)
+        return wishlistRepository.existsByUser_IdAndProduct_Id(userId, productId)
     }
 
     @Transactional
     fun addToWishlist(userId: String, productId: String): WishlistDTO? {
-        if (wishlistRepository.existsByUserIdAndProductId(userId, productId)) {
+        if (wishlistRepository.existsByUser_IdAndProduct_Id(userId, productId)) {
             return null
         }
         val product = productRepository.findById(productId).orElse(null) ?: return null
+        val user = userRepository.getReferenceById(userId)
         val wishlist = wishlistRepository.save(
-            Wishlist(userId = userId, productId = productId)
+            Wishlist(user = user, product = product)
         )
         return WishlistDTO(
             id = wishlist.id ?: "",
@@ -54,10 +57,10 @@ class WishlistService(
 
     @Transactional
     fun removeFromWishlist(userId: String, productId: String): Boolean {
-        if (!wishlistRepository.existsByUserIdAndProductId(userId, productId)) {
+        if (!wishlistRepository.existsByUser_IdAndProduct_Id(userId, productId)) {
             return false
         }
-        wishlistRepository.deleteByUserIdAndProductId(userId, productId)
+        wishlistRepository.deleteByUser_IdAndProduct_Id(userId, productId)
         return true
     }
 }

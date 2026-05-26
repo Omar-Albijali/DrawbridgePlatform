@@ -1,16 +1,22 @@
 package uqu.drawbridge.platform.model
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
+import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.ManyToOne
 import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import org.hibernate.annotations.OnDelete
+import org.hibernate.annotations.OnDeleteAction
 import java.time.LocalDateTime
 import uqu.drawbridge.platform.NotificationChannel
 import uqu.drawbridge.platform.NotificationEntityType
@@ -38,9 +44,6 @@ class SupportTicket(
     @Column(name = "ticket_number", nullable = false, unique = true)
     var ticketNumber: String,
 
-    @Column(name = "user_id", nullable = false)
-    var userId: String,
-
     @Column(nullable = false)
     var subject: String,
 
@@ -62,8 +65,16 @@ class SupportTicket(
     var createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(name = "updated_at", nullable = false)
-    var updatedAt: LocalDateTime = LocalDateTime.now()
+    var updatedAt: LocalDateTime = LocalDateTime.now(),
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var user: User
 ) {
+    val userId: String
+        get() = user.id ?: ""
     @PrePersist
     fun onCreate() {
         val now = LocalDateTime.now()
@@ -82,9 +93,6 @@ class SupportTicket(
 class Notification(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: String? = null,
-
-    @Column(nullable = false)
-    var recipientId: String,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -118,8 +126,17 @@ class Notification(
     var read: Boolean = false,
 
     @Column(nullable = false)
-    var createdAt: LocalDateTime = LocalDateTime.now()
-)
+    var createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "recipient_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var recipient: User
+) {
+    val recipientId: String
+        get() = recipient.id ?: ""
+}
 
 @Entity
 @Table(
@@ -135,9 +152,6 @@ class NotificationPreference(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: String? = null,
 
-    @Column(name = "user_id", nullable = false)
-    var userId: String,
-
     @Enumerated(EnumType.STRING)
     @Column(name = "preference_key", nullable = false)
     var preferenceKey: NotificationPreferenceKey,
@@ -150,17 +164,23 @@ class NotificationPreference(
     var enabled: Boolean = true,
 
     @Column(nullable = false)
-    var updatedAt: LocalDateTime = LocalDateTime.now()
-)
+    var updatedAt: LocalDateTime = LocalDateTime.now(),
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var user: User
+) {
+    val userId: String
+        get() = user.id ?: ""
+}
 
 @Entity
 @Table(name = "web_push_subscriptions")
 class WebPushSubscription(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: String? = null,
-
-    @Column(name = "user_id", nullable = false)
-    var userId: String,
 
     @Column(nullable = false, unique = true, columnDefinition = "TEXT")
     var endpoint: String,
@@ -175,5 +195,14 @@ class WebPushSubscription(
     var userAgent: String? = null,
 
     @Column(nullable = false)
-    var createdAt: LocalDateTime = LocalDateTime.now()
-)
+    var createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    var user: User
+) {
+    val userId: String
+        get() = user.id ?: ""
+}

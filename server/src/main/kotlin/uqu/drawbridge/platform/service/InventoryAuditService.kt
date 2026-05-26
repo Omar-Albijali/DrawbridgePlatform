@@ -15,6 +15,8 @@ import uqu.drawbridge.platform.model.InventoryAuditChangeType
 import uqu.drawbridge.platform.model.InventoryAuditLog
 import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.model.InventoryStockTargetType
+import uqu.drawbridge.platform.model.InventoryItem
+import uqu.drawbridge.platform.model.Product
 import uqu.drawbridge.platform.repository.InventoryAuditLogRepository
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.ProductRepository
@@ -53,8 +55,8 @@ class InventoryAuditService(
 
         val savedLog = inventoryAuditLogRepository.save(
             InventoryAuditLog(
-                productId = productId,
-                inventoryItemId = inventoryItemId,
+                product = productRepository.getReferenceById(productId),
+                inventoryItem = inventoryItemId?.let { inventoryItemRepository.getReferenceById(it) },
                 stockTargetType = stockTargetType,
                 changeType = changeType,
                 sourceType = sourceType,
@@ -124,7 +126,7 @@ class InventoryAuditService(
                 return true
             }
 
-            val product = productRepository.findById(inventoryItem.productId).orElse(null)
+            val product = productRepository.findById(inventoryItem.productId ?: "").orElse(null)
             return product?.wholesaler?.id == userId
         }
 
@@ -148,10 +150,10 @@ class InventoryAuditService(
             val predicates = mutableListOf<Predicate>()
 
             productId?.let {
-                predicates += criteriaBuilder.equal(root.get<String>("productId"), it)
+                predicates += criteriaBuilder.equal(root.get<Product>("product").get<String>("id"), it)
             }
             inventoryItemId?.let {
-                predicates += criteriaBuilder.equal(root.get<String>("inventoryItemId"), it)
+                predicates += criteriaBuilder.equal(root.get<InventoryItem>("inventoryItem").get<String>("id"), it)
             }
             stockTargetType?.let {
                 predicates += criteriaBuilder.equal(root.get<InventoryStockTargetType>("stockTargetType"), it)
@@ -177,7 +179,7 @@ class InventoryAuditService(
     private fun InventoryAuditLog.toDTO(): InventoryAuditLogDTO {
         return InventoryAuditLogDTO(
             id = this.id ?: "",
-            productId = this.productId,
+            productId = this.productId ?: "",
             inventoryItemId = this.inventoryItemId,
             stockTargetType = this.stockTargetType,
             changeType = this.changeType,

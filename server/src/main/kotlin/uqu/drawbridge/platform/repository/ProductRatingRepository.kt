@@ -6,11 +6,11 @@ import uqu.drawbridge.platform.model.ProductRating
 import java.math.BigDecimal
 
 interface ProductRatingRepository : JpaRepository<ProductRating, String> {
-    fun findByProductId(productId: String): List<ProductRating>
-    fun findByUserId(userId: String): List<ProductRating>
-    fun findByProductIdAndUserId(productId: String, userId: String): ProductRating?
-    fun countByProductId(productId: String): Int
+    fun findByProduct_Id(productId: String): List<ProductRating>
+    fun findByUser_Id(userId: String): List<ProductRating>
+    fun findByProduct_IdAndUser_Id(productId: String, userId: String): ProductRating?
+    fun countByProduct_Id(productId: String): Int
     
-    @Query("SELECT AVG(r.rating) FROM ProductRating r WHERE r.productId = :productId")
+    @Query("SELECT AVG(r.rating) FROM ProductRating r WHERE r.product.id = :productId")
     fun getAverageRatingByProductId(productId: String): BigDecimal?
 }

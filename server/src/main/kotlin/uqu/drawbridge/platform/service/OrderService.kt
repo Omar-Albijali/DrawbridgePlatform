@@ -42,7 +42,7 @@ class OrderService(
     }
 
     fun getOrderGroupsByRetailer(retailerId: String): List<OrderGroup> {
-        return orderGroupRepository.findByRetailerId(retailerId)
+        return orderGroupRepository.findByRetailer_Id(retailerId)
     }
 
     fun getOrderGroupsByPaymentStatus(paymentStatus: PaymentStatus): List<OrderGroup> {
@@ -50,7 +50,7 @@ class OrderService(
     }
 
     fun getOrderGroupsByRetailerAndPaymentStatus(retailerId: String, paymentStatus: PaymentStatus): List<OrderGroup> {
-        return orderGroupRepository.findByRetailerIdAndPaymentStatus(retailerId, paymentStatus)
+        return orderGroupRepository.findByRetailer_IdAndPaymentStatus(retailerId, paymentStatus)
     }
 
     @Transactional
@@ -86,15 +86,15 @@ class OrderService(
     }
 
     fun getOrdersByOrderGroup(orderGroupId: String): List<Order> {
-        return orderRepository.findByOrderGroupId(orderGroupId)
+        return orderRepository.findByOrderGroup_Id(orderGroupId)
     }
 
     fun getOrdersByRetailer(retailerId: String): List<Order> {
-        return orderRepository.findByRetailerId(retailerId)
+        return orderRepository.findByRetailer_Id(retailerId)
     }
 
     fun getOrdersByWholesaler(wholesalerId: String): List<Order> {
-        return orderRepository.findByWholesalerId(wholesalerId)
+        return orderRepository.findByWholesaler_Id(wholesalerId)
     }
 
     fun getOrdersByStatus(status: OrderStatus): List<Order> {
@@ -102,11 +102,11 @@ class OrderService(
     }
 
     fun getOrdersByRetailerAndStatus(retailerId: String, status: OrderStatus): List<Order> {
-        return orderRepository.findByRetailerIdAndStatus(retailerId, status)
+        return orderRepository.findByRetailer_IdAndStatus(retailerId, status)
     }
 
     fun getOrdersByWholesalerAndStatus(wholesalerId: String, status: OrderStatus): List<Order> {
-        return orderRepository.findByWholesalerIdAndStatus(wholesalerId, status)
+        return orderRepository.findByWholesaler_IdAndStatus(wholesalerId, status)
     }
 
     fun getAutoOrders(): List<Order> {
@@ -127,7 +127,7 @@ class OrderService(
         val shortOrderId = shortOrderId(orderId)
 
         notificationService.sendEventNotification(
-            recipientId = persisted.retailerId,
+            recipientId = persisted.retailerId ?: "",
             type = NotificationType.ORDER,
             eventKey = NotificationEventKey.ORDER_CREATED,
             entityType = NotificationEntityType.ORDER,
@@ -139,7 +139,7 @@ class OrderService(
         )
 
         notificationService.sendEventNotification(
-            recipientId = persisted.wholesalerId,
+            recipientId = persisted.wholesalerId ?: "",
             type = NotificationType.ORDER,
             eventKey = NotificationEventKey.ORDER_CREATED,
             entityType = NotificationEntityType.ORDER,
@@ -164,27 +164,31 @@ class OrderService(
         if (quantity <= 0) return null
 
         val subtotal = unitPrice.multiply(BigDecimal(quantity))
+        val orderGroup = OrderGroup(
+            retailer = userRepository.getReferenceById(retailerId),
+            groupTotal = subtotal,
+            paymentStatus = PaymentStatus.PENDING,
+            orders = mutableListOf()
+        )
+
         val order = Order(
-            retailerId = retailerId,
-            wholesalerId = wholesalerId,
+            retailer = userRepository.getReferenceById(retailerId),
+            wholesaler = userRepository.getReferenceById(wholesalerId),
             status = OrderStatus.PENDING,
             subtotal = subtotal,
             autoOrder = true,
-            orderItems = mutableListOf(
-                OrderItem(
-                    productId = productId,
-                    quantity = quantity,
-                    unitPrice = unitPrice
-                )
-            )
+            orderItems = mutableListOf(),
+            orderGroup = orderGroup
         )
+        orderGroup.orders.add(order)
 
-        val orderGroup = OrderGroup(
-            retailerId = retailerId,
-            groupTotal = subtotal,
-            paymentStatus = PaymentStatus.PENDING,
-            orders = mutableListOf(order)
+        val orderItem = OrderItem(
+            product = productRepository.getReferenceById(productId),
+            quantity = quantity,
+            unitPrice = unitPrice,
+            order = order
         )
+        order.orderItems.add(orderItem)
 
         return orderGroupRepository.save(orderGroup).orders.firstOrNull()
     }
@@ -303,11 +307,11 @@ class OrderService(
     // ==================== ORDER ITEM OPERATIONS ====================
 
     fun getOrderItemsByOrderId(orderId: String): List<OrderItem> {
-        return orderItemRepository.findByOrderId(orderId)
+        return orderItemRepository.findByOrder_Id(orderId)
     }
 
     fun getOrderItemsByProductId(productId: String): List<OrderItem> {
-        return orderItemRepository.findByProductId(productId)
+        return orderItemRepository.findByProduct_Id(productId)
     }
 
     @Transactional
@@ -434,7 +438,7 @@ class OrderService(
 
     // Reuse existing helper methods
     private fun recalculateOrderSubtotal(order: Order) {
-        val items = orderItemRepository.findByOrderId(order.id!!)
+        val items = orderItemRepository.findByOrder_Id(order.id!!)
         val subtotal = items.fold(BigDecimal.ZERO) { acc, item ->
             acc + (item.unitPrice * BigDecimal(item.quantity))
         }
@@ -442,14 +446,14 @@ class OrderService(
         orderRepository.save(order)
         
         // Also update the order group total
-        val orderGroup = orderGroupRepository.findById(order.orderGroupId!!).orElse(null)
+        val orderGroup = order.orderGroup
         if (orderGroup != null) {
             recalculateOrderGroupTotal(orderGroup)
         }
     }
 
     private fun recalculateOrderGroupTotal(orderGroup: OrderGroup) {
-        val orders = orderRepository.findByOrderGroupId(orderGroup.id!!)
+        val orders = orderRepository.findByOrderGroup_Id(orderGroup.id!!)
         val total = orders.fold(BigDecimal.ZERO) { acc, order ->
             acc + order.subtotal
         }
@@ -476,7 +480,7 @@ class OrderService(
         ).forEach { (recipientId, recipient) ->
             val notification = orderStatusNotification(order, recipient)
             notificationService.sendEventNotification(
-                recipientId = recipientId,
+                recipientId = recipientId ?: "",
                 type = NotificationType.ORDER,
                 eventKey = NotificationEventKey.ORDER_STATUS_UPDATED,
                 entityType = NotificationEntityType.ORDER,
@@ -581,7 +585,7 @@ class OrderService(
         val ordersByGroupId = if (groupIds.isEmpty()) {
             emptyMap()
         } else {
-            orderRepository.findByOrderGroupIdIn(groupIds).groupBy { it.orderGroupId.orEmpty() }
+            orderRepository.findByOrderGroup_IdIn(groupIds).groupBy { it.orderGroupId.orEmpty() }
         }
         val allOrders = ordersByGroupId.values.flatten()
         val orderDTOsById = mapOrdersToDTOs(allOrders).associateBy { it.id }
@@ -593,7 +597,7 @@ class OrderService(
 
             uqu.drawbridge.platform.OrderGroupDTO(
                 id = group.id.orEmpty(),
-                retailerId = group.retailerId,
+                retailerId = group.retailerId ?: "",
                 groupTotal = group.groupTotal.toDouble(),
                 paymentStatus = group.paymentStatus,
                 createdAt = group.createdAt.toString(),
@@ -607,11 +611,11 @@ class OrderService(
             return emptyList()
         }
 
-        val retailersById = userRepository.findAllById(orders.map { it.retailerId }.distinct())
+        val retailersById = userRepository.findAllById(orders.mapNotNull { it.retailerId }.distinct())
             .associateBy { it.id.orEmpty() }
         val orderGroupsById = orderGroupRepository.findAllById(orders.mapNotNull { it.orderGroupId }.distinct())
             .associateBy { it.id.orEmpty() }
-        val productIds = orders.flatMap { order -> order.orderItems.map { item -> item.productId } }.distinct()
+        val productIds = orders.flatMap { order -> order.orderItems.mapNotNull { item -> item.productId } }.distinct()
         val productsById = productRepository.findAllById(productIds).associateBy { it.id.orEmpty() }
         val categoriesById = categoryRepository.findAllById(productsById.values.map { it.categoryId }.distinct())
             .associateBy { it.id.orEmpty() }
@@ -626,7 +630,7 @@ class OrderService(
 
                 uqu.drawbridge.platform.OrderItemDTO(
                     id = item.id.orEmpty(),
-                    productId = item.productId,
+                    productId = item.productId ?: "",
                     productName = product?.name ?: "Unknown Product",
                     productCategory = categoryName,
                     productImageUrl = imageUrl,
@@ -638,8 +642,8 @@ class OrderService(
             uqu.drawbridge.platform.OrderDTO(
                 id = order.id.orEmpty(),
                 orderGroupId = order.orderGroupId.orEmpty(),
-                wholesalerId = order.wholesalerId,
-                retailerId = order.retailerId,
+                wholesalerId = order.wholesalerId ?: "",
+                retailerId = order.retailerId ?: "",
                 retailerName = retailer?.businessName ?: retailer?.representative?.name ?: "Unknown",
                 status = order.status,
                 subtotal = order.subtotal.toDouble(),
@@ -661,12 +665,13 @@ class OrderService(
         val now = LocalDateTime.now()
         val sourceType = if (order.autoOrder) InventoryAuditSourceType.RESTOCK else InventoryAuditSourceType.ORDER
         val reason = if (order.autoOrder) "Auto-restock order delivered" else "Order delivered"
-        val quantitiesByProductId = orderItemRepository.findByOrderId(orderId)
-            .groupingBy { it.productId }
+        val quantitiesByProductId = orderItemRepository.findByOrder_Id(orderId)
+            .groupingBy { it.productId ?: "" }
             .fold(0) { total, item -> total + item.quantity }
 
         quantitiesByProductId.forEach { (productId, quantity) ->
-            val inventoryItem = inventoryItemRepository.findByRetailerIdAndProductId(order.retailerId, productId)
+            if (productId.isEmpty()) return@forEach
+            val inventoryItem = inventoryItemRepository.findByRetailer_IdAndProduct_Id(order.retailerId ?: "", productId)
             if (inventoryItem != null) {
                 val previousQuantity = inventoryItem.currentQuantity
                 inventoryItem.currentQuantity = previousQuantity + quantity
@@ -683,10 +688,11 @@ class OrderService(
                     reason = reason
                 )
             } else {
+                val retailer = order.retailer ?: return@forEach
                 val savedItem = inventoryItemRepository.save(
                     InventoryItem(
-                        retailerId = order.retailerId,
-                        productId = productId,
+                        retailer = retailer,
+                        product = productRepository.getReferenceById(productId),
                         currentQuantity = quantity,
                         lastUpdated = now,
                         autoOrderConfig = AutoOrderConfig()
