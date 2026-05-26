@@ -27,6 +27,10 @@ compose.desktop {
     application {
         mainClass = "uqu.drawbridge.posdemo.MainKt"
 
+        buildTypes.release.proguard {
+            isEnabled = false
+        }
+
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb)
             packageName = "uqu.drawbridge.posdemo.desktop"
