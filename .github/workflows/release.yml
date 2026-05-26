@@ -147,11 +147,9 @@ jobs:
               PosDemoClient/desktopApp/build/compose/binaries/main-release/deb/*.deb
           - label: windows
             os: windows-latest
-            tasks: :desktopApp:packageReleaseExe :desktopApp:packageReleaseMsi :PosDemoClient:desktopApp:packageReleaseExe :PosDemoClient:desktopApp:packageReleaseMsi
+            tasks: :desktopApp:packageReleaseMsi :PosDemoClient:desktopApp:packageReleaseMsi
             patterns: |
-              desktopApp/build/compose/binaries/main-release/exe/*.exe
               desktopApp/build/compose/binaries/main-release/msi/*.msi
-              PosDemoClient/desktopApp/build/compose/binaries/main-release/exe/*.exe
               PosDemoClient/desktopApp/build/compose/binaries/main-release/msi/*.msi
           - label: macos
             os: macos-latest
