@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional
 import uqu.drawbridge.platform.dto.PosInventoryChangeRequest
 import uqu.drawbridge.platform.dto.PosInventoryChangeResponse
 import uqu.drawbridge.platform.dto.PosInventoryChangeType
-import uqu.drawbridge.platform.model.InventoryAuditSourceType
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.model.PosEventReceipt
 import uqu.drawbridge.platform.model.PosEventReceiptStatus
 import uqu.drawbridge.platform.repository.InventoryItemRepository
@@ -91,7 +91,8 @@ class PosInventorySyncService(
                 productId = product.id,
                 gtin = gtin,
                 quantityBefore = previousQuantity,
-                quantityAfter = updated.currentQuantity
+                quantityAfter = updated.currentQuantity,
+                productName = product.name
             )
         } catch (ex: Exception) {
             logger.warn("Failed POS inventory sync for retailer={} event={}", retailerId, eventId, ex)

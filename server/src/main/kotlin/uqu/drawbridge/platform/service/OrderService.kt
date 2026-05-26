@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.security.access.AccessDeniedException
 import uqu.drawbridge.platform.model.*
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.NotificationEntityType
 import uqu.drawbridge.platform.NotificationEventKey
 import uqu.drawbridge.platform.NotificationPreferenceKey

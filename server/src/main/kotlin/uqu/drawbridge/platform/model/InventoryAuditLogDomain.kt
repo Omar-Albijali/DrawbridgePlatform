@@ -10,6 +10,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.Index
 import jakarta.persistence.Table
 import java.time.LocalDateTime
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 
 enum class InventoryStockTargetType {
     PRODUCT_CATALOG,
@@ -22,13 +23,6 @@ enum class InventoryAuditChangeType {
     UPDATE
 }
 
-enum class InventoryAuditSourceType {
-    MANUAL,
-    ORDER,
-    RESTOCK,
-    POS,
-    SYSTEM
-}
 
 @Entity
 @Table(

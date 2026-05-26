@@ -102,17 +102,3 @@ data class InventoryAuditLogPageResponse(
     val totalPages: Int
 )
 
-@JsExport
-@Serializable
-data class PosScanRequest(
-    val retailerId: String,
-    val gtin: String
-)
-
-@JsExport
-@Serializable
-data class PosScanResponse(
-    val productName: String,
-    val newStock: Int,
-    val message: String
-)

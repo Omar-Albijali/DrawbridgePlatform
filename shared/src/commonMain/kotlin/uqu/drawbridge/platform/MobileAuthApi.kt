@@ -148,24 +148,7 @@ class MobileAuthApi(
         return payload.toUserDto()
     }
 
-    suspend fun scanBarcode(retailerId: String, gtin: String): PosScanResponse {
-        val token = requireBearerToken()
-        val response = client.post(buildUrl("/inventory/scan")) {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            accept(ContentType.Application.Json)
-            bearerAuth(token)
-            setBody(PosScanRequest(retailerId = retailerId, gtin = gtin))
-        }
 
-        val body = response.bodyAsText()
-        ensureSuccess(response.status, body)
-        val parsed = json.parseToJsonElement(body).jsonObject
-        return PosScanResponse(
-            productName = parsed.stringValue("productName"),
-            newStock = parsed["newStock"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
-            message = parsed.stringValue("message"),
-        )
-    }
 
     suspend fun fetchPosIntegrationConfig(): PosIntegrationConfigDTO {
         val response = authorizedGet("/retailer/pos-integration")

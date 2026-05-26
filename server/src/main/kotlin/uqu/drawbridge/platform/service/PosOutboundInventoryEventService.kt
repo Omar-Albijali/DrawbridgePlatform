@@ -18,13 +18,14 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uqu.drawbridge.platform.dto.PosOutboundInventoryEventDTO
 import uqu.drawbridge.platform.model.InventoryAuditLog
-import uqu.drawbridge.platform.model.InventoryAuditSourceType
-import uqu.drawbridge.platform.model.PosOutboundEventStatus
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
+import uqu.drawbridge.platform.dto.PosOutboundEventStatus
 import uqu.drawbridge.platform.model.PosOutboundInventoryEvent
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.PosIntegrationRepository
 import uqu.drawbridge.platform.repository.PosOutboundInventoryEventRepository
 import uqu.drawbridge.platform.repository.ProductRepository
+import uqu.drawbridge.platform.dto.PosInventoryWebhookPayload
 import kotlin.math.min
 
 @Service
@@ -216,7 +217,7 @@ class PosOutboundInventoryEventService(
     }
 
     private fun shouldPublish(sourceType: InventoryAuditSourceType): Boolean {
-        return sourceType == InventoryAuditSourceType.ORDER || sourceType == InventoryAuditSourceType.MANUAL
+        return sourceType == InventoryAuditSourceType.ORDER || sourceType == InventoryAuditSourceType.RESTOCK || sourceType == InventoryAuditSourceType.MANUAL
     }
 
     private fun hmacSha256(secret: String, payload: String): String {
@@ -250,19 +251,4 @@ class PosOutboundInventoryEventService(
             reason = this.reason
         )
     }
-
-    private data class PosInventoryWebhookPayload(
-        val eventId: String,
-        val eventTime: String,
-        val retailerId: String,
-        val sourceType: String,
-        val sourceId: String?,
-        val gtin: String,
-        val productId: String,
-        val inventoryItemId: String,
-        val quantityBefore: Int,
-        val quantityAfter: Int,
-        val changeAmount: Int,
-        val reason: String?
-    )
 }

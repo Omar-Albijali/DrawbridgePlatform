@@ -7,6 +7,7 @@ import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uqu.drawbridge.platform.model.*
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.repository.CategoryRepository
 import uqu.drawbridge.platform.repository.ProductRepository
 import uqu.drawbridge.platform.repository.UserRepository

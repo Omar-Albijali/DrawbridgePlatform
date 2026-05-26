@@ -1,7 +1,7 @@
 package uqu.drawbridge.platform.dto
 
 import uqu.drawbridge.platform.model.InventoryAuditChangeType
-import uqu.drawbridge.platform.model.InventoryAuditSourceType
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.model.InventoryStockTargetType
 
 data class InventoryAuditLogDTO(
