@@ -47,15 +47,8 @@ jobs:
       - name: Build web app
         run: npm run build
 
-      - name: Upload web build
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-dist-ci
-          path: webApp/dist
-          if-no-files-found: error
-
   android-debug:
-    name: Android debug APKs
+    name: Android debug compile
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -64,63 +57,11 @@ jobs:
       - name: Set up toolchain
         uses: ./.github/actions/setup-build
 
-      - name: Build Android debug APKs
-        run: ./gradlew --no-daemon :androidApp:assembleDebug :PosDemoClient:androidApp:assembleDebug
-
-      - name: Upload Android APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-debug-ci
-          path: |
-            androidApp/build/outputs/apk/debug/*.apk
-            PosDemoClient/androidApp/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+      - name: Compile Android debug apps
+        run: ./gradlew --no-daemon :androidApp:compileDebugKotlinAndroid :PosDemoClient:androidApp:compileDebugKotlinAndroid
 
   desktop:
-    name: Desktop ${{ matrix.label }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - label: linux
-            os: ubuntu-latest
-            tasks: :desktopApp:packageReleaseDeb :PosDemoClient:desktopApp:packageReleaseDeb
-            paths: |
-              desktopApp/build/compose/binaries/main-release/deb/*.deb
-              PosDemoClient/desktopApp/build/compose/binaries/main-release/deb/*.deb
-          - label: windows
-            os: windows-latest
-            tasks: :desktopApp:packageReleaseMsi :PosDemoClient:desktopApp:packageReleaseMsi
-            paths: |
-              desktopApp/build/compose/binaries/main-release/msi/*.msi
-              PosDemoClient/desktopApp/build/compose/binaries/main-release/msi/*.msi
-          - label: macos
-            os: macos-latest
-            tasks: :desktopApp:packageReleaseDmg :PosDemoClient:desktopApp:packageReleaseDmg
-            paths: |
-              desktopApp/build/compose/binaries/main-release/dmg/*.dmg
-              PosDemoClient/desktopApp/build/compose/binaries/main-release/dmg/*.dmg
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up toolchain
-        uses: ./.github/actions/setup-build
-
-      - name: Build desktop packages
-        shell: bash
-        run: ./gradlew --no-daemon ${{ matrix.tasks }}
-
-      - name: Upload desktop packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-${{ matrix.label }}-ci
-          path: ${{ matrix.paths }}
-          if-no-files-found: error
-
-  server-jar:
-    name: Server jar
+    name: Desktop build
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -129,24 +70,12 @@ jobs:
       - name: Set up toolchain
         uses: ./.github/actions/setup-build
 
-      - name: Build server boot jar
-        run: ./gradlew --no-daemon :server:bootJar
+      - name: Build desktop apps
+        run: ./gradlew --no-daemon :desktopApp:build :PosDemoClient:desktopApp:build
 
-      - name: Upload server jar
-        uses: actions/upload-artifact@v4
-        with:
-          name: server-jar-ci
-          path: |
-            server/build/libs/server-*.jar
-            !server/build/libs/*-plain.jar
-          if-no-files-found: error
-
-  ios-simulator:
-    name: iOS simulator builds
-    runs-on: macos-latest
-    env:
-      IOS_SIMULATOR_ARCH: arm64
-      IOS_SIMULATOR_DESTINATION: generic/platform=iOS Simulator
+  server-build:
+    name: Server build
+    runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -154,30 +83,46 @@ jobs:
       - name: Set up toolchain
         uses: ./.github/actions/setup-build
 
-      - name: Build main iOS app for simulator
+      - name: Build server
+        run: ./gradlew --no-daemon :server:build
+
+  ios-build:
+    name: iOS builds
+    runs-on: macos-latest
+    env:
+      IOS_ARCH: arm64
+      IOS_DESTINATION: generic/platform=iOS
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up toolchain
+        uses: ./.github/actions/setup-build
+
+      - name: Build main iOS app
         run: |
           xcodebuild \
             -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -configuration Debug \
-            -destination "$IOS_SIMULATOR_DESTINATION" \
+            -destination "$IOS_DESTINATION" \
             -derivedDataPath "$RUNNER_TEMP/ios-main" \
             CODE_SIGNING_ALLOWED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
             ONLY_ACTIVE_ARCH=YES \
-            ARCHS="$IOS_SIMULATOR_ARCH" \
+            ARCHS="$IOS_ARCH" \
             build
 
-      - name: Build POS iOS app for simulator
+      - name: Build POS iOS app
         run: |
           xcodebuild \
             -project PosDemoClient/iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -configuration Debug \
-            -destination "$IOS_SIMULATOR_DESTINATION" \
+            -destination "$IOS_DESTINATION" \
             -derivedDataPath "$RUNNER_TEMP/ios-pos" \
             CODE_SIGNING_ALLOWED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
             ONLY_ACTIVE_ARCH=YES \
-            ARCHS="$IOS_SIMULATOR_ARCH" \
+            ARCHS="$IOS_ARCH" \
             build
