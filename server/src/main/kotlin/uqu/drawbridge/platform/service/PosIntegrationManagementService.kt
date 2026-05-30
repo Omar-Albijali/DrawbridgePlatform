@@ -13,13 +13,14 @@ import uqu.drawbridge.platform.PosIntegrationEventLogDTO
 import uqu.drawbridge.platform.UserRole
 import uqu.drawbridge.platform.model.PosIntegration
 import uqu.drawbridge.platform.model.PosIntegrationStatus
-import uqu.drawbridge.platform.model.InventoryAuditSourceType
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.repository.InventoryAuditLogRepository
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.PosEventReceiptRepository
 import uqu.drawbridge.platform.repository.PosIntegrationRepository
 import uqu.drawbridge.platform.repository.PosOutboundInventoryEventRepository
 import uqu.drawbridge.platform.repository.ProductRepository
+import uqu.drawbridge.platform.repository.UserRepository
 import uqu.drawbridge.platform.validation.RequestValidation
 
 @Service
@@ -31,7 +32,8 @@ class PosIntegrationManagementService(
     private val inventoryAuditLogRepository: InventoryAuditLogRepository,
     private val inventoryItemRepository: InventoryItemRepository,
     private val productRepository: ProductRepository,
-    private val posApiKeyService: PosApiKeyService
+    private val posApiKeyService: PosApiKeyService,
+    private val userRepository: UserRepository
 ) {
     private val secureRandom = SecureRandom()
 
@@ -39,7 +41,7 @@ class PosIntegrationManagementService(
     fun getCurrentRetailerConfig(authenticationName: String): PosIntegrationConfigDTO {
         val retailer = requireRetailer(authenticationName)
         val retailerId = retailer.id ?: throw IllegalStateException("User id missing")
-        val integration = posIntegrationRepository.findByRetailerId(retailerId)
+        val integration = posIntegrationRepository.findByRetailer_Id(retailerId)
         return integration.toConfigDto(retailerId)
     }
 
@@ -50,7 +52,7 @@ class PosIntegrationManagementService(
     ): PosIntegrationConfigDTO {
         val retailer = requireRetailer(authenticationName)
         val retailerId = retailer.id ?: throw IllegalStateException("User id missing")
-        val integration = posIntegrationRepository.findByRetailerId(retailerId)
+        val integration = posIntegrationRepository.findByRetailer_Id(retailerId)
             ?: throw IllegalArgumentException("Generate POS API key first")
 
         val normalizedStatus = parseStatus(request.status)
@@ -85,13 +87,13 @@ class PosIntegrationManagementService(
         val apiKeyPrefix = rawApiKey.take(16)
         val now = LocalDateTime.now()
 
-        val integration = posIntegrationRepository.findByRetailerId(retailerId)?.apply {
+        val integration = posIntegrationRepository.findByRetailer_Id(retailerId)?.apply {
             this.apiKeyHash = apiKeyHash
             this.apiKeyPrefix = apiKeyPrefix
             this.rotatedAt = now
             this.status = PosIntegrationStatus.ACTIVE
         } ?: PosIntegration(
-            retailerId = retailerId,
+            retailer = userRepository.getReferenceById(retailerId),
             apiKeyHash = apiKeyHash,
             apiKeyPrefix = apiKeyPrefix,
             status = PosIntegrationStatus.ACTIVE,
@@ -123,7 +125,7 @@ class PosIntegrationManagementService(
         val safeLimit = limit.coerceIn(1, 200)
 
         val outboundLogs = posOutboundInventoryEventRepository
-            .findTop200ByRetailerIdOrderByEventTimeDesc(retailerId)
+            .findTop200ByRetailer_IdOrderByEventTimeDesc(retailerId)
             .map { event ->
                 PosIntegrationEventLogDTO(
                     direction = "OUTBOUND",
@@ -146,7 +148,7 @@ class PosIntegrationManagementService(
             }
 
         val inboundLogs = posEventReceiptRepository
-            .findTop200ByRetailerIdOrderByProcessedAtDesc(retailerId)
+            .findTop200ByRetailer_IdOrderByProcessedAtDesc(retailerId)
             .map { receipt ->
                 val auditLog = inventoryAuditLogRepository.findFirstBySourceTypeAndSourceIdOrderByCreatedAtDesc(
                     sourceType = InventoryAuditSourceType.POS,
@@ -157,8 +159,8 @@ class PosIntegrationManagementService(
                     inventoryItem?.retailerId == retailerId
                 }
 
-                val product = auditLog?.let { log ->
-                    productRepository.findById(log.productId).orElse(null)
+                val product = auditLog?.productId?.let { logProductId ->
+                    productRepository.findById(logProductId).orElse(null)
                 }
 
                 PosIntegrationEventLogDTO(

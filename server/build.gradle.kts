@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "uqu.drawbridge.platform"
-version = "1.0.0"
+version = rootProject.extra["releaseVersion"] as String
 
 java {
     toolchain {
@@ -81,4 +81,9 @@ allOpen {
     annotation("jakarta.persistence.Entity")
     annotation("jakarta.persistence.MappedSuperclass")
     annotation("jakarta.persistence.Embeddable")
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    // Replace with the exact package and class name of your application
+    mainClass.set("uqu.drawbridge.platform.DrawbridgeApplicationKt")
 }

@@ -5,12 +5,20 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.delete
+import io.ktor.client.request.forms.MultiPartFormDataContent
+import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
@@ -27,6 +35,7 @@ import kotlinx.serialization.json.jsonPrimitive
 class MobileApiException(
     message: String,
     val statusCode: Int? = null,
+    val isUnauthorized: Boolean = false,
 ) : Exception(message)
 
 data class MobileSession(
@@ -43,6 +52,8 @@ data class DashboardSummary(
 
 class MobileAuthApi(
     private val client: HttpClient = createMobileHttpClient(),
+    private val tokenProvider: suspend () -> String? = { null },
+    private val onUnauthorized: suspend () -> Unit = {},
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -55,10 +66,10 @@ class MobileAuthApi(
             accept(ContentType.Application.Json)
             setBody(LoginRequest(email = email, password = password, rememberMe = rememberMe))
         }
-        ensureSuccess(response.status, response.bodyAsText())
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
 
         val authResponse = json.decodeFromString(AuthResponsePayload.serializer(), response.bodyAsText()).toAuthResponse()
-        val user = fetchUserById(authResponse.userId, authResponse.token)
+        val user = fetchUserById(authResponse.userId, tokenOverride = authResponse.token, notifyUnauthorized = false)
         return MobileSession(token = authResponse.token, user = user)
     }
 
@@ -68,24 +79,32 @@ class MobileAuthApi(
             accept(ContentType.Application.Json)
             setBody(request.toPayload())
         }
-        ensureSuccess(response.status, response.bodyAsText())
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
 
         val authResponse = json.decodeFromString(AuthResponsePayload.serializer(), response.bodyAsText()).toAuthResponse()
-        val user = fetchUserById(authResponse.userId, authResponse.token)
+        val user = fetchUserById(authResponse.userId, tokenOverride = authResponse.token, notifyUnauthorized = false)
         return MobileSession(token = authResponse.token, user = user)
     }
 
-    suspend fun fetchDashboardSummary(userId: String, role: UserRole, token: String): DashboardSummary {
+    suspend fun logout() {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/auth/logout")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(LogoutRequest(token = token))
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun fetchDashboardSummary(userId: String, role: UserRole): DashboardSummary {
         val endpoint = if (role == UserRole.WHOLESALER) {
             "/orders/wholesaler/$userId"
         } else {
             "/orders/retailer/$userId"
         }
 
-        val response = client.get(buildUrl(endpoint)) {
-            accept(ContentType.Application.Json)
-            bearerAuth(token)
-        }
+        val response = authorizedGet(endpoint)
         ensureSuccess(response.status, response.bodyAsText())
 
         val items = json.parseToJsonElement(response.bodyAsText()).jsonArray
@@ -114,38 +133,824 @@ class MobileAuthApi(
         )
     }
 
-    suspend fun fetchUserById(userId: String, token: String): UserDTO {
-        val response = client.get(buildUrl("/users/$userId")) {
-            accept(ContentType.Application.Json)
-            bearerAuth(token)
-        }
-        ensureSuccess(response.status, response.bodyAsText())
+    suspend fun fetchUserById(userId: String): UserDTO {
+        return fetchUserById(userId, tokenOverride = null, notifyUnauthorized = true)
+    }
+
+    private suspend fun fetchUserById(
+        userId: String,
+        tokenOverride: String?,
+        notifyUnauthorized: Boolean,
+    ): UserDTO {
+        val response = authorizedGet("/users/$userId", tokenOverride)
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = notifyUnauthorized)
         val payload = json.decodeFromString(UserPayload.serializer(), response.bodyAsText())
         return payload.toUserDto()
     }
 
-    suspend fun scanBarcode(retailerId: String, gtin: String, token: String): PosScanResponse {
-        val response = client.post(buildUrl("/inventory/scan")) {
+
+
+    suspend fun fetchPosIntegrationConfig(): PosIntegrationConfigDTO {
+        val response = authorizedGet("/retailer/pos-integration")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(PosIntegrationConfigDTO.serializer(), body)
+    }
+
+    suspend fun updatePosIntegrationConfig(
+        request: PosIntegrationConfigUpdateRequest,
+    ): PosIntegrationConfigDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/retailer/pos-integration")) {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             accept(ContentType.Application.Json)
             bearerAuth(token)
-            setBody(PosScanRequest(retailerId = retailerId, gtin = gtin))
+            setBody(request)
         }
-
         val body = response.bodyAsText()
-        val parsed = json.parseToJsonElement(body).jsonObject
-        return PosScanResponse(
-            productName = parsed.stringValue("productName"),
-            newStock = parsed["newStock"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
-            message = parsed.stringValue("message"),
-        )
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(PosIntegrationConfigDTO.serializer(), body)
+    }
+
+    suspend fun rotatePosIntegrationApiKey(): PosIntegrationApiKeyRotateResponse {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/retailer/pos-integration/api-key/rotate")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(PosIntegrationApiKeyRotateResponse.serializer(), body)
+    }
+
+    suspend fun fetchPosIntegrationEventLogs(limit: Int = 100): List<PosIntegrationEventLogDTO> {
+        val token = requireBearerToken()
+        val response = client.get(buildUrl("/retailer/pos-integration/events")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("limit", limit.coerceIn(1, 100))
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchInventoryByRetailer(retailerId: String): List<InventoryItemDTO> {
+        val response = authorizedGet("/inventory/retailer/$retailerId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchInventoryItem(inventoryItemId: String): InventoryItemDTO {
+        val response = authorizedGet("/inventory/$inventoryItemId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(InventoryItemDTO.serializer(), body)
+    }
+
+    suspend fun createInventoryItem(request: CreateInventoryItemRequest): InventoryItemDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/inventory")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(InventoryItemDTO.serializer(), body)
+    }
+
+    suspend fun updateInventoryQuantity(inventoryItemId: String, quantity: Int): InventoryItemDTO {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/inventory/$inventoryItemId/quantity")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("quantity", quantity)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(InventoryItemDTO.serializer(), body)
+    }
+
+    suspend fun toggleAutoOrderConfig(inventoryItemId: String, enabled: Boolean): AutoOrderConfigDTO {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/inventory/auto-order/$inventoryItemId/toggle")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("enabled", enabled)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(AutoOrderConfigDTO.serializer(), body)
+    }
+
+    suspend fun updateAutoOrderConfig(
+        inventoryItemId: String,
+        request: UpdateAutoOrderConfigRequest,
+    ): AutoOrderConfigDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/inventory/auto-order/$inventoryItemId")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(AutoOrderConfigDTO.serializer(), body)
+    }
+
+    suspend fun fetchInventoryAuditLogs(
+        productId: String? = null,
+        inventoryItemId: String? = null,
+        stockTargetType: String? = null,
+        sourceType: String? = null,
+        page: Int = 0,
+        size: Int = 20,
+    ): InventoryAuditLogPageResponse {
+        val token = requireBearerToken()
+        val response = client.get(buildUrl("/inventory/logs")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            productId?.takeIf { it.isNotBlank() }?.let { parameter("productId", it) }
+            inventoryItemId?.takeIf { it.isNotBlank() }?.let { parameter("inventoryItemId", it) }
+            stockTargetType?.takeIf { it.isNotBlank() }?.let { parameter("stockTargetType", it) }
+            sourceType?.takeIf { it.isNotBlank() }?.let { parameter("sourceType", it) }
+            parameter("page", page)
+            parameter("size", size)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(InventoryAuditLogPageResponse.serializer(), body)
+    }
+
+    suspend fun fetchProductsByWholesaler(wholesalerId: String): List<ProductDTO> {
+        val response = authorizedGet("/products/wholesaler/$wholesalerId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun createProduct(request: CreateProductRequest): ProductDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/products")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(ProductDTO.serializer(), body)
+    }
+
+    suspend fun updateProduct(productId: String, request: CreateProductRequest): ProductDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/products/$productId")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(ProductDTO.serializer(), body)
+    }
+
+    suspend fun uploadProductImage(
+        productId: String,
+        fileName: String,
+        mimeType: String?,
+        bytes: ByteArray,
+        altText: String = "",
+        sortIndex: Int? = null,
+    ): ProductImageResponse {
+        val token = requireBearerToken()
+        val contentType = mimeType?.takeIf { it.isNotBlank() } ?: ContentType.Image.JPEG.toString()
+        val safeName = fileName.ifBlank { "product-image.jpg" }.replace("\"", "")
+        val response = client.post(buildUrl("/products/$productId/images")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append(
+                            key = "file",
+                            value = bytes,
+                            headers = Headers.build {
+                                append(HttpHeaders.ContentDisposition, "filename=\"$safeName\"")
+                                append(HttpHeaders.ContentType, contentType)
+                            },
+                        )
+                        append("altText", altText)
+                        sortIndex?.let { append("sortIndex", it.toString()) }
+                    },
+                ),
+            )
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(ProductImageResponse.serializer(), body)
+    }
+
+    suspend fun uploadProfileImage(
+        userId: String,
+        fileName: String,
+        mimeType: String?,
+        bytes: ByteArray,
+    ): ImageUploadResponse {
+        val token = requireBearerToken()
+        val contentType = mimeType?.takeIf { it.isNotBlank() } ?: ContentType.Image.JPEG.toString()
+        val safeName = fileName.ifBlank { "profile-image.jpg" }.replace("\"", "")
+        val response = client.post(buildUrl("/users/$userId/profile-image")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append(
+                            key = "file",
+                            value = bytes,
+                            headers = Headers.build {
+                                append(HttpHeaders.ContentDisposition, "filename=\"$safeName\"")
+                                append(HttpHeaders.ContentType, contentType)
+                            },
+                        )
+                    },
+                ),
+            )
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(ImageUploadResponse.serializer(), body)
+    }
+
+    suspend fun fetchProductImages(productId: String): List<ProductImageResponse> {
+        val response = authorizedGet("/products/$productId/images")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun reorderProductImages(productId: String, orderedImageIds: List<String>) {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/products/$productId/images/reorder")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(orderedImageIds)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun deleteProductImage(imageId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/images/$imageId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun deleteProduct(productId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/products/$productId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun toggleProductPublished(productId: String): ProductDTO {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/products/$productId/toggle-published")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(ProductDTO.serializer(), body)
+    }
+
+    suspend fun fetchMarketplaceProducts(query: MarketplaceProductQuery = MarketplaceProductQuery()): PaginatedProductResponse {
+        val response = client.get(buildUrl("/products")) {
+            accept(ContentType.Application.Json)
+            parameter("page", query.page.coerceAtLeast(0))
+            parameter("size", query.size.coerceIn(1, 100))
+            query.search?.trim()?.takeIf { it.isNotEmpty() }?.let { parameter("search", it) }
+            query.categoryIds.filter { it.isNotBlank() }.forEach { parameter("category", it.trim()) }
+            query.brands.filter { it.isNotBlank() }.forEach { parameter("brand", it.trim()) }
+            query.minPrice?.takeIf { it >= 0.0 }?.let { parameter("minPrice", it) }
+            query.maxPrice?.takeIf { it >= 0.0 }?.let { parameter("maxPrice", it) }
+            query.sort.trim().takeIf { it.isNotEmpty() }?.let { parameter("sort", it) }
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body, notifyUnauthorized = false)
+        return json.decodeFromString(PaginatedProductResponse.serializer(), body)
+    }
+
+    suspend fun fetchProductById(productId: String): ProductDTO {
+        val response = client.get(buildUrl("/products/$productId")) {
+            accept(ContentType.Application.Json)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body, notifyUnauthorized = false)
+        return json.decodeFromString(ProductDTO.serializer(), body)
+    }
+
+    suspend fun fetchProductCategories(): List<CategoryDTO> {
+        val response = client.get(buildUrl("/products/categories")) {
+            accept(ContentType.Application.Json)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body, notifyUnauthorized = false)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchProductBrands(): List<String> {
+        val response = client.get(buildUrl("/products/brands")) {
+            accept(ContentType.Application.Json)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body, notifyUnauthorized = false)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchImageBytes(imageUrl: String): ByteArray {
+        val resolvedUrl = MobileApiConfig.resolveResourceUrl(imageUrl)
+        val response = client.get(resolvedUrl)
+        if (!response.status.isSuccess()) {
+            ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
+        }
+        return response.body()
+    }
+
+    suspend fun fetchWishlist(userId: String): List<WishlistDTO> {
+        val response = authorizedGet("/wishlist/$userId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun addToWishlist(userId: String, productId: String): WishlistDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/wishlist/$userId/$productId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(WishlistDTO.serializer(), body)
+    }
+
+    suspend fun removeFromWishlist(userId: String, productId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/wishlist/$userId/$productId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun fetchCartItems(retailerId: String): List<CartItemDTO> {
+        val response = authorizedGet("/cart/$retailerId/items")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun addCartItem(retailerId: String, productId: String, quantity: Int): CartItemDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/cart/$retailerId/items")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(AddToCartRequest(productId = productId, quantity = quantity))
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(CartItemDTO.serializer(), body)
+    }
+
+    suspend fun updateCartItemQuantity(retailerId: String, productId: String, quantity: Int): CartItemDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/cart/$retailerId/items/$productId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("quantity", quantity)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(CartItemDTO.serializer(), body)
+    }
+
+    suspend fun removeCartItem(retailerId: String, productId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/cart/$retailerId/items/$productId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun clearCart(retailerId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/cart/$retailerId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun checkoutCart(retailerId: String): OrderGroupDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/cart/$retailerId/checkout")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(OrderGroupDTO.serializer(), body)
+    }
+
+    suspend fun fetchOrdersByRetailer(retailerId: String): List<OrderDTO> {
+        val response = authorizedGet("/orders/retailer/$retailerId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchOrdersByWholesaler(wholesalerId: String): List<OrderDTO> {
+        val response = authorizedGet("/orders/wholesaler/$wholesalerId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchOrderById(orderId: String): OrderDTO {
+        val response = authorizedGet("/orders/$orderId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(OrderDTO.serializer(), body)
+    }
+
+    suspend fun updateOrderStatus(orderId: String, status: OrderStatus): OrderDTO {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/orders/$orderId/status")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("status", status.name)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(OrderDTO.serializer(), body)
+    }
+
+    suspend fun confirmOrderDelivery(orderId: String): OrderDTO {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/orders/$orderId/confirm-delivery")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(OrderDTO.serializer(), body)
+    }
+
+    suspend fun cancelOrder(orderId: String): OrderDTO {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/orders/$orderId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(OrderDTO.serializer(), body)
+    }
+
+    suspend fun fetchInvoiceByOrder(orderId: String): InvoiceDTO {
+        val response = authorizedGet("/payments/invoices/order/$orderId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(InvoiceDTO.serializer(), body)
+    }
+
+    suspend fun forgotPassword(email: String) {
+        val response = client.post(buildUrl("/auth/forgot-password")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            setBody(ForgotPasswordRequest(email = email))
+        }
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
+    }
+
+    suspend fun resetPassword(token: String, newPassword: String) {
+        val response = client.post(buildUrl("/auth/reset-password")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            setBody(ResetPasswordRequest(token = token, newPassword = newPassword))
+        }
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
+    }
+
+    suspend fun verifyEmail(token: String) {
+        val response = client.post(buildUrl("/auth/verify-email")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            setBody(VerifyEmailRequest(token = token))
+        }
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
+    }
+
+    suspend fun resendVerification(email: String) {
+        val response = client.post(buildUrl("/auth/resend-verification")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            setBody(ResendVerificationRequest(email = email))
+        }
+        ensureSuccess(response.status, response.bodyAsText(), notifyUnauthorized = false)
+    }
+
+    suspend fun updateUserProfile(userId: String, request: UpdateUserProfileRequest): UserDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/users/$userId")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(UserPayload.serializer(), body).toUserDto()
+    }
+
+    suspend fun changePassword(userId: String, request: ChangePasswordRequest) {
+        val token = requireBearerToken()
+        val response = client.patch(buildUrl("/users/$userId/password")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun fetchAddresses(): List<AddressResponseDto> {
+        val response = authorizedGet("/addresses")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun createAddress(request: CreateAddressRequest): AddressResponseDto {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/addresses")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(AddressResponseDto.serializer(), body)
+    }
+
+    suspend fun updateAddress(addressId: String, request: CreateAddressRequest): AddressResponseDto {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/addresses/$addressId")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(AddressResponseDto.serializer(), body)
+    }
+
+    suspend fun deleteAddress(addressId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/addresses/$addressId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun fetchPaymentMethods(ownerId: String): List<PaymentMethodDTO> {
+        val response = authorizedGet("/payments/methods/owner/$ownerId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun addPaymentMethod(request: CreatePaymentMethodRequest): PaymentMethodDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/payments/methods")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(PaymentMethodDTO.serializer(), body)
+    }
+
+    suspend fun deletePaymentMethod(paymentMethodId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/payments/methods/$paymentMethodId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun setDefaultPaymentMethod(paymentMethodId: String): PaymentMethodDTO {
+        val token = requireBearerToken()
+        val response = client.post(buildUrl("/payments/methods/$paymentMethodId/default")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(PaymentMethodDTO.serializer(), body)
+    }
+
+    suspend fun fetchSupportTickets(): List<SupportTicketDTO> {
+        val response = authorizedGet("/support/my")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchSupportTicket(ticketId: String): SupportTicketDTO {
+        val response = authorizedGet("/support/$ticketId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(SupportTicketDTO.serializer(), body)
+    }
+
+    suspend fun createSupportTicket(
+        request: CreateTicketRequest,
+        attachmentFileName: String? = null,
+        attachmentMimeType: String? = null,
+        attachmentBytes: ByteArray? = null,
+    ): SupportTicketDTO {
+        val token = requireBearerToken()
+        val safeAttachmentName = attachmentFileName?.ifBlank { "support-attachment" }?.replace("\"", "")
+        val safeAttachmentType = attachmentMimeType?.takeIf { it.isNotBlank() } ?: ContentType.Application.OctetStream.toString()
+        val response = client.post(buildUrl("/support")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append("subject", request.subject.trim())
+                        append("category", request.category.name)
+                        append("description", request.description.trim())
+                        if (attachmentBytes != null && attachmentBytes.isNotEmpty() && safeAttachmentName != null) {
+                            append(
+                                key = "attachment",
+                                value = attachmentBytes,
+                                headers = Headers.build {
+                                    append(HttpHeaders.ContentDisposition, "filename=\"$safeAttachmentName\"")
+                                    append(HttpHeaders.ContentType, safeAttachmentType)
+                                },
+                            )
+                        }
+                    },
+                ),
+            )
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(SupportTicketDTO.serializer(), body)
+    }
+
+    suspend fun fetchNotifications(recipientId: String): List<NotificationDTO> {
+        val response = authorizedGet("/notifications/recipient/$recipientId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchUnreadNotificationCount(recipientId: String): Int {
+        val response = authorizedGet("/notifications/recipient/$recipientId/unread-count")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(UnreadCountDTO.serializer(), body).count
+    }
+
+    suspend fun markNotificationRead(notificationId: String): NotificationDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/notifications/$notificationId/read")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(NotificationDTO.serializer(), body)
+    }
+
+    suspend fun markAllNotificationsRead(recipientId: String): Int {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/notifications/recipient/$recipientId/read-all")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(UnreadCountDTO.serializer(), body).count
+    }
+
+    suspend fun deleteNotification(notificationId: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/notifications/$notificationId")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
+    }
+
+    suspend fun fetchNotificationPreferences(userId: String): List<NotificationPreferenceDTO> {
+        val response = authorizedGet("/notifications/preferences/$userId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun fetchPushSubscriptions(userId: String): List<WebPushSubscriptionDTO> {
+        val response = authorizedGet("/notifications/push-subscriptions/$userId")
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(body)
+    }
+
+    suspend fun upsertNotificationPreference(
+        userId: String,
+        request: UpsertNotificationPreferenceRequest,
+    ): NotificationPreferenceDTO {
+        val token = requireBearerToken()
+        val response = client.put(buildUrl("/notifications/preferences/$userId")) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            setBody(request)
+        }
+        val body = response.bodyAsText()
+        ensureSuccess(response.status, body)
+        return json.decodeFromString(NotificationPreferenceDTO.serializer(), body)
+    }
+
+    suspend fun unregisterPushSubscription(endpoint: String) {
+        val token = requireBearerToken()
+        val response = client.delete(buildUrl("/notifications/push-subscriptions")) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+            parameter("endpoint", endpoint)
+        }
+        ensureSuccess(response.status, response.bodyAsText())
     }
 
     private fun buildUrl(path: String): String = "${MobileApiConfig.baseUrl}${path}"
 
-    private fun ensureSuccess(status: HttpStatusCode, body: String) {
+    private suspend fun authorizedGet(path: String, tokenOverride: String? = null): HttpResponse {
+        val token = requireBearerToken(tokenOverride)
+        return client.get(buildUrl(path)) {
+            accept(ContentType.Application.Json)
+            bearerAuth(token)
+        }
+    }
+
+    private suspend fun requireBearerToken(tokenOverride: String? = null): String {
+        val token = tokenOverride ?: tokenProvider()
+        if (!token.isNullOrBlank()) {
+            return token
+        }
+
+        onUnauthorized()
+        throw MobileApiException(
+            message = "Your session expired. Please sign in again.",
+            statusCode = HttpStatusCode.Unauthorized.value,
+            isUnauthorized = true,
+        )
+    }
+
+    private suspend fun ensureSuccess(
+        status: HttpStatusCode,
+        body: String,
+        notifyUnauthorized: Boolean = true,
+    ) {
         if (status.isSuccess()) {
             return
+        }
+
+        val isUnauthorized = status == HttpStatusCode.Unauthorized
+        if (isUnauthorized && notifyUnauthorized) {
+            onUnauthorized()
         }
 
         val message = runCatching {
@@ -156,8 +961,13 @@ class MobileAuthApi(
         }.getOrNull()
 
         throw MobileApiException(
-            message = message ?: "Request failed with status ${status.value}",
+            message = if (isUnauthorized && notifyUnauthorized) {
+                "Your session expired. Please sign in again."
+            } else {
+                message ?: "Request failed with status ${status.value}"
+            },
             statusCode = status.value,
+            isUnauthorized = isUnauthorized,
         )
     }
 

@@ -4,8 +4,10 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uqu.drawbridge.platform.model.*
 import uqu.drawbridge.platform.repository.InvoiceRepository
+import uqu.drawbridge.platform.repository.OrderRepository
 import uqu.drawbridge.platform.repository.PaymentMethodRepository
 import uqu.drawbridge.platform.repository.PaymentRepository
+import uqu.drawbridge.platform.repository.UserRepository
 import uqu.drawbridge.platform.*
 import uqu.drawbridge.platform.validation.RequestValidation
 import java.math.BigDecimal
@@ -17,7 +19,9 @@ class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val invoiceRepository: InvoiceRepository,
     private val paymentMethodRepository: PaymentMethodRepository,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val orderRepository: OrderRepository,
+    private val userRepository: UserRepository
 ) {
 
     // ==================== PAYMENT OPERATIONS ====================
@@ -31,11 +35,11 @@ class PaymentService(
     }
 
     fun getPaymentsByOrderId(orderId: String): List<Payment> {
-        return paymentRepository.findByOrderId(orderId)
+        return paymentRepository.findByOrder_Id(orderId)
     }
 
     fun getPaymentsByOwnerId(ownerId: String): List<Payment> {
-        return paymentRepository.findByOwnerId(ownerId)
+        return paymentRepository.findByOwner_Id(ownerId)
     }
 
     fun getPaymentsByStatus(status: PaymentStatus): List<Payment> {
@@ -107,7 +111,7 @@ class PaymentService(
     }
 
     fun getInvoiceByOrderId(orderId: String): Invoice? {
-        return invoiceRepository.findByOrderId(orderId)
+        return invoiceRepository.findByOrder_Id(orderId)
     }
 
     fun getInvoiceByNumber(invoiceNumber: String): Invoice? {
@@ -130,7 +134,7 @@ class PaymentService(
     @Transactional
     fun createInvoiceForOrder(orderId: String, totalAmount: BigDecimal, currency: String, dueDays: Int = 30): Invoice {
         val invoice = Invoice(
-            orderId = orderId,
+            order = orderRepository.getReferenceById(orderId),
             invoiceNumber = generateInvoiceNumber(),
             issueDate = LocalDateTime.now(),
             dueDate = LocalDateTime.now().plusDays(dueDays.toLong()),
@@ -157,21 +161,21 @@ class PaymentService(
     }
 
     fun getPaymentMethodsByOwner(ownerId: String): List<PaymentMethod> {
-        return paymentMethodRepository.findByOwnerId(ownerId)
+        return paymentMethodRepository.findByOwner_Id(ownerId)
     }
 
     fun getPaymentMethodsByOwnerAndType(ownerId: String, type: PaymentMethodType): List<PaymentMethod> {
-        return paymentMethodRepository.findByOwnerIdAndType(ownerId, type)
+        return paymentMethodRepository.findByOwner_IdAndType(ownerId, type)
     }
 
     fun getDefaultPaymentMethod(ownerId: String): PaymentMethod? {
-        return paymentMethodRepository.findByOwnerIdAndIsDefaultTrue(ownerId)
+        return paymentMethodRepository.findByOwner_IdAndIsDefaultTrue(ownerId)
     }
 
     @Transactional
     fun addPaymentMethod(paymentMethod: PaymentMethod): PaymentMethod {
         // If this is the first payment method for the owner, make it default
-        val existingMethods = paymentMethodRepository.findByOwnerId(paymentMethod.ownerId)
+        val existingMethods = paymentMethodRepository.findByOwner_Id(paymentMethod.ownerId)
         if (existingMethods.isEmpty()) {
             paymentMethod.isDefault = true
         }
@@ -183,7 +187,7 @@ class PaymentService(
         val method = paymentMethodRepository.findById(id).orElse(null) ?: return null
         
         // Remove default from other methods
-        val currentDefault = paymentMethodRepository.findByOwnerIdAndIsDefaultTrue(method.ownerId)
+        val currentDefault = paymentMethodRepository.findByOwner_IdAndIsDefaultTrue(method.ownerId)
         if (currentDefault != null && currentDefault.id != id) {
             currentDefault.isDefault = false
             paymentMethodRepository.save(currentDefault)
@@ -221,7 +225,7 @@ class PaymentService(
         id = (this.id ?: ""),
         orderId = this.orderId,
         ownerId = this.ownerId,
-        paymentMethodId = this.paymentMethodId,
+        paymentMethodId = this.paymentMethodId ?: "",
         amount = this.amount.toDouble(),
         status = this.status,
         transactionRef = this.transactionRef,
@@ -254,15 +258,17 @@ class PaymentService(
 
     fun getPaymentsDTOByOrderId(orderId: String): List<PaymentDTO> = getPaymentsByOrderId(orderId).map { it.toDTO() }
 
+    fun getPaymentsDTOByOwner(ownerId: String): List<PaymentDTO> = getPaymentsByOwnerId(ownerId).map { it.toDTO() }
+
     fun createPaymentDTO(request: CreatePaymentRequest): PaymentDTO {
         RequestValidation.requireNotBlank(request.orderId, "orderId")
         RequestValidation.requireNotBlank(request.ownerId, "ownerId")
         RequestValidation.requireNotBlank(request.paymentMethodId, "paymentMethodId")
         val amount = RequestValidation.parsePositiveBigDecimal(request.amount.toString(), "amount")
         val payment = Payment(
-            orderId = request.orderId,
-            ownerId = request.ownerId,
-            paymentMethodId = request.paymentMethodId,
+            order = orderRepository.getReferenceById(request.orderId),
+            owner = userRepository.getReferenceById(request.ownerId),
+            paymentMethod = paymentMethodRepository.findById(request.paymentMethodId).orElse(null),
             amount = amount,
             status = PaymentStatus.PENDING,
             transactionRef = request.transactionRef,
@@ -287,7 +293,7 @@ class PaymentService(
         RequestValidation.requireNotBlank(request.currency, "currency")
         val totalAmount = RequestValidation.parsePositiveBigDecimal(request.totalAmount.toString(), "totalAmount")
         val invoice = Invoice(
-            orderId = request.orderId,
+            order = orderRepository.getReferenceById(request.orderId),
             invoiceNumber = request.invoiceNumber,
             issueDate = LocalDateTime.parse(request.issueDate),
             dueDate = LocalDateTime.parse(request.dueDate),
@@ -305,7 +311,7 @@ class PaymentService(
         RequestValidation.requireNotBlank(request.type, "type")
         RequestValidation.requireNotBlank(request.maskedDetails, "maskedDetails")
         val paymentMethod = PaymentMethod(
-            ownerId = request.ownerId,
+            owner = userRepository.getReferenceById(request.ownerId),
             type = PaymentMethodType.valueOf(request.type),
             maskedDetails = request.maskedDetails,
             isDefault = request.isDefault

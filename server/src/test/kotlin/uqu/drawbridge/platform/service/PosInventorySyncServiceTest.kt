@@ -24,44 +24,49 @@ import uqu.drawbridge.platform.model.User
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.PosEventReceiptRepository
 import uqu.drawbridge.platform.repository.ProductRepository
+import uqu.drawbridge.platform.repository.UserRepository
 
 class PosInventorySyncServiceTest {
     private val productRepository = mock(ProductRepository::class.java)
     private val inventoryItemRepository = mock(InventoryItemRepository::class.java)
     private val posEventReceiptRepository = mock(PosEventReceiptRepository::class.java)
     private val inventoryService = mock(InventoryService::class.java)
+    private val userRepository = mock(UserRepository::class.java)
 
     private val service = PosInventorySyncService(
         productRepository = productRepository,
         inventoryItemRepository = inventoryItemRepository,
         posEventReceiptRepository = posEventReceiptRepository,
-        inventoryService = inventoryService
+        inventoryService = inventoryService,
+        userRepository = userRepository
     )
 
     @Test
     fun `delta request updates inventory and records receipt`() {
         val retailerId = "ret-1"
         val product = product("prod-1", "123456")
-        val inventory = inventoryItem("inv-1", retailerId, product.id!!, 10)
+        val inventory = inventoryItem()
         val pendingReceipt = PosEventReceipt(
             id = "receipt-1",
-            retailerId = retailerId,
+            retailer = User(id = retailerId, email = "", passwordHash = "", role = UserRole.RETAILER, phoneNumber = "", businessName = "", verificationStatus = true, commercialRegistrationNumber = ""),
             eventId = "evt-1",
             eventType = "inventory.changed",
             processedAt = LocalDateTime.now()
         )
-        val updatedInventory = inventoryItem("inv-1", retailerId, product.id!!, 7)
+        val updatedInventory = inventoryItem(7)
 
-        `when`(posEventReceiptRepository.existsByRetailerIdAndEventIdAndEventType(retailerId, "evt-1", "inventory.changed"))
+        `when`(posEventReceiptRepository.existsByRetailer_IdAndEventIdAndEventType(retailerId, "evt-1", "inventory.changed"))
             .thenReturn(false)
+        `when`(userRepository.getReferenceById(retailerId))
+            .thenReturn(User(id = retailerId, email = "", passwordHash = "", role = UserRole.RETAILER, phoneNumber = "", businessName = "", verificationStatus = true, commercialRegistrationNumber = ""))
         `when`(posEventReceiptRepository.saveAndFlush(any(PosEventReceipt::class.java))).thenReturn(pendingReceipt)
         `when`(productRepository.findByGtin("123456")).thenReturn(product)
-        `when`(inventoryItemRepository.findByRetailerIdAndProductId(retailerId, "prod-1")).thenReturn(inventory)
+        `when`(inventoryItemRepository.findByRetailer_IdAndProduct_Id("ret-1", "prod-1")).thenReturn(inventoryItem())
         `when`(
             inventoryService.adjustQuantity(
                 "inv-1",
                 -3,
-                uqu.drawbridge.platform.model.InventoryAuditSourceType.POS,
+                uqu.drawbridge.platform.dto.InventoryAuditSourceType.POS,
                 "evt-1",
                 "POS sale"
             )
@@ -89,7 +94,7 @@ class PosInventorySyncServiceTest {
     @Test
     fun `duplicate event returns already processed and skips mutation`() {
         val retailerId = "ret-1"
-        `when`(posEventReceiptRepository.existsByRetailerIdAndEventIdAndEventType(retailerId, "evt-dup", "inventory.changed"))
+        `when`(posEventReceiptRepository.existsByRetailer_IdAndEventIdAndEventType(retailerId, "evt-dup", "inventory.changed"))
             .thenReturn(true)
 
         val response = service.applyIncomingInventoryChange(
@@ -124,7 +129,7 @@ class PosInventorySyncServiceTest {
             ),
             name = "Beans",
             description = "Desc",
-            categoryId = "cat-1",
+            category = uqu.drawbridge.platform.model.Category(id = "cat-1", name = "category"),
             price = BigDecimal("20.00"),
             stockQuantity = 10,
             gtin = gtin,
@@ -132,13 +137,17 @@ class PosInventorySyncServiceTest {
         )
     }
 
-    private fun inventoryItem(id: String, retailerId: String, productId: String, quantity: Int): InventoryItem {
+    private fun product(): Product {
+        return product("prod-1", "123456")
+    }
+
+    private fun inventoryItem(quantity: Int = 10): InventoryItem {
         return InventoryItem(
-            id = id,
-            retailerId = retailerId,
-            productId = productId,
+            id = "inv-1",
+            retailer = User(id = "ret-1", email = "", passwordHash = "", role = uqu.drawbridge.platform.UserRole.RETAILER, phoneNumber = "", businessName = "", verificationStatus = true, commercialRegistrationNumber = ""),
+            product = product(),
             currentQuantity = quantity,
-            autoOrderConfig = AutoOrderConfig()
+            autoOrderConfig = uqu.drawbridge.platform.model.AutoOrderConfig()
         )
     }
 }

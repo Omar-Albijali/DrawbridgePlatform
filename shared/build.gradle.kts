@@ -19,7 +19,7 @@ val localEnv = Properties().apply {
 
 buildConfig {
     packageName("uqu.drawbridge.platform.shared")
-    buildConfigField("String", "API_BASE_URL", "\"${localEnv.getProperty("COMPOSE_API_BASE_URL") ?: "http://10.0.2.2:8080/api"}\"")
+    buildConfigField("String", "API_BASE_URL", "\"${localEnv.getProperty("COMPOSE_API_BASE_URL")?.trim().orEmpty()}\"")
 }
 
 kotlin {
@@ -46,10 +46,10 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.content.negotiation)
-            implementation(libs.ktor.serialization.kotlinx.json)
-            implementation(libs.kotlinx.serialization.json)
+            api(libs.ktor.client.core)
+            api(libs.ktor.client.content.negotiation)
+            api(libs.ktor.serialization.kotlinx.json)
+            api(libs.kotlinx.serialization.json)
         }
         val androidMain by getting {
             dependencies {

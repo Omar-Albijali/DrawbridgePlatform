@@ -13,7 +13,7 @@ class AddressService(
     private val userRepository: UserRepository
 ) {
     fun getAddresses(userId: String): List<AddressResponseDto> {
-        return addressRepository.findByUserId(userId).map {
+        return addressRepository.findByUser_Id(userId).map {
             AddressResponseDto(it.id!!, it.street, it.city, it.state, it.zipCode, it.country)
         }
     }
@@ -25,7 +25,8 @@ class AddressService(
             city = request.city,
             state = request.state,
             zipCode = request.zipCode,
-            country = request.country
+            country = request.country,
+            user = user
         )
         user.addresses.add(address)
         userRepository.save(user)

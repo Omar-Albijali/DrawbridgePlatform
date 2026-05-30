@@ -5,6 +5,6 @@ import uqu.drawbridge.platform.model.EmailVerificationToken
 
 interface EmailVerificationTokenRepository : JpaRepository<EmailVerificationToken, String> {
     fun findByToken(token: String): EmailVerificationToken?
-    fun deleteAllByUserId(userId: String)
+    fun deleteAllByUser_Id(userId: String)
 }
 

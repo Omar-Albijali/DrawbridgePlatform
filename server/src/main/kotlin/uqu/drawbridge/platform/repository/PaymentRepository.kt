@@ -5,8 +5,8 @@ import uqu.drawbridge.platform.model.Payment
 import uqu.drawbridge.platform.PaymentStatus
 
 interface PaymentRepository : JpaRepository<Payment, String> {
-    fun findByOrderId(orderId: String): List<Payment>
-    fun findByOwnerId(ownerId: String): List<Payment>
+    fun findByOrder_Id(orderId: String): List<Payment>
+    fun findByOwner_Id(ownerId: String): List<Payment>
     fun findByStatus(status: PaymentStatus): List<Payment>
     fun findByTransactionRef(transactionRef: String): Payment?
 }

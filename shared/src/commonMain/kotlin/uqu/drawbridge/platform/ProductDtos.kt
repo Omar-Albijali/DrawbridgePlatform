@@ -4,6 +4,7 @@ package uqu.drawbridge.platform
 
 
 import kotlin.js.JsExport
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @JsExport
@@ -66,4 +67,28 @@ data class ProductImageResponse(
     val altText: String,
     val sortIndex: Int,
     val productId: String // Long -> String
+)
+
+@Serializable
+data class PaginatedProductResponse(
+    val content: List<ProductDTO>,
+    val currentPage: Int,
+    val pageSize: Int,
+    val totalPages: Int,
+    val totalElements: Long,
+    @SerialName("isFirst")
+    val isFirst: Boolean,
+    @SerialName("isLast")
+    val isLast: Boolean,
+)
+
+data class MarketplaceProductQuery(
+    val page: Int = 0,
+    val size: Int = 12,
+    val search: String? = null,
+    val categoryIds: List<String> = emptyList(),
+    val brands: List<String> = emptyList(),
+    val minPrice: Double? = null,
+    val maxPrice: Double? = null,
+    val sort: String = "featured",
 )

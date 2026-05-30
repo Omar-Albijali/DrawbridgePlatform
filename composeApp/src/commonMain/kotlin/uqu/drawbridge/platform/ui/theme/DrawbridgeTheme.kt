@@ -3,9 +3,6 @@ package uqu.drawbridge.platform.ui.theme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -15,24 +12,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-internal val Primary500 = Color(0xFF3B82F6) // Blue 500
-internal val Primary600 = Color(0xFF2563EB)
-internal val Primary100 = Color(0xFFDBEAFE)
+internal val Primary500 = Color(0xFF10B981)
+internal val Primary600 = Color(0xFF059669)
+internal val Primary100 = Color(0xFFD1FAE5)
 
-internal val Secondary500 = Color(0xFF6B7280)
+internal val Secondary500 = Color(0xFF0284C7)
 
 internal val SuccessColor = Color(0xFF10B981)
 internal val WarningColor = Color(0xFFF59E0B)
 internal val ErrorColor = Color(0xFFEF4444)
 
+internal val AppNavyBase = Color(0xFF03111F)
+internal val AppNavySurface = Color(0xFF0B1F33)
+internal val AppNavySurfaceHigh = Color(0xFF102A3D)
+internal val AppDarkLine = Color(0xFF27465C)
+internal val AppMutedText = Color(0xFFA8B7C7)
+
 private val LightScheme = lightColorScheme(
     primary = Primary500,
-    onPrimary = Color.White,
+    onPrimary = Color(0xFF052E2B),
     primaryContainer = Primary100,
-    onPrimaryContainer = Color(0xFF1E3A8A),
+    onPrimaryContainer = Color(0xFF064E3B),
     secondary = Secondary500,
     onSecondary = Color.White,
     background = Color(0xFFF8FAFC),
@@ -48,17 +50,17 @@ private val LightScheme = lightColorScheme(
 private val DarkScheme = darkColorScheme(
     primary = Primary500,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFF1E3A8A),
+    primaryContainer = Color(0xFF064E3B),
     onPrimaryContainer = Primary100,
-    secondary = Color(0xFF9CA3AF),
-    onSecondary = Color(0xFF111827),
-    background = Color(0xFF020617),
+    secondary = Color(0xFF7DD3FC),
+    onSecondary = Color(0xFF082F49),
+    background = AppNavyBase,
     onBackground = Color(0xFFF8FAFC),
-    surface = Color(0xFF0F172A),
+    surface = AppNavySurface,
     onSurface = Color(0xFFF8FAFC),
-    surfaceVariant = Color(0xFF1E293B),
-    onSurfaceVariant = Color(0xFF94A3B8),
-    outline = Color(0xFF334155),
+    surfaceVariant = AppNavySurfaceHigh,
+    onSurfaceVariant = AppMutedText,
+    outline = AppDarkLine,
     error = ErrorColor,
 )
 
@@ -71,12 +73,12 @@ internal fun DrawbridgeTheme(
     MaterialTheme(
         colorScheme = if (darkTheme) DarkScheme else LightScheme,
         typography = baseTypography.copy(
-            displayLarge = baseTypography.displayLarge.copy(fontWeight = FontWeight.Black, letterSpacing = (-1.5).sp),
-            displayMedium = baseTypography.displayMedium.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp),
+            displayLarge = baseTypography.displayLarge.copy(fontWeight = FontWeight.Black, letterSpacing = 0.sp),
+            displayMedium = baseTypography.displayMedium.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = 0.sp),
             headlineLarge = baseTypography.headlineLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.sp),
             headlineMedium = baseTypography.headlineMedium.copy(
                 fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp,
+                letterSpacing = 0.sp,
             ),
             titleLarge = baseTypography.titleLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp),
             bodyLarge = baseTypography.bodyLarge.copy(lineHeight = 24.sp, letterSpacing = 0.15.sp),
@@ -90,38 +92,27 @@ internal fun DrawbridgeTheme(
 internal fun AppBackground() {
     val isDark = MaterialTheme.colorScheme.surface.red < 0.2f
     
-    val gradientStart = if (isDark) Color(0xFF020617) else Color(0xFFF8FAFC)
-    val gradientEnd = if (isDark) Color(0xFF0F172A) else Color(0xFFE2E8F0)
-    
-    val accent1 = if (isDark) Color(0x333B82F6) else Color(0x153B82F6)
-    val accent2 = if (isDark) Color(0x2210B981) else Color(0x0F10B981)
+    val gradientColors = if (isDark) {
+        listOf(
+            Color(0xFF03111F),
+            Color(0xFF0B1F33),
+            Color(0xFF03111F),
+        )
+    } else {
+        listOf(
+            Color(0xFFF8FAFC),
+            Color(0xFFEFF6FF),
+            Color(0xFFF8FAFC),
+        )
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(gradientStart, gradientEnd)
+                    colors = gradientColors,
                 )
             ),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(400.dp)
-                .background(Brush.radialGradient(listOf(accent1, Color.Transparent), radius = 1000f)),
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 250.dp)
-                .background(
-                    Brush.radialGradient(
-                        listOf(accent2, Color.Transparent), 
-                        radius = 1200f, 
-                        center = androidx.compose.ui.geometry.Offset(1200f, 800f)
-                    )
-                ),
-        )
-    }
+    )
 }

@@ -5,7 +5,7 @@ import uqu.drawbridge.platform.model.PaymentMethod
 import uqu.drawbridge.platform.PaymentMethodType
 
 interface PaymentMethodRepository : JpaRepository<PaymentMethod, String> {
-    fun findByOwnerId(ownerId: String): List<PaymentMethod>
-    fun findByOwnerIdAndType(ownerId: String, type: PaymentMethodType): List<PaymentMethod>
-    fun findByOwnerIdAndIsDefaultTrue(ownerId: String): PaymentMethod?
+    fun findByOwner_Id(ownerId: String): List<PaymentMethod>
+    fun findByOwner_IdAndType(ownerId: String, type: PaymentMethodType): List<PaymentMethod>
+    fun findByOwner_IdAndIsDefaultTrue(ownerId: String): PaymentMethod?
 }

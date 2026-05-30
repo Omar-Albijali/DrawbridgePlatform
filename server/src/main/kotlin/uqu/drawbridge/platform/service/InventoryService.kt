@@ -11,14 +11,14 @@ import uqu.drawbridge.platform.NotificationType
 import uqu.drawbridge.platform.CreateInventoryItemRequest
 import uqu.drawbridge.platform.UpdateAutoOrderConfigRequest
 import uqu.drawbridge.platform.AutoOrderConfigDTO
-import uqu.drawbridge.platform.PosScanResponse
 import uqu.drawbridge.platform.ScheduleType
 import uqu.drawbridge.platform.model.AutoOrderConfig
-import uqu.drawbridge.platform.model.InventoryAuditSourceType
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.model.InventoryItem
 import uqu.drawbridge.platform.model.InventoryStockTargetType
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.ProductRepository
+import uqu.drawbridge.platform.repository.UserRepository
 import uqu.drawbridge.platform.validation.RequestValidation
 import java.time.DayOfWeek
 import java.time.LocalDateTime
@@ -29,7 +29,8 @@ class InventoryService(
     private val productRepository: ProductRepository,
     private val orderService: OrderService,
     private val notificationService: NotificationService,
-    private val inventoryAuditService: InventoryAuditService
+    private val inventoryAuditService: InventoryAuditService,
+    private val userRepository: UserRepository
 ) {
 
     // ==================== INVENTORY ITEM OPERATIONS ====================
@@ -43,15 +44,15 @@ class InventoryService(
     }
 
     fun getInventoryItemsByRetailer(retailerId: String): List<InventoryItem> {
-        return inventoryItemRepository.findByRetailerId(retailerId)
+        return inventoryItemRepository.findByRetailer_Id(retailerId)
     }
 
     fun getInventoryItemsByProduct(productId: String): List<InventoryItem> {
-        return inventoryItemRepository.findByProductId(productId)
+        return inventoryItemRepository.findByProduct_Id(productId)
     }
 
     fun getInventoryItemByRetailerAndProduct(retailerId: String, productId: String): InventoryItem? {
-        return inventoryItemRepository.findByRetailerIdAndProductId(retailerId, productId)
+        return inventoryItemRepository.findByRetailer_IdAndProduct_Id(retailerId, productId)
     }
 
     fun getLowStockItems(threshold: Int): List<InventoryItem> {
@@ -191,7 +192,7 @@ class InventoryService(
         calculateNextScheduledAt(config)
         val savedItem = inventoryItemRepository.save(item)
         notificationService.sendEventNotification(
-            recipientId = savedItem.retailerId,
+            recipientId = savedItem.retailerId ?: "",
             type = NotificationType.STOCK,
             eventKey = NotificationEventKey.AUTO_RESTOCK_TRIGGERED,
             entityType = NotificationEntityType.INVENTORY_ITEM,
@@ -222,8 +223,8 @@ class InventoryService(
     // ==================== DTO CONVERSION ====================
 
     private fun InventoryItem.toDTO(): InventoryItemDTO {
-        val product = productRepository.findById(this.productId).orElse(null)
-        val supplierName = product?.wholesaler?.businessName ?: "Unknown Supplier"
+        val product = this.product
+        val supplierName = product.wholesaler.businessName
         
         val status = when {
             this.currentQuantity == 0 -> InventoryStatus.OUT_OF_STOCK
@@ -233,7 +234,7 @@ class InventoryService(
 
         return InventoryItemDTO(
             id = (this.id ?: ""),
-            name = product?.name ?: "Unknown Product",
+            name = product.name,
             currentStock = this.currentQuantity,
             autoRestock = this.autoOrderConfig.enabled,
             autoOrderConfig = this.autoOrderConfig.toDTO(),
@@ -241,8 +242,8 @@ class InventoryService(
             supplier = supplierName,
             lastRestocked = this.lastUpdated.toString(),
             reorderQuantity = this.autoOrderConfig.reorderQuantity,
-            minimumOrderQuantity = product?.minimumOrderQuantity ?: 1,
-            imageUrl = product?.images?.sortedBy { it.sortIndex }?.firstOrNull()?.url
+            minimumOrderQuantity = product.minimumOrderQuantity,
+            imageUrl = product.images.sortedBy { it.sortIndex }.firstOrNull()?.url
         )
     }
 
@@ -275,12 +276,12 @@ class InventoryService(
 
     @Transactional(readOnly = true)
     fun getInventoryItemsDTOByRetailer(retailerId: String): List<uqu.drawbridge.platform.InventoryItemDTO> {
-        return itemsToDTOs(inventoryItemRepository.findByRetailerId(retailerId))
+        return itemsToDTOs(inventoryItemRepository.findByRetailer_Id(retailerId))
     }
 
     @Transactional(readOnly = true)
     fun getInventoryItemsDTOByProduct(productId: String): List<uqu.drawbridge.platform.InventoryItemDTO> {
-        return itemsToDTOs(inventoryItemRepository.findByProductId(productId))
+        return itemsToDTOs(inventoryItemRepository.findByProduct_Id(productId))
     }
 
     @Transactional(readOnly = true)
@@ -341,8 +342,8 @@ class InventoryService(
             minThreshold = request.minThreshold
         )
         val inventoryItem = InventoryItem(
-            productId = request.productId,
-            retailerId = request.retailerId,
+            product = productRepository.getReferenceById(request.productId),
+            retailer = userRepository.getReferenceById(request.retailerId),
             currentQuantity = request.currentStock,
             lastUpdated = LocalDateTime.now(),
             autoOrderConfig = autoOrderConfig
@@ -418,7 +419,7 @@ class InventoryService(
         reason: String? = null
     ) {
         inventoryAuditService.logStockChange(
-            productId = item.productId,
+            productId = item.productId ?: "",
             inventoryItemId = item.id,
             stockTargetType = InventoryStockTargetType.RETAILER_INVENTORY,
             sourceType = sourceType,
@@ -441,7 +442,7 @@ class InventoryService(
     }
 
     private fun validateAutoOrderReorderQuantity(item: InventoryItem, reorderQuantity: Int) {
-        val product = productRepository.findById(item.productId).orElse(null)
+        val product = productRepository.findById(item.productId ?: "").orElse(null)
             ?: throw IllegalArgumentException("Product not found for inventory item ${item.id ?: item.productId}.")
 
         if (reorderQuantity < product.minimumOrderQuantity) {
@@ -502,35 +503,10 @@ class InventoryService(
     }
 
 
-    // ==================== POS SCAN ====================
-
-    @Transactional
-    fun scanByGtin(retailerId: String, gtin: String): PosScanResponse {
-        val product = productRepository.findByGtin(gtin)
-            ?: return PosScanResponse(productName = "", newStock = 0, message = "No product found for GTIN: $gtin")
-
-        val inventoryItem = inventoryItemRepository.findByRetailerIdAndProductId(retailerId, product.id!!)
-            ?: return PosScanResponse(productName = product.name, newStock = 0, message = "No inventory entry found for this product")
-
-        if (inventoryItem.currentQuantity <= 0) {
-            return PosScanResponse(productName = product.name, newStock = 0, message = "Out of stock")
-        }
-
-        inventoryItem.currentQuantity -= 1
-        inventoryItem.lastUpdated = LocalDateTime.now()
-        inventoryItemRepository.save(inventoryItem)
-
-        return PosScanResponse(
-            productName = product.name,
-            newStock = inventoryItem.currentQuantity,
-            message = "OK"
-        )
-    }
-
     private fun itemsToDTOs(items: List<InventoryItem>): List<uqu.drawbridge.platform.InventoryItemDTO> {
         if (items.isEmpty()) return emptyList()
 
-        val productIds = items.map { it.productId }.distinct()
+        val productIds = items.mapNotNull { it.productId }.distinct()
         val products = productRepository.findAllById(productIds).associateBy { it.id }
 
         return items.map { item ->
@@ -564,7 +540,7 @@ class InventoryService(
         val minThreshold = item.autoOrderConfig.minThreshold
         if (item.currentQuantity <= minThreshold) {
             notificationService.sendEventNotification(
-                recipientId = item.retailerId,
+                recipientId = item.retailerId ?: "",
                 type = NotificationType.STOCK,
                 eventKey = NotificationEventKey.LOW_STOCK_ALERT,
                 entityType = NotificationEntityType.INVENTORY_ITEM,
@@ -594,13 +570,13 @@ class InventoryService(
         val reorderQuantity = config.reorderQuantity
         if (!config.enabled || reorderQuantity <= 0) return false
 
-        val product = productRepository.findById(item.productId).orElse(null) ?: return false
+        val product = productRepository.findById(item.productId ?: "").orElse(null) ?: return false
         if (reorderQuantity < product.minimumOrderQuantity || reorderQuantity > product.stockQuantity) return false
         val wholesalerId = product.wholesaler.id ?: return false
         val createdOrder = orderService.createAutoRestockOrder(
-            retailerId = item.retailerId,
+            retailerId = item.retailerId ?: "",
             wholesalerId = wholesalerId,
-            productId = item.productId,
+            productId = item.productId ?: "",
             quantity = reorderQuantity,
             unitPrice = product.price
         ) ?: return false

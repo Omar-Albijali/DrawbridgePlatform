@@ -6,8 +6,8 @@ import uqu.drawbridge.platform.model.Wishlist
 
 @Repository
 interface WishlistRepository : JpaRepository<Wishlist, String> {
-    fun findAllByUserId(userId: String): List<Wishlist>
-    fun findByUserIdAndProductId(userId: String, productId: String): Wishlist?
-    fun deleteByUserIdAndProductId(userId: String, productId: String)
-    fun existsByUserIdAndProductId(userId: String, productId: String): Boolean
+    fun findAllByUser_Id(userId: String): List<Wishlist>
+    fun findByUser_IdAndProduct_Id(userId: String, productId: String): Wishlist?
+    fun deleteByUser_IdAndProduct_Id(userId: String, productId: String)
+    fun existsByUser_IdAndProduct_Id(userId: String, productId: String): Boolean
 }

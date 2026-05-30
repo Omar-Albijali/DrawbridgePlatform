@@ -25,6 +25,7 @@ enum class NotificationType {
 }
 
 @JsExport
+@Serializable
 enum class NotificationEventKey {
     ORDER_CREATED,
     ORDER_STATUS_UPDATED,
@@ -36,6 +37,7 @@ enum class NotificationEventKey {
 }
 
 @JsExport
+@Serializable
 enum class NotificationEntityType {
     ORDER,
     INVENTORY_ITEM,
@@ -45,6 +47,7 @@ enum class NotificationEntityType {
 }
 
 @JsExport
+@Serializable
 enum class NotificationPreferenceKey {
     ORDER_CONFIRMATION,
     SHIPPING_STATUS,
@@ -71,6 +74,7 @@ data class NotificationDTO(
 )
 
 @JsExport
+@Serializable
 data class NotificationPreferenceDTO(
     val userId: String,
     val preferenceKey: NotificationPreferenceKey,
@@ -79,6 +83,7 @@ data class NotificationPreferenceDTO(
 )
 
 @JsExport
+@Serializable
 data class UpsertNotificationPreferenceRequest(
     val preferenceKey: NotificationPreferenceKey,
     val channel: NotificationChannel,
@@ -86,12 +91,14 @@ data class UpsertNotificationPreferenceRequest(
 )
 
 @JsExport
+@Serializable
 data class UnreadCountDTO(
     val recipientId: String,
     val count: Int
 )
 
 @JsExport
+@Serializable
 data class WebPushSubscriptionDTO(
     val id: String,
     val userId: String,
@@ -103,6 +110,7 @@ data class WebPushSubscriptionDTO(
 )
 
 @JsExport
+@Serializable
 data class RegisterWebPushSubscriptionRequest(
     val userId: String,
     val endpoint: String,

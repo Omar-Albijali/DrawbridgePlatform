@@ -18,13 +18,15 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uqu.drawbridge.platform.dto.PosOutboundInventoryEventDTO
 import uqu.drawbridge.platform.model.InventoryAuditLog
-import uqu.drawbridge.platform.model.InventoryAuditSourceType
-import uqu.drawbridge.platform.model.PosOutboundEventStatus
+import uqu.drawbridge.platform.dto.InventoryAuditSourceType
+import uqu.drawbridge.platform.dto.PosOutboundEventStatus
 import uqu.drawbridge.platform.model.PosOutboundInventoryEvent
 import uqu.drawbridge.platform.repository.InventoryItemRepository
 import uqu.drawbridge.platform.repository.PosIntegrationRepository
 import uqu.drawbridge.platform.repository.PosOutboundInventoryEventRepository
 import uqu.drawbridge.platform.repository.ProductRepository
+import uqu.drawbridge.platform.repository.UserRepository
+import uqu.drawbridge.platform.dto.PosInventoryWebhookPayload
 import kotlin.math.min
 
 @Service
@@ -33,6 +35,7 @@ class PosOutboundInventoryEventService(
     private val posIntegrationRepository: PosIntegrationRepository,
     private val inventoryItemRepository: InventoryItemRepository,
     private val productRepository: ProductRepository,
+    private val userRepository: UserRepository,
     @Value("\${pos.webhook.max-retries:6}")
     private val maxRetries: Int,
     @Value("\${pos.webhook.retry-base-delay-ms:5000}")
@@ -55,18 +58,19 @@ class PosOutboundInventoryEventService(
         }
         val inventoryItemId = auditLog.inventoryItemId ?: return
         val inventoryItem = inventoryItemRepository.findById(inventoryItemId).orElse(null) ?: return
-        val integration = posIntegrationRepository.findByRetailerId(inventoryItem.retailerId) ?: return
-        val product = productRepository.findById(auditLog.productId).orElse(null) ?: return
+        val integration = posIntegrationRepository.findByRetailer_Id(inventoryItem.retailerId ?: "") ?: return
+        val productId = auditLog.productId ?: return
+        val product = productRepository.findById(productId).orElse(null) ?: return
 
         val eventId = "audit-${auditLog.id ?: UUID.randomUUID()}"
-        if (posOutboundInventoryEventRepository.findByEventIdAndRetailerId(eventId, inventoryItem.retailerId) != null) {
+        if (posOutboundInventoryEventRepository.findByEventIdAndRetailer_Id(eventId, inventoryItem.retailerId ?: "") != null) {
             return
         }
 
         val payload = PosInventoryWebhookPayload(
             eventId = eventId,
             eventTime = auditLog.createdAt.toString(),
-            retailerId = inventoryItem.retailerId,
+            retailerId = inventoryItem.retailerId ?: "",
             sourceType = auditLog.sourceType.name,
             sourceId = auditLog.sourceId,
             gtin = product.gtin,
@@ -83,12 +87,12 @@ class PosOutboundInventoryEventService(
         posOutboundInventoryEventRepository.save(
             PosOutboundInventoryEvent(
                 eventId = eventId,
-                retailerId = inventoryItem.retailerId,
+                retailer = userRepository.getReferenceById(inventoryItem.retailerId ?: ""),
+                product = product,
+                inventoryItem = inventoryItem,
                 sourceType = auditLog.sourceType,
                 sourceId = auditLog.sourceId,
-                productId = auditLog.productId,
                 gtin = product.gtin,
-                inventoryItemId = inventoryItemId,
                 quantityBefore = auditLog.quantityBefore,
                 quantityAfter = auditLog.quantityAfter,
                 changeAmount = auditLog.changeAmount,
@@ -103,18 +107,18 @@ class PosOutboundInventoryEventService(
 
     @Transactional(readOnly = true)
     fun getRetailerEvent(retailerId: String, eventId: String): PosOutboundInventoryEventDTO? {
-        return posOutboundInventoryEventRepository.findByEventIdAndRetailerId(eventId, retailerId)?.toDto()
+        return posOutboundInventoryEventRepository.findByEventIdAndRetailer_Id(eventId, retailerId)?.toDto()
     }
 
     @Transactional(readOnly = true)
     fun getRetailerEvents(retailerId: String, since: String?, limit: Int): List<PosOutboundInventoryEventDTO> {
         val safeLimit = limit.coerceIn(1, 200)
         val events = parseSince(since)?.let { value ->
-            posOutboundInventoryEventRepository.findTop200ByRetailerIdAndEventTimeGreaterThanEqualOrderByEventTimeDesc(
+            posOutboundInventoryEventRepository.findTop200ByRetailer_IdAndEventTimeGreaterThanEqualOrderByEventTimeDesc(
                 retailerId = retailerId,
                 eventTime = value
             )
-        } ?: posOutboundInventoryEventRepository.findTop200ByRetailerIdOrderByEventTimeDesc(retailerId)
+        } ?: posOutboundInventoryEventRepository.findTop200ByRetailer_IdOrderByEventTimeDesc(retailerId)
         return events.take(safeLimit).map { it.toDto() }
     }
 
@@ -130,7 +134,7 @@ class PosOutboundInventoryEventService(
     }
 
     private fun dispatchEvent(event: PosOutboundInventoryEvent) {
-        val integration = posIntegrationRepository.findByRetailerId(event.retailerId)
+        val integration = posIntegrationRepository.findByRetailer_Id(event.retailerId)
         if (integration == null) {
             markDeadLetter(event, "POS integration no longer exists")
             return
@@ -216,7 +220,7 @@ class PosOutboundInventoryEventService(
     }
 
     private fun shouldPublish(sourceType: InventoryAuditSourceType): Boolean {
-        return sourceType == InventoryAuditSourceType.ORDER || sourceType == InventoryAuditSourceType.MANUAL
+        return sourceType == InventoryAuditSourceType.ORDER || sourceType == InventoryAuditSourceType.RESTOCK || sourceType == InventoryAuditSourceType.MANUAL
     }
 
     private fun hmacSha256(secret: String, payload: String): String {
@@ -250,19 +254,4 @@ class PosOutboundInventoryEventService(
             reason = this.reason
         )
     }
-
-    private data class PosInventoryWebhookPayload(
-        val eventId: String,
-        val eventTime: String,
-        val retailerId: String,
-        val sourceType: String,
-        val sourceId: String?,
-        val gtin: String,
-        val productId: String,
-        val inventoryItemId: String,
-        val quantityBefore: Int,
-        val quantityAfter: Int,
-        val changeAmount: Int,
-        val reason: String?
-    )
 }

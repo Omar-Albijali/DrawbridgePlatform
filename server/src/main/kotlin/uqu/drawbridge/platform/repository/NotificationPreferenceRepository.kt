@@ -6,9 +6,9 @@ import uqu.drawbridge.platform.NotificationPreferenceKey
 import uqu.drawbridge.platform.model.NotificationPreference
 
 interface NotificationPreferenceRepository : JpaRepository<NotificationPreference, String> {
-    fun findByUserId(userId: String): List<NotificationPreference>
+    fun findByUser_Id(userId: String): List<NotificationPreference>
 
-    fun findByUserIdAndPreferenceKeyAndChannel(
+    fun findByUser_IdAndPreferenceKeyAndChannel(
         userId: String,
         preferenceKey: NotificationPreferenceKey,
         channel: NotificationChannel
