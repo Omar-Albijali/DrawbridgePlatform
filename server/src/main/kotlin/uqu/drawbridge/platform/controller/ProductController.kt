@@ -9,6 +9,7 @@ import uqu.drawbridge.platform.*
 import uqu.drawbridge.platform.dto.PaginatedResponse
 import uqu.drawbridge.platform.model.Category
 import uqu.drawbridge.platform.model.Product
+import uqu.drawbridge.platform.service.OrderService
 import uqu.drawbridge.platform.service.ProductService
 import uqu.drawbridge.platform.service.UserService
 
@@ -16,7 +17,8 @@ import uqu.drawbridge.platform.service.UserService
 @RequestMapping("/api/products")
 class ProductController(
     private val productService: ProductService,
-    private val userService: UserService
+    private val userService: UserService,
+    private val orderService: OrderService,
 ) {
 
     // ==================== PRODUCTS ====================

@@ -1,5 +1,5 @@
 import { fetchApi } from './api';
-import { Order, OrderGroup, OrderStatus, UpdateOrderTrackingRequest } from '../types';
+import { Order, OrderGroup, OrderStatus, UpdateOrderTrackingRequest, MostOrderedProductDTO } from '../types';
 
 
 export const orderService = {
@@ -34,5 +34,11 @@ export const orderService = {
     // Order Groups
     getGroupsByRetailer: (retailerId: string) => fetchApi<OrderGroup[]>(`/orders/groups/retailer/${retailerId}`),
 
-    getGroupById: (id: string) => fetchApi<OrderGroup>(`/orders/groups/${id}`)
+    getGroupById: (id: string) => fetchApi<OrderGroup>(`/orders/groups/${id}`),
+
+    // Dashboard
+    getMostOrdered: (retailerId: string) =>
+        fetchApi<MostOrderedProductDTO[]>(
+            `/dashboard/most-ordered?retailerId=${retailerId}`
+        ),
 };
