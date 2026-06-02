@@ -62,7 +62,8 @@ import {
     PosIntegrationConfigDTO,
     PosIntegrationConfigUpdateRequest,
     PosIntegrationApiKeyRotateResponse,
-    PosIntegrationEventLogDTO
+    PosIntegrationEventLogDTO,
+    MostOrderedProductDTO
 } from 'shared';
 
 export {
@@ -125,7 +126,8 @@ export {
     PosIntegrationConfigDTO,
     PosIntegrationConfigUpdateRequest,
     PosIntegrationApiKeyRotateResponse,
-    PosIntegrationEventLogDTO
+    PosIntegrationEventLogDTO,
+    MostOrderedProductDTO
 };
 
 export type User = UserDTO;
@@ -146,6 +148,7 @@ export type Payment = PaymentDTO;
 export type Invoice = InvoiceDTO;
 export type PaymentMethod = PaymentMethodDTO;
 export type SupportTicket = SupportTicketDTO;
+export type MostOrderedProduct = MostOrderedProductDTO;
 
 type KotlinDataShape<T> = Omit<T, 'copy' | 'hashCode' | 'equals'>;
 export type PosIntegrationConfig = KotlinDataShape<PosIntegrationConfigDTO>;
