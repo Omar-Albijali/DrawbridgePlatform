@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart, Star, Package } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import PageShell from '../components/PageShell';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { productService } from '../services/productService';
+import { formatCurrency } from '../i18n/display';
 import { UserRole, type Product } from '../types';
 
 export default function ProductDetail(): JSX.Element {
+    const { t } = useTranslation();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { isAuthenticated, user } = useAuth();
@@ -26,6 +29,8 @@ export default function ProductDetail(): JSX.Element {
             try {
                 const data = await productService.getById(id);
                 setProduct(data);
+                setSelectedImage(data.images?.[0] || data.image);
+                setQuantity(Math.max(1, data.minimumOrderQuantity ?? 1));
             } catch {
                 navigate('/marketplace', { replace: true });
             } finally {
@@ -37,6 +42,9 @@ export default function ProductDetail(): JSX.Element {
 
     const handleAddToCart = (): void => {
         if (!product) return;
+        const minimumOrderQuantity = Math.max(1, product.minimumOrderQuantity ?? 1);
+        const stock = product.stock ?? 0;
+        if (stock < minimumOrderQuantity) return;
         if (!isAuthenticated) {
             navigate(`/login?returnTo=/marketplace/product/${id}`);
             return;
@@ -46,6 +54,7 @@ export default function ProductDetail(): JSX.Element {
         setTimeout(() => setAdded(false), 1500);
     };
 
+    const allImages = (product?.images ?? []) as string[];
 
     if (loading) {
         return (
@@ -59,6 +68,12 @@ export default function ProductDetail(): JSX.Element {
 
     if (!product) return <></>;
 
+    const minimumOrderQuantity = Math.max(1, product.minimumOrderQuantity ?? 1);
+    const stock = product.stock ?? 0;
+    const isOutOfStock = stock === 0;
+    const isBelowMinimumStock = stock > 0 && stock < minimumOrderQuantity;
+    const isAddDisabled = added || isOutOfStock || isBelowMinimumStock;
+
     return (
         <PageShell title="" description="">
             {/* Back button */}
@@ -68,6 +83,7 @@ export default function ProductDetail(): JSX.Element {
                 className="mb-6 flex items-center gap-2 text-sm font-medium text-navy-500 hover:text-navy-800 transition-colors"
             >
                 <ArrowLeft className="h-4 w-4" />
+                {t('marketplace.detail.back')}
             </button>
 
             <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
@@ -127,16 +143,19 @@ export default function ProductDetail(): JSX.Element {
                             ))}
                         </div>
                         <span className="text-sm font-medium text-navy-700">{product.rating ?? 0}</span>
+                        <span className="text-sm text-navy-400">({t('marketplace.detail.reviews', { count: product.reviews ?? 0 })})</span>
                     </div>
 
                     {/* Price */}
                     <div className="flex items-baseline gap-3">
             <span className="text-3xl font-extrabold text-navy-900">
+              {formatCurrency(product.price)}
             </span>
                     </div>
 
                     {/* Supplier */}
                     <p className="text-sm text-navy-500">
+                        {t('marketplace.detail.suppliedBy')}{' '}
                         <span className="font-semibold text-navy-700">{product.supplier}</span>
                     </p>
 
@@ -152,14 +171,27 @@ export default function ProductDetail(): JSX.Element {
                                         : 'text-red-600'
                             }`}
                         >
+              {stock > 0
+                  ? t('marketplace.detail.unitsInStock', { count: stock })
+                  : t('marketplace.detail.outOfStock')}
             </span>
                     </div>
+                    <p className="text-sm font-semibold text-navy-700">
+                        {t('marketplace.detail.minimumOrder', { count: minimumOrderQuantity })}
+                    </p>
+                    {isBelowMinimumStock && (
+                        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+                            {t('marketplace.detail.unavailableBelowMinimum')}
+                        </p>
+                    )}
 
                     <hr className="border-gray-200" />
 
                     {/* Description */}
                     <div>
+                        <h2 className="mb-2 text-base font-semibold text-navy-800">{t('marketplace.detail.description')}</h2>
                         <p className="text-sm leading-relaxed text-navy-600">
+                            {product.description || t('marketplace.detail.noDescription')}
                         </p>
                     </div>
 
@@ -167,9 +199,13 @@ export default function ProductDetail(): JSX.Element {
                     {!isWholesaler && (
                         <div className="flex flex-col gap-3 pt-2">
                             <div className="flex items-center gap-3">
+                                <span className="text-sm font-medium text-navy-700">{t('marketplace.detail.quantity')}</span>
                                 <div className="flex items-center rounded-lg border border-gray-200 overflow-hidden">
                                     <button
                                         type="button"
+                                        onClick={() => setQuantity((q) => Math.max(minimumOrderQuantity, q - 1))}
+                                        disabled={quantity <= minimumOrderQuantity}
+                                        className="px-3 py-2 text-navy-600 hover:bg-gray-100 transition-colors disabled:cursor-not-allowed disabled:text-gray-300"
                                     >
                                         −
                                     </button>
@@ -178,6 +214,9 @@ export default function ProductDetail(): JSX.Element {
                   </span>
                                     <button
                                         type="button"
+                                        onClick={() => setQuantity((q) => Math.min(stock, q + 1))}
+                                        disabled={quantity >= stock}
+                                        className="px-3 py-2 text-navy-600 hover:bg-gray-100 transition-colors disabled:cursor-not-allowed disabled:text-gray-300"
                                     >
                                         +
                                     </button>
@@ -187,14 +226,25 @@ export default function ProductDetail(): JSX.Element {
                             <button
                                 type="button"
                                 onClick={handleAddToCart}
+                                disabled={isAddDisabled}
                                 className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-base font-semibold transition-all duration-300 ${
                                     added
                                         ? 'bg-green-500 text-white'
+                                        : isOutOfStock || isBelowMinimumStock
                                             ? 'cursor-not-allowed bg-gray-200 text-gray-400'
                                             : 'bg-primary-600 text-white hover:bg-primary-500 hover:shadow-md active:bg-primary-700'
                                 }`}
                             >
                                 <ShoppingCart className="h-5 w-5" />
+                                {added
+                                    ? t('marketplace.detail.addedToCart')
+                                    : isOutOfStock
+                                        ? t('marketplace.detail.outOfStockTitle')
+                                        : isBelowMinimumStock
+                                            ? t('marketplace.card.unavailable')
+                                            : isAuthenticated
+                                                ? t('marketplace.card.addToCart')
+                                                : t('marketplace.card.signInToAdd')}
                             </button>
                         </div>
                     )}
