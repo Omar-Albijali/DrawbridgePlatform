@@ -3,6 +3,7 @@ package uqu.drawbridge.platform.service
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.security.access.AccessDeniedException
+import uqu.drawbridge.platform.MostOrderedProductDTO
 import uqu.drawbridge.platform.model.*
 import uqu.drawbridge.platform.dto.InventoryAuditSourceType
 import uqu.drawbridge.platform.NotificationEntityType
@@ -360,6 +361,34 @@ class OrderService(
         }
         
         return savedItem
+    }
+
+    // ==================== MOST ORDERED PRODUCTS ====================
+
+    @Transactional(readOnly = true)
+    fun getMostOrderedProducts(retailerId: String, minOrderCount: Long = 3): List<MostOrderedProductDTO> {
+        val rows = orderItemRepository.findMostOrderedProductIdsByRetailer(retailerId, minOrderCount)
+
+        if (rows.isEmpty()) return emptyList()
+
+        val productIds = rows.map { it[0] as String }
+        val orderCountByProductId = rows.associate { row ->
+            (row[0] as String) to (row[1] as Number).toInt()
+        }
+
+        val productsById = productRepository.findAllById(productIds).associateBy { it.id.orEmpty() }
+
+        return productIds.mapNotNull { productId ->
+            val product = productsById[productId] ?: return@mapNotNull null
+            val orderCount = orderCountByProductId[productId] ?: return@mapNotNull null
+            MostOrderedProductDTO(
+                productId = productId,
+                productName = product.name,
+                productImageUrl = product.images.firstOrNull()?.url,
+                orderCount = orderCount,
+                price = product.price.toDouble()
+            )
+        }
     }
 
     // ==================== HELPER METHODS ====================

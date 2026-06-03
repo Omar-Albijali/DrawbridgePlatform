@@ -10,7 +10,7 @@ export const supportedLanguages = ['en', 'ar'] as const;
 export type SupportedLanguage = (typeof supportedLanguages)[number];
 
 const isSupportedLanguage = (value: string | null | undefined): value is SupportedLanguage =>
-  value === 'en' || value === 'ar';
+    value === 'en' || value === 'ar';
 
 function getStoredLanguage(): SupportedLanguage {
   if (typeof window === 'undefined') {
@@ -148,7 +148,7 @@ const resources = {
         heroEyebrow: 'Next-gen B2B ecosystem',
         heroTitle: 'Your supply chain, orchestrated in one platform.',
         heroDescription:
-          'Connect with verified suppliers, optimize inventory flow, and move from discovery to fulfillment without switching tools.',
+            'Connect with verified suppliers, optimize inventory flow, and move from discovery to fulfillment without switching tools.',
         startTrading: 'Start trading',
         exploreMarketplace: 'Explore marketplace',
         featuresTitle: 'Built for operational scale',
@@ -156,13 +156,13 @@ const resources = {
         featureCards: {
           inventoryTitle: 'Smart inventory',
           inventoryDescription:
-            'Track stock in real time and plan replenishment with confidence across all storage locations.',
+              'Track stock in real time and plan replenishment with confidence across all storage locations.',
           marketplaceTitle: 'Global marketplace',
           marketplaceDescription:
-            'Discover verified wholesale suppliers, compare options, and source products faster.',
+              'Discover verified wholesale suppliers, compare options, and source products faster.',
           operationsTitle: 'Secure operations',
           operationsDescription:
-            'Run procurement workflows with trusted partners and auditable transaction history.',
+              'Run procurement workflows with trusted partners and auditable transaction history.',
         },
         ctaTitle: 'Ready to modernize your supply network?',
         ctaDescription: 'Create your account to start sourcing from trusted suppliers.',
@@ -193,14 +193,14 @@ const resources = {
         errors: {
           emailUnverified: 'Your email is not verified yet.',
           invalidLogin:
-            'Invalid email or password. Use retailer@test.com / wholesaler@test.com and password: password',
+              'Invalid email or password. Use retailer@test.com / wholesaler@test.com and password: password',
           enterEmailForVerification: 'Enter your email to resend the verification link.',
           resendFailed: 'Unable to resend the verification link. Please try again.',
           generic: 'Something went wrong. Please try again later.',
         },
         messages: {
           verificationResent:
-            "If your account exists and is unverified, we've sent a new verification link.",
+              "If your account exists and is unverified, we've sent a new verification link.",
         },
         register: {
           title: 'Create Account',
@@ -252,7 +252,7 @@ const resources = {
         forgot: {
           checkEmailTitle: 'Check your email',
           checkEmailMessage:
-            "If an account exists for {{email}}, we've sent a password reset link to that address.",
+              "If an account exists for {{email}}, we've sent a password reset link to that address.",
           title: 'Forgot your password?',
           description: "Enter your email address and we'll send you a link to reset your password.",
           sendResetLink: 'Send Reset Link',
@@ -304,6 +304,7 @@ const resources = {
           processing: 'Processing',
           changeVsLastMonth: '{{change}}% vs last month',
         },
+
         monthlyExpenses: 'Monthly Expenses',
         monthlySales: 'Monthly Sales',
         expenses: 'Expenses',
@@ -322,6 +323,10 @@ const resources = {
           lowStock: 'Low Stock',
           outOfStock: 'Out of Stock',
         },
+        mostOrders: 'Most Orders',
+        mostOrdersDescription: 'Your most frequently ordered products (ordered 3+ times)',
+        timesOrdered: '{{count}} orders',
+        noMostOrders: 'No products ordered 3 or more times yet',
       },
       marketplace: {
         title: 'Marketplace',
@@ -590,7 +595,7 @@ const resources = {
         noItemsToReorder: 'This order has no items to re-order.',
         unableToReorder: 'Unable to re-order items from this order right now.',
         reorderPartial:
-          'Added {{added}} item(s) to your cart. {{failed}} item(s) could not be added.{{details}}',
+            'Added {{added}} item(s) to your cart. {{failed}} item(s) could not be added.{{details}}',
         unavailableItems: ' Unavailable: {{items}}{{suffix}}.',
         andMore: ', and more',
         reorderSuccess: 'Order items were added to your cart.',
@@ -638,7 +643,7 @@ const resources = {
         refreshing: 'Refreshing...',
         integrationContract: 'Integration Contract',
         contractDescription:
-          'Use <apiKey>X-API-Key</apiKey> auth. Inbound payload <retailerId>retailerId</retailerId> must match this page retailer scope.',
+            'Use <apiKey>X-API-Key</apiKey> auth. Inbound payload <retailerId>retailerId</retailerId> must match this page retailer scope.',
         inboundContract: 'Inbound (POS → Platform)',
         outboundContract: 'Outbound (Platform → POS)',
         endpoint: 'Endpoint',
@@ -708,7 +713,7 @@ const resources = {
         emptyDescription: 'Your cart is currently empty.',
         emptyTitle: 'Your cart is empty',
         emptyText:
-          "Looks like you haven't added anything to your cart yet. Browse our marketplace to find products for your business.",
+            "Looks like you haven't added anything to your cart yet. Browse our marketplace to find products for your business.",
         browseMarketplace: 'Browse Marketplace',
         description: '{{count}} items in your cart',
         clear: 'Clear Cart',
@@ -868,7 +873,7 @@ const resources = {
         myTickets: 'My Tickets',
         detailPromptTitle: 'Share enough detail for a faster resolution',
         detailPromptDescription:
-          'Include what happened, when it happened, and any order or payment context you already have.',
+            'Include what happened, when it happened, and any order or payment context you already have.',
         subjectPlaceholder: 'Short summary of the issue',
         descriptionPlaceholder: 'Describe the issue in detail',
         categoryHint: {
@@ -1136,7 +1141,7 @@ const resources = {
         heroEyebrow: 'منظومة حديثة للتجارة بين الشركات',
         heroTitle: 'سلسلة توريدك منظمة في منصة واحدة.',
         heroDescription:
-          'تواصل مع موردين موثوقين، وحسن أتمتة مخزونك، وانتقل من الاكتشاف إلى التنفيذ دون تبديل الأدوات.',
+            'تواصل مع موردين موثوقين، وحسن أتمتة مخزونك، وانتقل من الاكتشاف إلى التنفيذ دون تبديل الأدوات.',
         startTrading: 'ابدأ معنا',
         exploreMarketplace: 'استكشف السوق',
         featuresTitle: 'مصممة للتوسع التشغيلي',
@@ -1178,7 +1183,7 @@ const resources = {
         errors: {
           emailUnverified: 'لم يتم التحقق من بريدك الإلكتروني بعد.',
           invalidLogin:
-            'البريد الإلكتروني أو كلمة المرور غير صحيحة. استخدم retailer@test.com / wholesaler@test.com وكلمة المرور: password',
+              'البريد الإلكتروني أو كلمة المرور غير صحيحة. استخدم retailer@test.com / wholesaler@test.com وكلمة المرور: password',
           enterEmailForVerification: 'أدخل بريدك الإلكتروني لإعادة إرسال رابط التحقق.',
           resendFailed: 'تعذر إعادة إرسال رابط التحقق. يرجى المحاولة مرة أخرى.',
           generic: 'حدث خطأ ما. يرجى المحاولة لاحقا.',
@@ -1305,6 +1310,10 @@ const resources = {
           lowStock: 'مخزون منخفض',
           outOfStock: 'نفد المخزون',
         },
+        mostOrders: 'الأكثر طلباً',
+        mostOrdersDescription: 'المنتجات التي طلبتها أكثر من مرتين (3 مرات أو أكثر)',
+        timesOrdered: '{{count}} طلبات',
+        noMostOrders: 'لا توجد منتجات تم طلبها 3 مرات أو أكثر بعد',
       },
       marketplace: {
         title: 'السوق',
@@ -1620,7 +1629,7 @@ const resources = {
         refreshing: 'جاري التحديث...',
         integrationContract: 'عقد التكامل',
         contractDescription:
-          'استخدم مصادقة <apiKey>X-API-Key</apiKey>. يجب أن يطابق <retailerId>retailerId</retailerId> في البيانات الواردة نطاق التاجر في هذه الصفحة.',
+            'استخدم مصادقة <apiKey>X-API-Key</apiKey>. يجب أن يطابق <retailerId>retailerId</retailerId> في البيانات الواردة نطاق التاجر في هذه الصفحة.',
         inboundContract: 'وارد (نقاط البيع ← المنصة)',
         outboundContract: 'صادر (المنصة ← نقاط البيع)',
         endpoint: 'نقطة النهاية',
