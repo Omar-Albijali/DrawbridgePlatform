@@ -32,6 +32,8 @@ import {
   shortenOrderIds,
 } from '../utils/notificationHelpers';
 import { NotificationType, UserRole, type Notification } from '../types';
+import darkLogo from "../assets/logo/Drawbridge_Icon_White.png";
+import lightLogo from "../assets/logo/Drawbridge_Icon_Teal.png";
 
 function itemStyles(type: NotificationType): { icon: JSX.Element; wrap: string; labelClass: string } {
   if (type === NotificationType.ORDER) {
@@ -172,9 +174,16 @@ export default function AppNavbar(): JSX.Element {
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
         <div className="flex items-center gap-5 lg:gap-7">
           <Link to={brandPath} className="group inline-flex items-center gap-3 text-slate-900 dark:text-white">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary-500/20 text-xs font-black tracking-wider text-primary-700 dark:text-primary-300">
-              DB
-            </span>
+            <Link
+                to={brandPath}
+                className="group inline-flex items-center gap-3 text-slate-900 dark:text-white"
+            >
+              <img
+                  src={dark ? darkLogo : lightLogo}
+                  alt="Drawbridge"
+                  style={{ width: "100px", height: "auto" }}
+              />
+            </Link>
             <span className="text-xl font-black tracking-tight group-hover:text-primary-600 dark:group-hover:text-primary-300">
               Drawbridge
             </span>

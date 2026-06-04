@@ -141,7 +141,7 @@ class CartService(
         return items.fold(BigDecimal.ZERO) { total, item ->
             val product = productRepository.findById(item.productId).orElse(null)
             if (product != null) {
-                total + (product.price * BigDecimal(item.quantity))
+                total + (getEffectivePrice(product) * BigDecimal(item.quantity))
             } else {
                 total
             }
@@ -191,17 +191,18 @@ class CartService(
                 status = OrderStatus.PENDING,
                 orderGroup = orderGroup
             )
-            
+
             val orderItems = wholesalerItems.mapNotNull { cartItem ->
                 val product = productRepository.findById(cartItem.productId).orElse(null)
                 if (product != null) {
-                    val itemTotal = product.price * BigDecimal(cartItem.quantity)
+                    val effectivePrice = getEffectivePrice(product)
+                    val itemTotal = effectivePrice * BigDecimal(cartItem.quantity)
                     subtotal += itemTotal
-                    
+
                     OrderItem(
                         product = product,
                         quantity = cartItem.quantity,
-                        unitPrice = product.price,
+                        unitPrice = effectivePrice,
                         order = order
                     )
                 } else null
@@ -259,6 +260,24 @@ class CartService(
     private fun validateMinimumOrderQuantity(product: Product, quantity: Int) {
         if (quantity < product.minimumOrderQuantity) {
             throw IllegalArgumentException("Minimum order quantity for ${product.name} is ${product.minimumOrderQuantity} units.")
+        }
+    }
+    private fun getEffectivePrice(product: Product): BigDecimal {
+        val now = java.time.LocalDate.now()
+        val isDiscountActive = product.discountPercentage != null &&
+                product.discountStartDate != null &&
+                product.discountEndDate != null &&
+                !now.isBefore(product.discountStartDate) &&
+                !now.isAfter(product.discountEndDate)
+
+        return if (isDiscountActive) {
+            product.price.multiply(
+                BigDecimal.ONE.subtract(
+                    BigDecimal(product.discountPercentage!!).divide(BigDecimal(100))
+                )
+            ).setScale(2, java.math.RoundingMode.HALF_UP)
+        } else {
+            product.price
         }
     }
 

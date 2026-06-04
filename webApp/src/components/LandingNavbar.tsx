@@ -3,6 +3,8 @@ import { Moon, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import LanguageToggle from './LanguageToggle';
+import darkLogo from "../assets/logo/Drawbridge_Icon_White.png";
+import lightLogo from "../assets/logo/Drawbridge_Icon_Teal.png";
 
 export default function LandingNavbar(): JSX.Element {
   const { dark, toggleTheme } = useTheme();
@@ -20,9 +22,12 @@ export default function LandingNavbar(): JSX.Element {
           className="hover-target inline-flex items-center gap-3 text-slate-900 transition hover:text-primary-600 dark:text-white"
           onClick={scrollToTop}
         >
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary-500/20 text-sm font-black tracking-wider text-primary-700 dark:text-primary-300">
-            DB
-          </span>
+            <img
+                src={dark ? darkLogo : lightLogo}
+                alt="Drawbridge"
+                style={{ width: "100px", height: "auto" }}
+            />
+
           <span className="text-2xl font-black tracking-tight">Drawbridge</span>
         </button>
 

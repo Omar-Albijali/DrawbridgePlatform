@@ -118,8 +118,28 @@ export default function Cart(): JSX.Element {
                   </div>
 
                   <div className="buyer-cart__price text-right">
-                    <p className="text-sm text-navy-500">{t('cart.each', { amount: formatCurrency(item.product.price) })}</p>
-                    <p className="font-bold text-navy-800">{formatCurrency(item.product.price * item.quantity)}</p>
+                    {item.product.discountedPrice != null ? (
+                        <>
+                          <p className="text-sm text-navy-400 line-through">
+                            {t('cart.each', { amount: formatCurrency(item.product.price) })}
+                          </p>
+                          <p className="text-sm text-primary-600 font-medium">
+                            {t('cart.each', { amount: formatCurrency(item.product.discountedPrice) })}
+                          </p>
+                          <p className="font-bold text-primary-600">
+                            {formatCurrency(item.product.discountedPrice * item.quantity)}
+                          </p>
+                        </>
+                    ) : (
+                        <>
+                          <p className="text-sm text-navy-500">
+                            {t('cart.each', { amount: formatCurrency(item.product.price) })}
+                          </p>
+                          <p className="font-bold text-navy-800">
+                            {formatCurrency(item.product.price * item.quantity)}
+                          </p>
+                        </>
+                    )}
                   </div>
                 </div>
                 {(isBelowMinimumOrder || isAboveStock) && (
