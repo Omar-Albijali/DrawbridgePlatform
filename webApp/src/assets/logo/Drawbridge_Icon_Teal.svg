@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220">
+  <path d="M 20 200 Q 50 196, 80 200 T 140 200 T 200 200 T 300 200" fill="none" stroke="#056670" stroke-width="2" stroke-linecap="round" opacity="0.32"/>
+  <path d="M 28 207 Q 58 203, 88 207 T 148 207 T 208 207 T 292 207" fill="none" stroke="#056670" stroke-width="2" stroke-linecap="round" opacity="0.2"/>
+  <rect x="34" y="104" width="36" height="80" rx="2" fill="#056670"/>
+  <rect x="34" y="96" width="9" height="8" fill="#056670"/>
+  <rect x="47.5" y="96" width="9" height="8" fill="#056670"/>
+  <rect x="61" y="96" width="9" height="8" fill="#056670"/>
+  <rect x="250" y="104" width="36" height="80" rx="2" fill="#056670"/>
+  <rect x="250" y="96" width="9" height="8" fill="#056670"/>
+  <rect x="263.5" y="96" width="9" height="8" fill="#056670"/>
+  <rect x="277" y="96" width="9" height="8" fill="#056670"/>
+  <line x1="70" y1="108" x2="250" y2="108" stroke="#056670" stroke-width="4" stroke-linecap="round"/>
+  <line x1="90"  y1="72" x2="90"  y2="108" stroke="#056670" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <line x1="120" y1="50" x2="120" y2="108" stroke="#056670" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <line x1="160" y1="42" x2="160" y2="108" stroke="#056670" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <line x1="200" y1="50" x2="200" y2="108" stroke="#056670" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <line x1="230" y1="72" x2="230" y2="108" stroke="#056670" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <path d="M 70 108 Q 160 -10, 250 108" fill="none" stroke="#056670" stroke-width="11" stroke-linecap="round"/>
+  <polygon points="160,18 170,32 160,46 150,32" fill="#B89635"/>
+  <polygon points="160,18 170,32 160,32" fill="#8d711f"/>
+</svg>
