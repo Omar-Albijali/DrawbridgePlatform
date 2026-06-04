@@ -1,7 +1,6 @@
 import { fetchApi } from './api';
 import { ImageUploadResponse, ProductImageResponse } from '../types';
 import { Product, Category, CreateProductRequest, PaginatedResponse } from '../types';
-import type { ApplyDiscountRequest } from '../types';
 
 interface MarketplaceProductQuery {
     page?: number;
@@ -110,7 +109,7 @@ export const productService = {
         method: 'PATCH'
     }),
 
-    applyDiscount: (productId: string, request: ApplyDiscountRequest) =>
+    applyDiscount: (productId: string, request: { discountPercentage: number; startDate: string; endDate: string }) =>
         fetchApi<Product>(`/products/${productId}/discount`, {
             method: 'PATCH',
             body: JSON.stringify(request)
