@@ -4,6 +4,7 @@ import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole, type Product } from '../../types';
+import {formatCurrency} from "../../i18n/display.ts";
 
 interface ProductCardProps {
   product: Product;
@@ -44,11 +45,8 @@ export default function ProductCard({
     void toggleWishlist(product.id);
   };
 
-  const originalPrice = product.originalPrice ?? undefined;
-  const discount =
-    originalPrice && originalPrice > product.price
-      ? Math.round(((originalPrice - product.price) / originalPrice) * 100)
-      : 0;
+  const discountedPrice = product.discountedPrice ?? undefined;
+  const discount = product.discountPercentage ?? 0;
 
   return (
     <div className="buyer-product-card bg-white rounded-xl shadow-card overflow-hidden group hover:shadow-card-hover transition-all duration-300 relative">
@@ -59,9 +57,9 @@ export default function ProductCard({
           className="buyer-product-card__image w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
         {discount > 0 && (
-          <span className="buyer-product-card__badge absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-            -{discount}%
-          </span>
+            <span className="buyer-product-card__badge absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+              -{discount}%
+            </span>
         )}
         {(product.stock ?? 0) < 20 && (
           <span className="buyer-product-card__badge absolute top-3 right-3 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
@@ -101,9 +99,11 @@ export default function ProductCard({
         </div>
 
         <div className="flex items-baseline gap-2 mb-4">
-          <span className="buyer-product-card__price text-xl font-bold text-navy-800">SAR {product.price.toFixed(2)}</span>
-          {originalPrice && (
-            <span className="text-sm text-navy-400 line-through">SAR {originalPrice.toFixed(2)}</span>
+          <span className="buyer-product-card__price text-xl font-bold text-navy-800">
+            {formatCurrency(discountedPrice ?? product.price)}
+          </span>
+          {discountedPrice != null && (
+              <span className="text-sm text-navy-400 line-through">{formatCurrency(product.price)}</span>
           )}
         </div>
 

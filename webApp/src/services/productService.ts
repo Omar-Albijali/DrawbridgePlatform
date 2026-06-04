@@ -1,6 +1,7 @@
 import { fetchApi } from './api';
 import { ImageUploadResponse, ProductImageResponse } from '../types';
 import { Product, Category, CreateProductRequest, PaginatedResponse } from '../types';
+import type { ApplyDiscountRequest } from '../types';
 
 interface MarketplaceProductQuery {
     page?: number;
@@ -108,6 +109,17 @@ export const productService = {
     togglePublished: (productId: string) => fetchApi<Product>(`/products/${productId}/toggle-published`, {
         method: 'PATCH'
     }),
+
+    applyDiscount: (productId: string, request: ApplyDiscountRequest) =>
+        fetchApi<Product>(`/products/${productId}/discount`, {
+            method: 'PATCH',
+            body: JSON.stringify(request)
+        }),
+
+    removeDiscount: (productId: string) =>
+        fetchApi<Product>(`/products/${productId}/discount`, {
+            method: 'DELETE'
+        }),
 
     // Categories
     getCategories: () => fetchApi<Category[]>('/products/categories'),
