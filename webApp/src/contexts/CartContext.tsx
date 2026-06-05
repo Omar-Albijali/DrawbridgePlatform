@@ -209,7 +209,10 @@ export function CartProvider({ children }: { children: ReactNode }): JSX.Element
   }, [clearCart, isAuthenticated, isWholesaler, items.length, user?.id]);
 
   const itemCount = items.reduce((totalItems, item) => totalItems + item.quantity, 0);
-  const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const subtotal = items.reduce((sum, item) => {
+    const effectivePrice = item.product.discountedPrice ?? item.product.price;
+    return sum + effectivePrice * item.quantity;
+  }, 0);
   const tax = subtotal * TAX_RATE;
   const total = subtotal + tax;
 

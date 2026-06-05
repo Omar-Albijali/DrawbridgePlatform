@@ -172,8 +172,8 @@ export default function ProductDetail(): JSX.Element {
                             }`}
                         >
               {stock > 0
-                ? t('marketplace.detail.unitsInStock', { count: stock })
-                : t('marketplace.detail.outOfStock')}
+                  ? t('marketplace.detail.unitsInStock', { count: stock })
+                  : t('marketplace.detail.outOfStock')}
             </span>
                     </div>
                     <p className="text-sm font-semibold text-navy-700">
@@ -237,14 +237,14 @@ export default function ProductDetail(): JSX.Element {
                             >
                                 <ShoppingCart className="h-5 w-5" />
                                 {added
-                                  ? t('marketplace.detail.addedToCart')
-                                  : isOutOfStock
-                                    ? t('marketplace.detail.outOfStockTitle')
-                                    : isBelowMinimumStock
-                                      ? t('marketplace.card.unavailable')
-                                    : isAuthenticated
-                                      ? t('marketplace.card.addToCart')
-                                      : t('marketplace.card.signInToAdd')}
+                                    ? t('marketplace.detail.addedToCart')
+                                    : isOutOfStock
+                                        ? t('marketplace.detail.outOfStockTitle')
+                                        : isBelowMinimumStock
+                                            ? t('marketplace.card.unavailable')
+                                            : isAuthenticated
+                                                ? t('marketplace.card.addToCart')
+                                                : t('marketplace.card.signInToAdd')}
                             </button>
                         </div>
                     )}
