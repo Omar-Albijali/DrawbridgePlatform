@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Heart, ShoppingCart, Star } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserRole, type Product } from '../../types';
-import {formatCurrency} from "../../i18n/display.ts";
+import { formatCurrency } from '../../i18n/display';
 
 interface ProductCardProps {
   product: Product;
@@ -19,12 +21,22 @@ export default function ProductCard({
   canAddToCart = true,
   onAuthRequired,
 }: ProductCardProps): JSX.Element {
+  const { t } = useTranslation();
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isRetailer = user?.role === UserRole.RETAILER;
   const [added, setAdded] = useState(false);
   const inWishlist = isInWishlist(product.id);
+  const minimumOrderQuantity = Math.max(1, product.minimumOrderQuantity ?? 1);
+  const stock = product.stock ?? 0;
+  const isBelowMinimumStock = stock < minimumOrderQuantity;
+
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>): void => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    navigate(`/marketplace/product/${product.id}`);
+  };
 
   const handleAddToCart = (): void => {
     if (!canAddToCart) return;
@@ -32,7 +44,8 @@ export default function ProductCard({
       onAuthRequired?.('/marketplace');
       return;
     }
-    void addToCart(product, 1);
+    if (isBelowMinimumStock) return;
+    void addToCart(product, minimumOrderQuantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 1000);
   };
@@ -49,7 +62,10 @@ export default function ProductCard({
   const discount = product.discountPercentage ?? 0;
 
   return (
-    <div className="buyer-product-card bg-white rounded-xl shadow-card overflow-hidden group hover:shadow-card-hover transition-all duration-300 relative">
+    <div
+      onClick={handleCardClick}
+      className="buyer-product-card bg-white rounded-xl shadow-card overflow-hidden group hover:shadow-card-hover transition-all duration-300 relative cursor-pointer"
+    >
       <div className="buyer-product-card__media relative aspect-[4/3] overflow-hidden bg-gray-100">
         <img
           src={product.image}
@@ -57,13 +73,13 @@ export default function ProductCard({
           className="buyer-product-card__image w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
         {discount > 0 && (
-            <span className="buyer-product-card__badge absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-              -{discount}%
-            </span>
+          <span className="buyer-product-card__badge absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+            -{discount}%
+          </span>
         )}
         {(product.stock ?? 0) < 20 && (
           <span className="buyer-product-card__badge absolute top-3 right-3 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-            Low Stock
+            {t('marketplace.card.lowStock')}
           </span>
         )}
       </div>
@@ -73,10 +89,10 @@ export default function ProductCard({
           type="button"
           onClick={handleToggleWishlist}
           className={`absolute top-3 right-3 z-20 pointer-events-auto w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${            inWishlist
-              ? 'bg-red-500 text-white scale-110'
-              : 'bg-white text-navy-400 hover:text-red-500 hover:scale-110'
+            ? 'bg-red-500 text-white scale-110'
+            : 'bg-white text-navy-400 hover:text-red-500 hover:scale-110'
           }`}
-          title={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+          title={inWishlist ? t('marketplace.card.removeWishlist') : t('marketplace.card.addWishlist')}
         >
           <Heart className={`w-4 h-4 transition-all duration-200 ${inWishlist ? 'fill-white' : ''}`} />
         </button>
@@ -103,32 +119,38 @@ export default function ProductCard({
             {formatCurrency(discountedPrice ?? product.price)}
           </span>
           {discountedPrice != null && (
-              <span className="text-sm text-navy-400 line-through">{formatCurrency(product.price)}</span>
+            <span className="text-sm text-navy-400 line-through">{formatCurrency(product.price)}</span>
           )}
         </div>
 
-        <p className="text-xs text-navy-500 mb-4">Supplied by: {product.supplier}</p>
+
 
         {canAddToCart ? (
           <button
             type="button"
             onClick={handleAddToCart}
-            disabled={added}
+            disabled={added || (isAuthenticated && isBelowMinimumStock)}
             className={`buyer-product-card__cta w-full flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold transition-all duration-300 ${
               added
                 ? 'cursor-default bg-green-500 text-white'
-                : 'bg-primary-600 text-white hover:bg-primary-500 hover:shadow-md active:bg-primary-700'
+                : isAuthenticated && isBelowMinimumStock
+                  ? 'cursor-not-allowed bg-gray-200 text-gray-500'
+                  : 'bg-primary-600 text-white hover:bg-primary-500 hover:shadow-md active:bg-primary-700'
             }`}
           >
             {added ? (
               <>
                 <ShoppingCart className="w-4 h-4 fill-white" />
-                Added!
+                {t('marketplace.card.added')}
               </>
             ) : (
               <>
                 <ShoppingCart className="w-4 h-4" />
-                {isAuthenticated ? 'Add to Cart' : 'Sign in to add'}
+                {isAuthenticated
+                  ? isBelowMinimumStock
+                    ? t('marketplace.card.unavailable')
+                    : t('marketplace.card.addToCart')
+                  : t('marketplace.card.signInToAdd')}
               </>
             )}
           </button>
