@@ -22,12 +22,11 @@ export default function LandingNavbar(): JSX.Element {
           className="hover-target inline-flex items-center gap-3 text-slate-900 transition hover:text-primary-600 dark:text-white"
           onClick={scrollToTop}
         >
-            <img
-                src={dark ? darkLogo : lightLogo}
-                alt="Drawbridge"
-                style={{ width: "100px", height: "auto" }}
-            />
-
+          <img
+            src={dark ? darkLogo : lightLogo}
+            alt="Drawbridge"
+            className="h-10 w-10 shrink-0 object-contain"
+          />
           <span className="text-2xl font-black tracking-tight">Drawbridge</span>
         </button>
 
