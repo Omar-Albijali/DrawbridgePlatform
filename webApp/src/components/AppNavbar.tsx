@@ -174,16 +174,11 @@ export default function AppNavbar(): JSX.Element {
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
         <div className="flex items-center gap-5 lg:gap-7">
           <Link to={brandPath} className="group inline-flex items-center gap-3 text-slate-900 dark:text-white">
-            <Link
-                to={brandPath}
-                className="group inline-flex items-center gap-3 text-slate-900 dark:text-white"
-            >
-              <img
-                  src={dark ? darkLogo : lightLogo}
-                  alt="Drawbridge"
-                  style={{ width: "100px", height: "auto" }}
-              />
-            </Link>
+            <img
+              src={dark ? darkLogo : lightLogo}
+              alt="Drawbridge"
+              className="h-10 w-10 shrink-0 object-contain"
+            />
             <span className="text-xl font-black tracking-tight group-hover:text-primary-600 dark:group-hover:text-primary-300">
               Drawbridge
             </span>
