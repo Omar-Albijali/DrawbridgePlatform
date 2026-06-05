@@ -1,5 +1,8 @@
 package uqu.drawbridge.platform.service
 
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.core.task.TaskExecutor
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -26,8 +29,10 @@ class UserService(
     private val jwtService: JwtService,
     private val emailService: EmailService,
     private val passwordResetTokenRepository: PasswordResetTokenRepository,
-    private val emailVerificationTokenRepository: EmailVerificationTokenRepository
+    private val emailVerificationTokenRepository: EmailVerificationTokenRepository,
+    @Qualifier("notificationTaskExecutor") private val notificationTaskExecutor: TaskExecutor
 ) {
+    private val log = LoggerFactory.getLogger(UserService::class.java)
 
     private fun normalizeEmail(email: String): String = email.trim().lowercase()
 
@@ -183,11 +188,16 @@ class UserService(
         )
         passwordResetTokenRepository.save(token)
 
-        emailService.sendPasswordResetEmail(
-            toEmail = user.email,
-            recipientName = user.representative.name,
-            resetToken = token.token
-        )
+        val toEmail = user.email
+        val recipientName = user.representative.name
+        val resetToken = token.token
+        enqueueEmail("password reset", toEmail) {
+            emailService.sendPasswordResetEmail(
+                toEmail = toEmail,
+                recipientName = recipientName,
+                resetToken = resetToken
+            )
+        }
     }
 
     @Transactional
@@ -260,11 +270,28 @@ class UserService(
         )
         emailVerificationTokenRepository.save(token)
 
-        emailService.sendEmailVerificationEmail(
-            toEmail = user.email,
-            recipientName = user.representative.name,
-            verificationToken = token.token
-        )
+        val toEmail = user.email
+        val recipientName = user.representative.name
+        val verificationToken = token.token
+        enqueueEmail("email verification", toEmail) {
+            emailService.sendEmailVerificationEmail(
+                toEmail = toEmail,
+                recipientName = recipientName,
+                verificationToken = verificationToken
+            )
+        }
+    }
+
+    private fun enqueueEmail(purpose: String, toEmail: String, send: () -> Unit) {
+        runCatching {
+            notificationTaskExecutor.execute {
+                runCatching(send).onFailure { ex ->
+                    log.warn("{} email task failed for {}", purpose, toEmail, ex)
+                }
+            }
+        }.onFailure { ex ->
+            log.warn("Skipped {} email for {} because the email executor rejected it.", purpose, toEmail, ex)
+        }
     }
 
     private fun User.toDto(): uqu.drawbridge.platform.UserDTO {

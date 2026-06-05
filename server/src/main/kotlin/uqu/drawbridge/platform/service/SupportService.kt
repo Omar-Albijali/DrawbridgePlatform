@@ -3,6 +3,8 @@ package uqu.drawbridge.platform.service
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.core.task.TaskExecutor
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
@@ -22,7 +24,8 @@ class SupportService(
     private val supportTicketRepository: SupportTicketRepository,
     private val fileStorageService: FileStorageService,
     private val notificationService: NotificationService,
-    private val emailService: EmailService
+    private val emailService: EmailService,
+    @Qualifier("notificationTaskExecutor") private val notificationTaskExecutor: TaskExecutor
 ) {
     private val log = LoggerFactory.getLogger(SupportService::class.java)
     private val dateFormatter = DateTimeFormatter.BASIC_ISO_DATE
@@ -77,19 +80,33 @@ class SupportService(
             log.warn("Failed to create in-app notification for support ticket {}", saved.ticketNumber, ex)
         }
 
+        val ticketNumber = saved.ticketNumber
+        val ticketSubject = saved.subject
+        val ticketCategory = saved.category.name
+        val ticketDescription = saved.description
+        val submitterEmail = user.email
+        val submitterId = user.id!!
+        val ticketAttachmentUrl = saved.attachmentUrl
+
         runCatching {
-            emailService.sendSupportTicketEmail(
-                toEmail = supportEmailRecipient,
-                ticketNumber = saved.ticketNumber,
-                subject = saved.subject,
-                category = saved.category.name,
-                description = saved.description,
-                userEmail = user.email,
-                userId = user.id!!,
-                attachmentUrl = saved.attachmentUrl
-            )
+            notificationTaskExecutor.execute {
+                runCatching {
+                    emailService.sendSupportTicketEmail(
+                        toEmail = supportEmailRecipient,
+                        ticketNumber = ticketNumber,
+                        subject = ticketSubject,
+                        category = ticketCategory,
+                        description = ticketDescription,
+                        userEmail = submitterEmail,
+                        userId = submitterId,
+                        attachmentUrl = ticketAttachmentUrl
+                    )
+                }.onFailure { ex ->
+                    log.warn("Support email delivery failed for ticket {}", ticketNumber, ex)
+                }
+            }
         }.onFailure { ex ->
-            log.warn("Support email delivery failed for ticket {}", saved.ticketNumber, ex)
+            log.warn("Skipped support email for ticket {} because the email executor rejected it.", ticketNumber, ex)
         }
 
         return saved.toDTO()
