@@ -154,13 +154,7 @@ class DataSeeder(
                     product = p1
                 )
             )
-            p1.images.add(
-                ProductImage(
-                    url = "https://images.unsplash.com/photo-1580915411954-282cb1b0d780?w=800&q=80",
-                    altText = "Coffee roasting process",
-                    product = p1
-                )
-            )
+
             val savedP1 = productRepository.save(p1)
 
             val p2 = Product(
@@ -183,27 +177,6 @@ class DataSeeder(
                 )
             )
             val savedP2 = productRepository.save(p2)
-
-            val p3 = Product(
-                name = "Espresso Roast Blend 5kg",
-                description = "Our signature dark roast blend optimized for espresso extraction",
-                price = BigDecimal("289.00"),
-                stockQuantity = 50,
-                gtin = "628100003",
-                wholesaler = wholesaler,
-                category = catFood,
-                published = true,
-                averageRating = BigDecimal("4.9"),
-                ratingCount = 89
-            )
-            p3.images.add(
-                ProductImage(
-                    url = "https://images.unsplash.com/photo-1552611052-33e04de081de?w=800&q=80",
-                    altText = "Espresso Roast Bulk Bag",
-                    product = p3
-                )
-            )
-            val savedP3 = productRepository.save(p3)
 
             // Seed some ratings
             productRatingRepository.save(
