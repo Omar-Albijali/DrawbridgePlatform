@@ -75,7 +75,16 @@ class Product(
     var averageRating: BigDecimal = BigDecimal.ZERO,
 
     @Column(nullable = false)
-    var ratingCount: Int = 0
+    var ratingCount: Int = 0,
+    @Column(nullable = true)
+    var discountPercentage: Int? = null,
+
+    @Column(nullable = true)
+    var discountStartDate: java.time.LocalDate? = null,
+
+    @Column(nullable = true)
+    var discountEndDate: java.time.LocalDate? = null
+
 ) {
     val categoryId: String
         get() = category.id ?: ""

@@ -393,7 +393,7 @@ private fun CartItemCard(
                         }
                     }
                     Text(
-                        text = "${formatMoney(product?.price ?: 0.0)} / unit",
+                        text = "${formatMoney(product?.effectivePrice ?: 0.0)} / unit",
                         style = MaterialTheme.typography.bodyMedium,
                         color = CommerceText,
                         fontWeight = FontWeight.SemiBold,

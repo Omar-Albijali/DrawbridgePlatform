@@ -109,6 +109,17 @@ export const productService = {
         method: 'PATCH'
     }),
 
+    applyDiscount: (productId: string, request: { discountPercentage: number; startDate: string; endDate: string }) =>
+        fetchApi<Product>(`/products/${productId}/discount`, {
+            method: 'PATCH',
+            body: JSON.stringify(request)
+        }),
+
+    removeDiscount: (productId: string) =>
+        fetchApi<Product>(`/products/${productId}/discount`, {
+            method: 'DELETE'
+        }),
+
     // Categories
     getCategories: () => fetchApi<Category[]>('/products/categories'),
 

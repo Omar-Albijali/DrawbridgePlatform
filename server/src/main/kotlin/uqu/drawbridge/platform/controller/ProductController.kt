@@ -137,6 +137,29 @@ class ProductController(
         }
     }
 
+    @PatchMapping("/{id}/discount")
+    fun applyDiscount(
+        authentication: Authentication,
+        @PathVariable id: String,
+        @RequestBody request: uqu.drawbridge.platform.ApplyDiscountRequest
+    ): ResponseEntity<ProductDTO> {
+        val existing = productService.getProductById(id) ?: return ResponseEntity.notFound().build()
+        requireProductOwner(authentication, existing)
+        val updated = productService.applyDiscount(id, request)
+        return if (updated != null) ResponseEntity.ok(updated) else ResponseEntity.notFound().build()
+    }
+
+    @DeleteMapping("/{id}/discount")
+    fun removeDiscount(
+        authentication: Authentication,
+        @PathVariable id: String
+    ): ResponseEntity<ProductDTO> {
+        val existing = productService.getProductById(id) ?: return ResponseEntity.notFound().build()
+        requireProductOwner(authentication, existing)
+        val updated = productService.removeDiscount(id)
+        return if (updated != null) ResponseEntity.ok(updated) else ResponseEntity.notFound().build()
+    }
+
     // ==================== CATEGORIES ====================
 
     @GetMapping("/categories")

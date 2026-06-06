@@ -63,7 +63,8 @@ import {
     PosIntegrationConfigUpdateRequest,
     PosIntegrationApiKeyRotateResponse,
     PosIntegrationEventLogDTO,
-    MostOrderedProductDTO
+    MostOrderedProductDTO,
+    ApplyDiscountRequest
 } from 'shared';
 
 export {
@@ -127,7 +128,8 @@ export {
     PosIntegrationConfigUpdateRequest,
     PosIntegrationApiKeyRotateResponse,
     PosIntegrationEventLogDTO,
-    MostOrderedProductDTO
+    MostOrderedProductDTO,
+    ApplyDiscountRequest
 };
 
 export type User = UserDTO;

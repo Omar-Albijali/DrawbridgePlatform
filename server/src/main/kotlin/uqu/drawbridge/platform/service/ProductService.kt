@@ -150,6 +150,32 @@ class ProductService(
         return productRepository.save(product).toDTO()
     }
 
+    @Transactional
+    fun applyDiscount(productId: String, request: ApplyDiscountRequest): ProductDTO? {
+        val validPercentages = (5..100 step 5).toList() + listOf(109)
+        require(request.discountPercentage in validPercentages) {
+            "Invalid discount percentage. Must be one of: $validPercentages"
+        }
+        val start = java.time.LocalDate.parse(request.startDate)
+        val end = java.time.LocalDate.parse(request.endDate)
+        require(!end.isBefore(start)) { "endDate must not be before startDate" }
+
+        val product = productRepository.findById(productId).orElse(null) ?: return null
+        product.discountPercentage = request.discountPercentage
+        product.discountStartDate = start
+        product.discountEndDate = end
+        return productRepository.save(product).toDTO()
+    }
+
+    @Transactional
+    fun removeDiscount(productId: String): ProductDTO? {
+        val product = productRepository.findById(productId).orElse(null) ?: return null
+        product.discountPercentage = null
+        product.discountStartDate = null
+        product.discountEndDate = null
+        return productRepository.save(product).toDTO()
+    }
+
     // ==================== CATEGORY OPERATIONS ====================
 
     fun getAllCategories(): List<Category> = categoryRepository.findAll()
@@ -194,6 +220,17 @@ class ProductService(
     ): ProductDTO {
         val sortedImages = product.images.sortedBy { it.sortIndex }
 
+        val now = java.time.LocalDate.now()
+        val isDiscountActive = product.discountPercentage != null &&
+                product.discountStartDate != null &&
+                product.discountEndDate != null &&
+                !now.isBefore(product.discountStartDate) &&
+                !now.isAfter(product.discountEndDate)
+
+        val discountedPrice = if (isDiscountActive)
+            product.price.toDouble() * (1.0 - product.discountPercentage!! / 100.0)
+        else null
+
         return ProductDTO(
             id = (product.id ?: ""),
             name = product.name,
@@ -209,7 +246,11 @@ class ProductService(
             reviews = product.ratingCount,
             supplier = product.wholesaler.businessName,
             published = product.published,
-            gtin = product.gtin
+            gtin = product.gtin,
+            discountPercentage = product.discountPercentage,
+            discountStartDate = product.discountStartDate?.toString(),
+            discountEndDate = product.discountEndDate?.toString(),
+            discountedPrice = discountedPrice
         )
     }
 

@@ -24,8 +24,15 @@ data class ProductDTO(
     val rating: Double,
     val reviews: Int,
     val supplier: String,
-    val published: Boolean
-)
+    val published: Boolean,
+    val discountPercentage: Int? = null,
+    val discountStartDate: String? = null,
+    val discountEndDate: String? = null,
+    val discountedPrice: Double? = null
+) {
+    val effectivePrice: Double
+        get() = discountedPrice ?: price
+}
 
 @JsExport
 @Serializable
@@ -91,4 +98,11 @@ data class MarketplaceProductQuery(
     val minPrice: Double? = null,
     val maxPrice: Double? = null,
     val sort: String = "featured",
+)
+@JsExport
+@Serializable
+data class ApplyDiscountRequest(
+    val discountPercentage: Int,
+    val startDate: String,
+    val endDate: String
 )

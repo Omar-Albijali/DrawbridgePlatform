@@ -1040,8 +1040,16 @@ private fun MarketplaceProductCard(
                             fontWeight = FontWeight.Black,
                             maxLines = 1,
                         )
+                        if (product.discountedPrice != null) {
+                            Text(
+                                text = formatMoneyAmount(product.price),
+                                style = MaterialTheme.typography.labelSmall.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough),
+                                color = MarketMuted,
+                                maxLines = 1,
+                            )
+                        }
                         Text(
-                            text = formatMoneyAmount(product.price),
+                            text = formatMoneyAmount(product.effectivePrice),
                             style = MaterialTheme.typography.titleLarge,
                             color = MarketText,
                             fontWeight = FontWeight.Black,
@@ -1443,8 +1451,17 @@ private fun ProductDetailContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (product.discountedPrice != null) {
+                        Text(
+                            text = formatPrice(product.price),
+                            style = MaterialTheme.typography.titleSmall.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough),
+                            color = MarketMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     Text(
-                        text = formatPrice(product.price),
+                        text = formatPrice(product.effectivePrice),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Black,
@@ -1666,7 +1683,7 @@ internal fun WishlistMainScreen(
             .let { items ->
                 when (sortMode) {
                     WishlistSortMode.Saved -> items
-                    WishlistSortMode.Price -> items.sortedByDescending { it.product?.price ?: it.wishlistItem.productPrice }
+                    WishlistSortMode.Price -> items.sortedByDescending { it.product?.effectivePrice ?: it.wishlistItem.productPrice }
                     WishlistSortMode.Rating -> items.sortedByDescending { it.product?.rating ?: 0.0 }
                 }
             }
@@ -1901,7 +1918,7 @@ private fun WishlistStatsRow(items: List<WishlistProductItem>) {
         val product = item.product
         product != null && product.stock >= product.minimumOrderQuantity.coerceAtLeast(1)
     }
-    val estimated = items.sumOf { item -> item.product?.price ?: item.wishlistItem.productPrice }
+    val estimated = items.sumOf { item -> item.product?.effectivePrice ?: item.wishlistItem.productPrice }
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         WishlistMetricCard(icon = Icons.Default.Favorite, value = saved.toString(), label = "Saved", tint = Color(0xFFFF5A8A), modifier = Modifier.weight(1f))
         WishlistMetricCard(icon = Icons.Default.CheckCircle, value = inStock.toString(), label = "In stock", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
@@ -1947,7 +1964,7 @@ private fun WishlistProductCard(
     val product = item.product
     val title = product?.name ?: item.wishlistItem.productName.ifBlank { "Product unavailable" }
     val supplier = product?.supplier?.ifBlank { product.brand } ?: "Marketplace product"
-    val price = product?.price ?: item.wishlistItem.productPrice
+    val price = product?.effectivePrice ?: item.wishlistItem.productPrice
     val moq = product?.minimumOrderQuantity?.coerceAtLeast(1) ?: 1
     val canAdd = product != null && product.stock >= moq && !isCartBusy
     val category = product?.category?.ifBlank { "Product" } ?: "Unavailable"

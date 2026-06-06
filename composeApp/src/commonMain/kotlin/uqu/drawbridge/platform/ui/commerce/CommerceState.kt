@@ -30,7 +30,7 @@ internal data class CartProductItem(
     val quantity: Int = cartItem.quantity
     val minimumOrderQuantity: Int = product?.minimumOrderQuantity?.coerceAtLeast(1) ?: 1
     val availableStock: Int? = product?.stock
-    val lineTotal: Double = (product?.price ?: 0.0) * quantity
+    val lineTotal: Double = (product?.effectivePrice ?: 0.0) * quantity
     val hasMissingProduct: Boolean = product == null
     val isBelowMinimumOrder: Boolean = quantity < minimumOrderQuantity
     val isAboveStock: Boolean = availableStock?.let { quantity > it } ?: false
