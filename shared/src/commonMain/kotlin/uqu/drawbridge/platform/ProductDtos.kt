@@ -29,7 +29,10 @@ data class ProductDTO(
     val discountStartDate: String? = null,
     val discountEndDate: String? = null,
     val discountedPrice: Double? = null
-)
+) {
+    val effectivePrice: Double
+        get() = discountedPrice ?: price
+}
 
 @JsExport
 @Serializable
